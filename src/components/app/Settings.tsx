@@ -77,6 +77,7 @@ import {
   rememberedAccounts,
 } from "@/lib/accounts";
 import { toast } from "sonner";
+import { DeveloperAssets } from "./DeveloperTools";
 
 type ProfileLink = { label: string; url: string };
 
@@ -86,7 +87,8 @@ type TabId =
   | "appearance"
   | "privacy"
   | "security"
-  | "data";
+  | "data"
+  | "files";
 
 const TABS: { id: TabId; label: string; icon: typeof UserIcon }[] = [
   { id: "account", label: "My Account", icon: UserIcon },
@@ -95,6 +97,7 @@ const TABS: { id: TabId; label: string; icon: typeof UserIcon }[] = [
   { id: "privacy", label: "Privacy & safety", icon: ShieldCheck },
   { id: "security", label: "Sessions", icon: ShieldCheck },
   { id: "data", label: "Data", icon: Download },
+  { id: "files", label: "My Files", icon: Download },
 ];
 
 /** Mirrors USERNAME_COOLDOWN_MS in src/convex/users.ts — shown as a hint. */
@@ -183,6 +186,7 @@ export function SettingsDialog({
             {tab === "privacy" && <PrivacyTab />}
             {tab === "security" && <SessionsTab />}
             {tab === "data" && <DataTab />}
+            {tab === "files" && <DeveloperAssets />}
           </div>
         </div>
         <AdBanner />

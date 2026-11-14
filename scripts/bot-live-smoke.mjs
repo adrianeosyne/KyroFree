@@ -41,6 +41,7 @@ if (process.argv.includes("--configure-auth")) {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
   });
+  setLocalEnv("KYRO_FILE_SIGNING_SECRET", randomBytes(32).toString("hex"));
   setLocalEnv(
     "JWT_PRIVATE_KEY",
     privateKey.export({ format: "pem", type: "pkcs8" }).toString(),

@@ -1,87 +1,133 @@
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
-
+import { ACCEPTED_FILES, allowedFilename } from "./filePolicy";
 export { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 export const MAX_ATTACHMENTS = 6;
-export const ACCEPTED_UPLOAD =
-  "image/*,video/*,audio/*,application/pdf,text/plain,text/markdown,application/json,.zip,.csv";
-
+export const ACCEPTED_UPLOAD = ACCEPTED_FILES;
 export interface PendingAttachment {
   storageId: Id<"_storage">;
   name: string;
   size: number;
   mimeType: string;
 }
+export interface UploadOptions {
+  signal?: AbortSignal;
+  onProgress?: (progress: number) => void;
+}
 
-/**
- * The current backend exposes `files:registerUpload`, so ownership tracking is
- * enabled by default. The explicit `false` escape hatch keeps an older backend
- * usable during an emergency rollback without reintroducing the original
- * missing-function error for normal deployments.
- */
-const uploadRegistrationEnabled =
-  import.meta.env.VITE_CONVEX_UPLOAD_REGISTRATION !== "false";
-
-/**
- * Files go straight to object storage through a short-lived signed URL, so
- * the browser never streams file contents through the database.
- */
-export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const registerUpload = useMutation(api.files.registerUpload);
-
+function directUpload(
+  url: string,
+  file: File,
+  options: UploadOptions,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const abort = () => xhr.abort();
+    const finish = () => options.signal?.removeEventListener("abort", abort);
+    xhr.open("POST", url);
+    xhr.setRequestHeader(
+      "Content-Type",
+      file.type || "application/octet-stream",
+    );
+    xhr.timeout = 120000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable)
+        options.onProgress?.(Math.round((e.loaded / e.total) * 85));
+    };
+    xhr.onerror = () => {
+      finish();
+      reject(new Error("Upload failed. Check your connection and retry."));
+    };
+    xhr.ontimeout = () => {
+      finish();
+      reject(
+        new Error("Upload timed out. Retry when your connection improves."),
+      );
+    };
+    xhr.onabort = () => {
+      finish();
+      reject(new DOMException("Upload cancelled", "AbortError"));
+    };
+    xhr.onload = () => {
+      finish();
+      try {
+        if (xhr.status < 200 || xhr.status >= 300)
+          throw new Error(`Upload failed (${xhr.status}).`);
+        resolve(JSON.parse(xhr.responseText).storageId);
+      } catch (cause) {
+        reject(cause);
+      }
+    };
+    options.signal?.addEventListener("abort", abort, { once: true });
+    if (options.signal?.aborted) {
+      finish();
+      reject(new DOMException("Upload cancelled", "AbortError"));
+      return;
+    }
+    xhr.send(file);
+  });
+}
+export function useUploadFile(
+  options: {
+    requireRegistration?: boolean;
+    applicationId?: Id<"botApplications">;
+  } = {},
+) {
+  const reserve = useMutation(api.files.generateUploadUrl),
+    register = useMutation(api.files.registerUpload),
+    verify = useAction(api.files.verifyUpload),
+    cancel = useMutation(api.files.cancel);
   return useCallback(
-    async (file: File): Promise<PendingAttachment> => {
-      if (file.size > MAX_UPLOAD_BYTES) {
+    async (
+      file: File,
+      transfer: UploadOptions = {},
+    ): Promise<PendingAttachment> => {
+      if (!file.size || file.size > MAX_UPLOAD_BYTES)
+        throw new Error(`"${file.name}" must be between 1 byte and 10 MiB.`);
+      if (!allowedFilename(file.name))
         throw new Error(
-          `"${file.name}" is larger than the 10 MB upload limit.`,
+          "This file format is not supported. Choose an image, media file, document or ZIP archive.",
         );
-      }
-      const uploadUrl = await generateUploadUrl();
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file,
-      });
-      if (!response.ok) {
-        throw new Error(`Upload failed (${response.status}). Try again.`);
-      }
-      const { storageId } = (await response.json()) as { storageId: string };
-      const attachment: PendingAttachment = {
-        storageId: storageId as Id<"_storage">,
+      const bytes = await file.arrayBuffer();
+      const sha256 = Array.from(
+        new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+        (b) => b.toString(16).padStart(2, "0"),
+      ).join("");
+      transfer.signal?.throwIfAborted();
+      const ticket = await reserve({
         name: file.name,
         size: file.size,
-        mimeType: file.type || "application/octet-stream",
-      };
-
-      // The signed upload has already completed. Legacy Kyro mutations accept
-      // this storage id directly, so never call a function that production is
-      // known not to expose.
-      if (!uploadRegistrationEnabled && !options.requireRegistration) {
-        return attachment;
-      }
-
+        sha256,
+        ...(options.applicationId
+          ? { applicationId: options.applicationId }
+          : {}),
+      });
       try {
-        return await registerUpload({
-          storageId: attachment.storageId,
+        transfer.signal?.throwIfAborted();
+        const storageId = (await directUpload(
+          ticket.uploadUrl,
+          file,
+          transfer,
+        )) as Id<"_storage">;
+        transfer.signal?.throwIfAborted();
+        transfer.onProgress?.(90);
+        await register({
+          storageId,
           name: file.name,
+          uploadId: ticket.uploadId,
         });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        const backendPredatesRegistration =
-          message.includes("Could not find public function") &&
-          message.toLowerCase().includes("registerupload");
-        if (!backendPredatesRegistration) throw error;
-
-        // The object is already in Convex storage. Older deployments predate
-        // upload ownership tracking, so they accept the storage id directly —
-        // return the local metadata instead of failing the whole upload.
-        return attachment;
+        const result = await verify({ uploadId: ticket.uploadId });
+        transfer.signal?.throwIfAborted();
+        transfer.onProgress?.(100);
+        return result;
+      } catch (cause) {
+        await cancel({ uploadId: ticket.uploadId }).catch(() => undefined);
+        throw cause;
       }
     },
-    [generateUploadUrl, options.requireRegistration, registerUpload],
+    [reserve, register, verify, cancel, options.applicationId],
   );
 }

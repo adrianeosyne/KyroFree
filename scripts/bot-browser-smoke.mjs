@@ -1,4 +1,4 @@
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import assert from "node:assert/strict";
 import { readFileSync, mkdirSync } from "node:fs";
 import { randomBytes } from "node:crypto";
@@ -48,6 +48,7 @@ try {
   assert.match(token, /^kyro_bot_[a-f0-9]{64}$/);
   await owner.getByRole("button", { name: "I've saved it" }).click();
   await owner.waitForURL(/\/developers\/[^/]+$/);
+  const createdApplicationId = new URL(owner.url()).pathname.split("/").pop();
   await owner
     .getByRole("button", { name: "Slash Commands", exact: true })
     .click();
@@ -59,6 +60,20 @@ try {
     .getByRole("button", { name: "Save command", exact: true })
     .click();
   await owner.getByText("Browser ping command", { exact: false }).waitFor();
+  await owner.getByRole("button", { name: "Permissions", exact: true }).click();
+  await owner.getByRole("checkbox", { name: /Upload attachments/ }).check();
+  await owner
+    .getByRole("button", { name: "Save default permissions", exact: true })
+    .click();
+  await owner.getByText("Application saved", { exact: true }).waitFor();
+  await owner
+    .getByRole("button", { name: "Webhooks & Events", exact: true })
+    .click();
+  await owner.getByLabel("message.created", { exact: true }).check();
+  await owner
+    .getByRole("button", { name: "Save event settings", exact: true })
+    .click();
+  await owner.getByText("Event delivery saved", { exact: true }).waitFor();
   await owner
     .getByRole("button", { name: "Installation", exact: true })
     .click();
@@ -69,13 +84,22 @@ try {
   await owner
     .getByRole("button", { name: "Authorize bot", exact: true })
     .click();
+  await owner.getByText(/was installed successfully/).waitFor();
+  await owner.getByRole("button", { name: "Open server", exact: true }).click();
   await owner.waitForURL(/\/dashboard\/s\//);
   bot = new KyroClient({ token, baseUrl: `${credentials.site}/api/bots/v1` });
   bot.on("interactionCreate", (interaction) =>
     interaction
-      .reply("Browser private pong", { ephemeral: true })
+      .reply(`Browser private pong ${name}`, { ephemeral: true })
       .then(() => undefined),
   );
+  bot.on("message.created", async (message) => {
+    if (!message.author.bot && message.content === `hello ${name}`)
+      await message.reply({
+        content: `Hello from ${name}`,
+        nonce: `hello:${message.id}`,
+      });
+  });
   await bot.login();
   await owner.goto(
     `http://127.0.0.1:5173/dashboard/developers/${credentials.applicationId}`,
@@ -115,24 +139,209 @@ try {
   await member
     .locator("textarea")
     .fill(`/${name.toLowerCase().replace(" ", "_")}:ping`);
+  await member
+    .getByRole("button")
+    .filter({ hasText: `/${name.toLowerCase().replace(" ", "_")}:ping` })
+    .waitFor();
   await member.locator("textarea").press("Enter");
   await member
     .getByRole("button", { name: "Run command", exact: true })
     .click();
-  await member.getByText("Browser private pong", { exact: true }).waitFor();
+  await member
+    .getByText(`Browser private pong ${name}`, { exact: true })
+    .waitFor();
   await owner.goto(
     `http://127.0.0.1:5173/dashboard/s/${credentials.serverId}/c/${credentials.channelId}`,
   );
   await owner.locator("textarea").waitFor();
   assert.equal(
-    await owner.getByText("Browser private pong", { exact: true }).count(),
+    await owner
+      .getByText(`Browser private pong ${name}`, { exact: true })
+      .count(),
     0,
   );
+  await member.getByLabel("Message", { exact: true }).fill(`hello ${name}`);
+  await member
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await member.getByText(`Hello from ${name}`, { exact: true }).waitFor();
+  await bot.sendMessage(credentials.channelId, {
+    content: "Browser SDK file",
+    files: [
+      {
+        data: new Blob(["SDK report"], { type: "text/plain" }),
+        name: "sdk-browser-report.txt",
+      },
+    ],
+  });
+  await member
+    .getByText("sdk-browser-report.txt", { exact: true })
+    .last()
+    .waitFor();
+  const uploadInput = member.getByLabel("Attach files", { exact: true });
+  const selectFiles = async (files) => {
+    await expect(uploadInput).toBeEnabled();
+    await uploadInput.setInputFiles(files);
+  };
+  await selectFiles([
+    {
+      name: "browser-one.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("First report"),
+    },
+    {
+      name: "browser-two.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("name,count\nKyro,2"),
+    },
+  ]);
+  const pending = member.getByLabel("Pending attachments", { exact: true });
+  await pending.getByText(/Ready/).nth(1).waitFor();
+  await member
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await pending.waitFor({ state: "detached" });
+  await member.getByText("browser-two.csv", { exact: true }).last().waitFor();
+  await member
+    .getByRole("button", { name: "Preview browser-two.csv", exact: true })
+    .last()
+    .click();
+  await expect(
+    member.getByLabel("Contents of browser-two.csv").last(),
+  ).toContainText("Kyro,2");
+  // Actual browser drag/drop and clipboard events exercise the shared upload queue.
+  await member.getByLabel("Message", { exact: true }).evaluate((element) => {
+    const data = new DataTransfer();
+    data.items.add(
+      new File(["Dropped report"], "dropped.txt", { type: "text/plain" }),
+    );
+    element.dispatchEvent(
+      new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: data,
+      }),
+    );
+  });
+  await pending.getByText(/Ready/).waitFor();
+  await member.getByLabel("Message", { exact: true }).evaluate((element) => {
+    const data = new DataTransfer();
+    const bytes = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg==",
+      ),
+      (c) => c.charCodeAt(0),
+    );
+    data.items.add(new File([bytes], "clipboard.png", { type: "image/png" }));
+    element.dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: data,
+      }),
+    );
+  });
+  await pending.getByText(/Ready/).nth(1).waitFor();
+  await member
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await member
+    .getByRole("img", { name: "clipboard.png", exact: true })
+    .last()
+    .waitFor();
+  await selectFiles({
+    name: "blocked.exe",
+    mimeType: "application/octet-stream",
+    buffer: Buffer.from("MZblocked"),
+  });
+  await pending.getByRole("alert").waitFor();
+  await member
+    .getByRole("button", { name: "Remove blocked.exe", exact: true })
+    .click();
+  const uploadPattern = /\/api\/storage\/upload/;
+  await member.context().route(uploadPattern, (route) => route.abort());
+  await selectFiles({
+    name: "retry.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Retry report"),
+  });
+  await pending.getByRole("alert").waitFor();
+  await member.context().unroute(uploadPattern);
+  await member
+    .getByRole("button", { name: "Retry retry.txt", exact: true })
+    .click();
+  await pending.getByText(/Ready/).waitFor();
+  await member
+    .getByRole("button", { name: "Remove retry.txt", exact: true })
+    .click();
+  await member.context().route(uploadPattern, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await route.abort().catch(() => undefined);
+  });
+  await selectFiles({
+    name: "cancel.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("Cancel this upload"),
+  });
+  await member
+    .getByRole("button", { name: "Cancel cancel.txt", exact: true })
+    .click();
+  await pending.waitFor({ state: "detached" });
+  await member.context().unroute(uploadPattern);
+  // The source is sent and rendered from persisted message content.
+  await member
+    .getByRole("button", { name: "Create Mermaid diagram", exact: true })
+    .click();
+  await member
+    .getByRole("button", { name: "Add to message", exact: true })
+    .click();
+  await member
+    .getByRole("button", { name: "Send message", exact: true })
+    .click();
+  await member.waitForFunction(
+    () =>
+      document.querySelector('textarea[aria-label="Message"]')?.value === "",
+  );
+  await member
+    .getByLabel("Mermaid diagram", { exact: true })
+    .last()
+    .scrollIntoViewIfNeeded();
+  await member
+    .getByRole("img", {
+      name: "Mermaid diagram. Use View source for its text representation.",
+      exact: true,
+    })
+    .last()
+    .waitFor({ timeout: 30000 });
+  await member
+    .getByRole("img", {
+      name: "Mermaid diagram. Use View source for its text representation.",
+      exact: true,
+    })
+    .last()
+    .scrollIntoViewIfNeeded();
+  assert(
+    (await member.getByLabel("Private bot responses").boundingBox()).height <=
+      254,
+    "Private responses must leave room for the chat on mobile",
+  );
+  await member.screenshot({ path: "test-results/ecosystem-chat-mobile.png" });
+  await owner.setViewportSize({ width: 1440, height: 1000 });
+  await owner.goto(
+    `http://127.0.0.1:5173/dashboard/developers/${createdApplicationId}?section=Analytics`,
+  );
+  await owner.getByText("Recent API requests", { exact: true }).waitFor();
+  await owner
+    .getByRole("cell", { name: /channels\/:channelId\/messages/ })
+    .first()
+    .waitFor();
+  await owner.screenshot({ path: "test-results/ecosystem-analytics.png" });
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
-    "PASS: browser password sign-in, portal creation/token display, command registration, installation consent, desktop settings, mobile profile and private response rendering.",
+    "PASS: browser password sign-in, portal creation/token display, command registration, installation consent, desktop settings, mobile profile, private responses, user-to-bot reply, SDK files, multi-file uploads, drag/drop, clipboard images, invalid files, persisted Mermaid and API analytics.",
   );
 } catch (error) {
+  console.error("Browser errors:", errors);
   if (activePage) {
     await activePage.screenshot({
       path: "test-results/bot-browser-failure.png",

@@ -1,5 +1,12 @@
 # Kyro Bot Developer Platform
 
+Current version: API v1 / SDK 0.2.0. The searchable reference is implemented at
+`/docs`, with all routes defined in [`src/lib/apiReference.ts`](../src/lib/apiReference.ts).
+See [delivery and deployment](developer-ecosystem-delivery.md) for the expanded
+portal, files, interactions, gateway sessions and Mermaid features.
+**Upgrade upload clients:** reservations, byte length and SHA-256 are now required;
+old unbound registration is rejected for ownership/content security.
+
 Kyro users can create a bot application, install it in a server they manage, and run its code on an external Node.js host. The platform persists applications, commands, permissions, events and audits in Convex. The official TypeScript SDK lives at [`sdk/kyro.js`](../sdk/kyro.js); it is distributed from this repository and is **not published to npm**.
 
 ## Quick start
@@ -18,7 +25,7 @@ npm run build:sdk
 npm install /absolute/path/to/KyroFree/sdk/kyro.js
 ```
 
-Use Node 20.19+ and ES modules. Configure `KYRO_BOT_TOKEN` in your host's secret environment. Subscribe to `messageCreate` for text triggers and grant View Channels, Read Message History and Send Messages.
+Use Node 20.19+ and ES modules for external bots; build the repository with Node 22+. Configure `KYRO_BOT_TOKEN` in your host's secret environment. Subscribe to `messageCreate` for text triggers and grant View Channels, Read Message History and Send Messages.
 
 ```ts
 import { KyroClient } from "kyro.js";
@@ -63,7 +70,8 @@ view_channel          send_messages          read_message_history
 manage_messages       manage_channels        manage_roles
 kick_members          ban_members            manage_server
 mention_everyone      add_reactions          upload_attachments
-use_external_emojis   create_polls
+use_external_emojis   create_polls           timeout_members
+view_audit_log
 ```
 
 The default request is `view_channel`, `send_messages`, `read_message_history`. Installation creates a dedicated role and server membership. Effective permissions are the intersection of the installation grant, current server-role permissions, and channel overrides. Administrator cannot bypass channel denies for a bot. Changing application defaults does not increase an existing grant.
@@ -74,7 +82,7 @@ Text message and interaction operations respect posting restrictions, timeout, r
 
 ## REST contract
 
-Production base: `https://kyro-chat.cyou/api/bots/v1`. The website proxy forwards to the configured Convex HTTP deployment. Developers can also use `https://<deployment>.convex.site/api/bots/v1`. Local HTTP actions use `http://127.0.0.1:3211/api/bots/v1` by default; Vite alone does not run Vercel's API functions.
+Production base: `https://kyro-chat.cyou/api/v1`; `/api/bots/v1` is retained as an alias. The website proxy forwards to the configured Convex HTTP deployment. Developers can also use `https://<deployment>.convex.site/api/bots/v1`. Local HTTP actions use `http://127.0.0.1:3211/api/bots/v1` by default; Vite alone does not run Vercel's API functions.
 
 Every endpoint except `GET /webhook-key` requires:
 
@@ -91,42 +99,42 @@ Success: `{"ok":true,"data":...}`. Failure: `{"ok":false,"error":{"code":"MISSIN
 
 Paths below are relative to the base. All server/channel endpoints require a current installation and relevant visibility.
 
-| Method and path                                           | Input                                                                              | Returned `data` / extra permission                                                   |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `GET /me`                                                 | None                                                                               | Bot identity: `id, applicationId, name, username, verified`.                         |
-| `GET /servers`                                            | None                                                                               | `{servers:[{id,name,permissions}]}`.                                                 |
-| `GET /servers/:serverId`                                  | None                                                                               | `id,name,description,ownerId,permissions`.                                           |
-| `PATCH /servers/:serverId`                                | Optional `name` (2–64), `description` (≤1000)                                      | `{id}`; `manage_server`.                                                             |
-| `GET /servers/:serverId/channels`                         | None                                                                               | `{channels:[{id,serverId,name,kind,topic}]}`; hidden channels filtered.              |
-| `POST /servers/:serverId/channels`                        | `name` (1–64 lowercase letters/digits/underscore/hyphen), optional `topic` (≤1000) | `{id}`; creates a text channel; `manage_channels`.                                   |
-| `GET /channels/:channelId`                                | None                                                                               | `id,serverId,name,kind,topic,permissions`.                                           |
-| `PATCH /channels/:channelId`                              | Optional `name,topic`, same constraints as creation                                | `{id}`; `manage_channels`.                                                           |
-| `DELETE /channels/:channelId`                             | None                                                                               | `{deleted:true}`; `manage_channels`, existing content cleanup.                       |
-| `GET /servers/:serverId/members/:userId`                  | None                                                                               | `id,name,username,bot,nickname,roleIds,joinedAt`; no email or credentials.           |
-| `DELETE /servers/:serverId/members/:userId`               | None                                                                               | `{removed:true}`; `kick_members`, hierarchy enforced.                                |
-| `PUT /servers/:serverId/bans/:userId`                     | `reason` (1–300)                                                                   | `{banned:true}`; `ban_members`, current member/hierarchy required.                   |
-| `GET /servers/:serverId/roles`                            | None                                                                               | `{roles:[{id,name,color,permissions,position,isDefault,managed}]}`.                  |
-| `POST /servers/:serverId/roles`                           | `name` (1–64), `permissions`, optional hex `color`                                 | `{id}`; `manage_roles`, lower-role/delegation checks.                                |
-| `PATCH /servers/:serverId/roles/:roleId`                  | Optional `name,color,permissions`                                                  | `{id}`; `manage_roles`.                                                              |
-| `DELETE /servers/:serverId/roles/:roleId`                 | None                                                                               | `{deleted:true}`; `manage_roles`.                                                    |
-| `PUT /servers/:serverId/members/:userId/roles/:roleId`    | `{}`                                                                               | `{updated:true}`; assigns a lower role, `manage_roles`.                              |
-| `DELETE /servers/:serverId/members/:userId/roles/:roleId` | None                                                                               | `{updated:true}`; removes a lower role, `manage_roles`.                              |
-| `POST /channels/:channelId/messages`                      | Message object below                                                               | Message DTO; `send_messages`.                                                        |
-| `GET /channels/:channelId/messages`                       | Query `limit` (1–100, default 50), optional `before` timestamp and `cursor`        | `{messages,nextBefore,nextCursor}` newest first; `read_message_history`.             |
-| `GET /channels/:channelId/messages/:messageId`            | None                                                                               | Message DTO; `read_message_history`.                                                 |
-| `PATCH /channels/:channelId/messages/:messageId`          | Message object, with no replacement attachments                                    | Message DTO; own messages only, replaces content/embeds.                             |
-| `DELETE /channels/:channelId/messages/:messageId`         | None                                                                               | `{deleted:true}`; other authors require `manage_messages`.                           |
-| `POST /channels/:channelId/messages/:messageId/reactions` | `emoji` (1–64)                                                                     | `{added:true}`; idempotent add, `add_reactions`.                                     |
-| `POST /channels/:channelId/messages/:messageId/polls`     | Poll object below                                                                  | `{id}`; own message, `create_polls`, one poll/message.                               |
-| `POST /channels/:channelId/uploads`                       | `{}`                                                                               | `{uploadUrl,maximumBytes}`; `upload_attachments`.                                    |
-| `POST /channels/:channelId/uploads/register`              | `storageId,name`                                                                   | `{storageId}`; validates metadata and ownership.                                     |
-| `GET /commands`                                           | None                                                                               | Command DTO array with `id,serverId,name,description,permissions,options,updatedAt`. |
-| `POST /commands`                                          | Command object below                                                               | `{id}`; upsert by application/scope/name.                                            |
-| `DELETE /commands/:commandId`                             | None                                                                               | `{deleted:true}`; own commands only.                                                 |
-| `POST /interactions/:interactionId/response`              | `content` (1–2000), optional `ephemeral` (default false)                           | `{id,ephemeral,messageId}`; one response, 15-minute expiry.                          |
-| `GET /events`                                             | None                                                                               | `{events:[Event]}`; leases up to 25 events in polling mode.                          |
-| `POST /events/ack`                                        | `ids` array (1–25)                                                                 | `{acknowledged:number}`; own leased events only.                                     |
-| `GET /webhook-key`                                        | No authentication                                                                  | `{configured,key}` where key is the PEM Ed25519 public key; 503 if unavailable.      |
+| Method and path                                           | Input                                                                              | Returned `data` / extra permission                                                         |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /me`                                                 | None                                                                               | Bot identity: `id, applicationId, name, username, verified`.                               |
+| `GET /servers`                                            | None                                                                               | `{servers:[{id,name,permissions}]}`.                                                       |
+| `GET /servers/:serverId`                                  | None                                                                               | `id,name,description,ownerId,permissions`.                                                 |
+| `PATCH /servers/:serverId`                                | Optional `name` (2–64), `description` (≤1000)                                      | `{id}`; `manage_server`.                                                                   |
+| `GET /servers/:serverId/channels`                         | None                                                                               | `{channels:[{id,serverId,name,kind,topic}]}`; hidden channels filtered.                    |
+| `POST /servers/:serverId/channels`                        | `name` (1–64 lowercase letters/digits/underscore/hyphen), optional `topic` (≤1000) | `{id}`; creates a text channel; `manage_channels`.                                         |
+| `GET /channels/:channelId`                                | None                                                                               | `id,serverId,name,kind,topic,permissions`.                                                 |
+| `PATCH /channels/:channelId`                              | Optional `name,topic`, same constraints as creation                                | `{id}`; `manage_channels`.                                                                 |
+| `DELETE /channels/:channelId`                             | None                                                                               | `{deleted:true}`; `manage_channels`, existing content cleanup.                             |
+| `GET /servers/:serverId/members/:userId`                  | None                                                                               | `id,name,username,bot,nickname,roleIds,joinedAt`; no email or credentials.                 |
+| `DELETE /servers/:serverId/members/:userId`               | None                                                                               | `{removed:true}`; `kick_members`, hierarchy enforced.                                      |
+| `PUT /servers/:serverId/bans/:userId`                     | `reason` (1–300)                                                                   | `{banned:true}`; `ban_members`, current member/hierarchy required.                         |
+| `GET /servers/:serverId/roles`                            | None                                                                               | `{roles:[{id,name,color,permissions,position,isDefault,managed}]}`.                        |
+| `POST /servers/:serverId/roles`                           | `name` (1–64), `permissions`, optional hex `color`                                 | `{id}`; `manage_roles`, lower-role/delegation checks.                                      |
+| `PATCH /servers/:serverId/roles/:roleId`                  | Optional `name,color,permissions`                                                  | `{id}`; `manage_roles`.                                                                    |
+| `DELETE /servers/:serverId/roles/:roleId`                 | None                                                                               | `{deleted:true}`; `manage_roles`.                                                          |
+| `PUT /servers/:serverId/members/:userId/roles/:roleId`    | `{}`                                                                               | `{updated:true}`; assigns a lower role, `manage_roles`.                                    |
+| `DELETE /servers/:serverId/members/:userId/roles/:roleId` | None                                                                               | `{updated:true}`; removes a lower role, `manage_roles`.                                    |
+| `POST /channels/:channelId/messages`                      | Message object below                                                               | Message DTO; `send_messages`.                                                              |
+| `GET /channels/:channelId/messages`                       | Query `limit` (1–100, default 50), optional `before` timestamp and `cursor`        | `{messages,nextBefore,nextCursor}` newest first; `read_message_history`.                   |
+| `GET /channels/:channelId/messages/:messageId`            | None                                                                               | Message DTO; `read_message_history`.                                                       |
+| `PATCH /channels/:channelId/messages/:messageId`          | Message object, with no replacement attachments                                    | Message DTO; own messages only, replaces content/embeds.                                   |
+| `DELETE /channels/:channelId/messages/:messageId`         | None                                                                               | `{deleted:true}`; other authors require `manage_messages`.                                 |
+| `POST /channels/:channelId/messages/:messageId/reactions` | `emoji` (1–64)                                                                     | `{added:true}`; idempotent add, `add_reactions`.                                           |
+| `POST /channels/:channelId/messages/:messageId/polls`     | Poll object below                                                                  | `{id}`; own message, `create_polls`, one poll/message.                                     |
+| `POST /channels/:channelId/uploads`                       | `name,size,sha256`                                                                 | `{uploadId,uploadUrl,maximumBytes,expiresAt}`; reserves quota; `upload_attachments`.       |
+| `POST /channels/:channelId/uploads/register`              | `storageId,name,uploadId`                                                          | `{storageId,name,size,mimeType}`; verifies actual bytes, size, hash, type and ownership.   |
+| `GET /commands`                                           | None                                                                               | Command DTO array with `id,serverId,name,description,permissions,options,updatedAt`.       |
+| `POST /commands`                                          | Command object below                                                               | `{id}`; upsert by application/scope/name.                                                  |
+| `DELETE /commands/:commandId`                             | None                                                                               | `{deleted:true}`; own commands only.                                                       |
+| `POST /interactions/:interactionId/response`              | `content` (1–2000), optional `ephemeral` (default false)                           | `{id,ephemeral,messageId}`; acknowledge within 15 seconds, respond once within 15 minutes. |
+| `GET /events`                                             | None                                                                               | `{events:[Event]}`; leases up to 25 events in polling mode.                                |
+| `POST /events/ack`                                        | `ids` array (1–25)                                                                 | `{acknowledged:number}`; own leased events only.                                           |
+| `GET /webhook-key`                                        | No authentication                                                                  | `{configured,key}` where key is the PEM Ed25519 public key; 503 if unavailable.            |
 
 Example message input:
 
@@ -150,7 +158,7 @@ Content is ≤2000 characters; up to three embeds and six attachments are allowe
 
 Message DTO fields: `id,channelId,content,embeds,replyToId,createdAt,editedAt,author,attachments`. `author` is `{id,name,username,bot}`. Attachments contain `{name,size,mimeType,url}`, without exposing storage ownership records. Use `nextCursor` as the next request's `cursor` to page without skipping messages that share a timestamp; keep the other query parameters fixed. `before` is an optional exclusive timestamp filter, and `nextBefore` is retained for clients that use timestamp filtering.
 
-Upload flow: obtain an upload URL, POST the file bytes to it with the actual content type, read `storageId`, register it, then send a message containing `attachmentIds:[storageId]`. Existing upload allowlists, the **10 MiB** cap, ownership and single claim rules apply. The SDK's `upload()` handles the upload/registration steps.
+Upload flow: reserve with `name`, actual byte `size` and SHA-256 hex `sha256`; POST bytes directly to the returned `uploadUrl`; register `storageId` with `uploadId`; then send verified `attachmentIds:[storageId]`. Content/signature checks, the **10 MiB** cap, default **250 MiB** identity quota, ownership and single-claim rules apply. SDK 0.2.0 handles these steps. Downloads require `KYRO_FILE_SIGNING_SECRET` on Convex and use expiring links that recheck access.
 
 Poll input: `{question,options,multipleChoice?,durationMinutes?}`. Question ≤300 characters, 2–10 nonempty options of ≤100 characters, optional duration 1–10080 minutes. Attach a poll to the bot's own existing message.
 
@@ -215,7 +223,7 @@ Events are inserted transactionally with source mutations, using stable IDs and 
 
 **Delivery is at least once.** Polling leases last 60 seconds. Acknowledge only after successful work; unacknowledged events are retried after the lease. Events expire after seven days, with up to six attempts before a dead status. The SDK caches 10,000 processed event IDs in memory to avoid duplicate callbacks on acknowledgment failures; durable consumers must persist IDs across process restarts. Use message nonces for repeat-safe replies. Ordering is not guaranteed across retries or multiple consumers.
 
-For webhook mode, configure a public HTTPS URL on port 443. The worker runs every minute, attempts up to 25 globally due deliveries per run, uses a 60-second lease, a five-second DNS timeout and a ten-second HTTP timeout, and accepts only 2xx responses. Failed deliveries back off by 1 minute, 5 minutes, 15 minutes, 1 hour and 6 hours. Delivery logs expose status/attempts and safe error codes. Owners can retry dead, unexpired events. Changing modes migrates queued events in bounded background transactions.
+For webhook mode, configure a public HTTPS URL on port 443. New events schedule delivery immediately; a recovery worker runs every minute and attempts up to 25 globally due deliveries per run, uses a 60-second lease, a five-second DNS timeout and a ten-second HTTP timeout, and accepts only 2xx responses. Default failed-delivery delays are 1 minute, 5 minutes, 15 minutes, 1 hour and 6 hours. The portal configures 1–6 attempts and a 10–3600-second base interval. Delivery logs expose status/attempts and safe error codes. Owners can retry dead, unexpired events. Changing modes migrates queued events in bounded background transactions.
 
 DNS resolves and pins a public IPv4 address for each request. Private/link-local/loopback destinations, unsupported schemes, credentials, non-443 ports and redirects are rejected. IPv6-only webhook hosts are not supported by this transport.
 
@@ -227,7 +235,7 @@ X-Kyro-Timestamp: <Unix seconds at delivery>
 X-Kyro-Signature: <base64 Ed25519 signature>
 ```
 
-The signed bytes are UTF-8 `timestamp + "." + rawBody`. Retrieve and pin the public key from `GET /webhook-key`; do not trust a key supplied by an incoming webhook. `verifyWebhook(rawBody,signature,timestamp,publicKey)` rejects modified bodies/signatures and timestamps beyond five minutes. Verify before JSON parsing or side effects, compare the header ID to the signed envelope ID, and atomically deduplicate event IDs in your own database. Timestamp checking alone does not prevent a replay within the tolerance window. Return 2xx only after accepting work durably. See the [webhook example](../sdk/kyro.js/examples/webhook.ts).
+The signed bytes are UTF-8 `timestamp + "." + rawBody`. Retrieve and pin the public key from `GET /webhook-key`; do not trust a key supplied by an incoming webhook. `verifyWebhook(rawBody,signature,timestamp,publicKey)` rejects modified bodies/signatures and timestamps beyond five minutes. Verify before JSON parsing or side effects, compare the signed applicationId to your expected application ID and the header ID to the signed envelope ID, and atomically deduplicate event IDs in your own database. Timestamp checking alone does not prevent a replay within the tolerance window. Return 2xx only after accepting work durably. See the [webhook example](../sdk/kyro.js/examples/webhook.ts).
 
 ## Directory, analytics and administration
 

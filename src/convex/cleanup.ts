@@ -1,6 +1,7 @@
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./functions";
 import { deleteClaimedUpload } from "./uploadSecurity";
+import { queueBotEvent } from "./botEvents";
 
 /** Delete a message and every object that exists only because it exists. */
 export async function deleteMessageData(
@@ -153,6 +154,7 @@ export async function deleteServerData(
   server: Doc<"servers">,
 ): Promise<void> {
   const serverId = server._id;
+  await queueBotEvent(ctx, serverId, "server.deleted", { id: serverId });
   const [
     channels,
     categories,

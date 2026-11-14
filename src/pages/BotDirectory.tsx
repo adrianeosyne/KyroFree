@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNow } from "@/hooks/use-now";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { Bot, ArrowLeft, Search, ShieldCheck } from "lucide-react";
 import { api } from "@/convex/_generated/api";
@@ -356,11 +356,27 @@ export function BotAuthorization() {
   const [serverId, setServerId] = useState("");
   const [selected, setSelected] = useState<string[] | null>(null);
   const install = useMutation(api.botApplications.install);
+  const begin = useMutation(api.developerManagement.beginAuthorization);
+  const [success, setSuccess] = useState(false);
+  const [linkParams] = useSearchParams();
+  const [consentState] = useState(
+    () => linkParams.get("state") ?? crypto.randomUUID(),
+  );
+  const [authorizationId, setAuthorizationId] =
+    useState<Id<"botAuthorizations"> | null>(null);
+  const redirect = useQuery(
+    api.developerManagement.authorizationResult,
+    success && authorizationId ? { authorizationId } : "skip",
+  );
   const task = useBotTask();
   const navigate = useNavigate();
   if (app === undefined || servers === undefined) return <BotLoading />;
   if (!app) return <div className="p-8">This bot is unavailable.</div>;
-  const permissions = selected ?? app.permissions;
+  const permissions =
+    selected ??
+    (linkParams.has("permissions")
+      ? (linkParams.get("permissions") ?? "").split(",").filter(Boolean)
+      : app.permissions);
   return (
     <div className="h-full overflow-y-auto bg-[#111318] p-4 pb-24 text-white sm:p-8">
       <div className="mx-auto max-w-2xl">
@@ -368,6 +384,41 @@ export function BotAuthorization() {
           title={`Add ${app.name} to your server`}
           description={`Created by ${app.owner.name}. Review the permissions before authorizing this bot.`}
         >
+          {app.avatarUrl && (
+            <img
+              src={app.avatarUrl}
+              alt={`${app.name} bot`}
+              className="size-16 rounded-xl"
+            />
+          )}
+          <p className="text-sm">{app.description}</p>
+          {linkParams.get("redirect_uri") && (
+            <p className="break-all text-xs text-[#A0A6B5]">
+              Requested return address: {linkParams.get("redirect_uri")}. Kyro
+              verifies that the developer registered this address.
+            </p>
+          )}
+          {success && redirect && (
+            <Button variant="outline" asChild>
+              <a href={redirect} rel="noopener noreferrer">
+                Continue to application
+              </a>
+            </Button>
+          )}
+          {success && (
+            <div
+              role="status"
+              className="rounded-lg border border-emerald-400/30 p-4"
+            >
+              <p>{app.name} was installed successfully.</p>
+              <Button
+                className="mt-3"
+                onClick={() => navigate(`/dashboard/s/${serverId}`)}
+              >
+                Open server
+              </Button>
+            </div>
+          )}
           <p className="text-sm text-[#A0A6B5]">
             The bot runs on its developer's infrastructure. Its grant applies
             only to the server you select and is always limited by that server's
@@ -401,15 +452,26 @@ export function BotAuthorization() {
               <Link to="/dashboard/bots">Cancel</Link>
             </Button>
             <Button
-              disabled={!serverId || task.busy}
+              disabled={!serverId || task.busy || success}
               onClick={() =>
                 void task.run(async () => {
+                  const authorizationId = await begin({
+                    applicationId: app.id,
+                    serverId: serverId as Id<"servers">,
+                    permissions,
+                    state: consentState,
+                    ...(linkParams.get("redirect_uri")
+                      ? { redirectUri: linkParams.get("redirect_uri")! }
+                      : {}),
+                  });
                   await install({
                     applicationId: app.id,
                     serverId: serverId as Id<"servers">,
                     permissions,
+                    authorizationId,
                   });
-                  navigate(`/dashboard/s/${serverId}`);
+                  setSuccess(true);
+                  setAuthorizationId(authorizationId);
                 }, "Bot installed")
               }
             >

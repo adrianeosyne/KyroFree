@@ -1,8 +1,8 @@
 {
   "name": "kyro.js",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Official TypeScript client for the Kyro Bot API; distributed from the KyroFree repository.",
+  "description": "Official TypeScript client for the Kyro API; distributed from adrianeosyne/KyroFree.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

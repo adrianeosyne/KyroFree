@@ -1,8 +1,11 @@
 import { Triggers } from "convex-helpers/server/triggers";
+import { makeFunctionReference } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { botChannel, botServer, messageDto } from "./botLib";
 import type { Ctx } from "./lib";
+import { EVENT_NAMES, subscribedEvent } from "../lib/botContract";
+import { fileUrl } from "./fileAccess";
 import {
   syncMetricEntry,
   syncUserMetrics,
@@ -29,7 +32,7 @@ export async function queueBotEvent(
       !app.enabled ||
       app.suspended ||
       app.deletedAt ||
-      !app.events.includes(type)
+      !subscribedEvent(app.events, type)
     )
       continue;
     try {
@@ -38,14 +41,16 @@ export async function queueBotEvent(
           ctx,
           app,
           channelId,
-          type.startsWith("message") ? "read_message_history" : undefined,
+          type.startsWith("message") || type.startsWith("attachment")
+            ? "read_message_history"
+            : undefined,
         );
       else await botServer(ctx, app, serverId, "view_channel");
     } catch {
       continue;
     }
     const now = Date.now();
-    await ctx.db.insert("botEvents", {
+    const eventId = await ctx.db.insert("botEvents", {
       applicationId: app._id,
       deliveryMode: app.deliveryMode,
       serverId,
@@ -58,6 +63,12 @@ export async function queueBotEvent(
       attempts: 0,
       nextAttemptAt: now,
     });
+    if (app.deliveryMode === "webhook")
+      await ctx.scheduler.runAfter(
+        0,
+        makeFunctionReference<"action">("botWebhooks:deliverEvent"),
+        { eventId },
+      );
   }
 }
 /** Recheck visibility at delivery time; queued data must not survive access revocation. */
@@ -71,16 +82,19 @@ export async function eventVisible(
     app.suspended ||
     app.deletedAt ||
     !app.tokenHash ||
-    !app.events.includes(event.type)
+    !subscribedEvent(app.events, event.type)
   )
     return false;
+  if (event.type === "server.deleted") return true;
   try {
     if (event.channelId)
       await botChannel(
         ctx,
         app,
         event.channelId,
-        event.type.startsWith("message") ? "read_message_history" : undefined,
+        event.type.startsWith("message") || event.type.startsWith("attachment")
+          ? "read_message_history"
+          : undefined,
       );
     else await botServer(ctx, app, event.serverId, "view_channel");
     return true;
@@ -88,14 +102,23 @@ export async function eventVisible(
     return false;
   }
 }
-export function eventDto(event: Doc<"botEvents">) {
+export function eventDto(event: Doc<"botEvents">, viewerId?: Id<"users">) {
+  const data = JSON.parse(event.payload);
+  if (viewerId && Array.isArray(data?.attachments))
+    data.attachments = data.attachments.map((a: { storageId?: string }) => ({
+      ...a,
+      url: a.storageId ? fileUrl(a.storageId, viewerId, data.id) : null,
+    }));
   return {
     id: event._id,
+    applicationId: event.applicationId,
     type: event.type,
+    name: EVENT_NAMES[event.type] ?? event.type,
+    version: 1,
     serverId: event.serverId,
     channelId: event.channelId ?? null,
     timestamp: event.createdAt,
-    data: JSON.parse(event.payload) as unknown,
+    data: data as unknown,
   };
 }
 
@@ -129,7 +152,11 @@ botTriggers.register("messages", async (ctx, change) => {
     change.operation === "update" &&
     change.oldDoc.content === change.newDoc.content &&
     JSON.stringify(change.oldDoc.embeds) ===
-      JSON.stringify(change.newDoc.embeds)
+      JSON.stringify(change.newDoc.embeds) &&
+    JSON.stringify(change.oldDoc.attachments) ===
+      JSON.stringify(change.newDoc.attachments) &&
+    JSON.stringify(change.oldDoc.components) ===
+      JSON.stringify(change.newDoc.components)
   )
     return;
   const channelId = ctx.db.normalizeId("channels", message.containerId);
@@ -154,6 +181,15 @@ botTriggers.register("messages", async (ctx, change) => {
 });
 botTriggers.register("serverMembers", async (ctx, change) => {
   const member = change.newDoc ?? change.oldDoc;
+  if (
+    change.operation === "update" &&
+    change.oldDoc.communicationDisabledUntil !==
+      change.newDoc.communicationDisabledUntil
+  )
+    await queueBotEvent(ctx, member.serverId, "member.timeout", {
+      id: member.userId,
+      communicationDisabledUntil: member.communicationDisabledUntil ?? null,
+    });
   const user = await ctx.db.get(member.userId);
   await queueBotEvent(
     ctx,
@@ -204,13 +240,12 @@ botTriggers.register("servers", async (ctx, change) => {
   );
 });
 botTriggers.register("channels", async (ctx, change) => {
-  if (change.operation === "update") return;
   const channel = change.newDoc ?? change.oldDoc;
-  if (change.operation === "insert")
+  if (change.operation !== "delete")
     await queueBotEvent(
       ctx,
       channel.serverId,
-      "channelCreate",
+      change.operation === "insert" ? "channelCreate" : "channel.updated",
       {
         id: channel._id,
         name: channel.name,
@@ -228,7 +263,13 @@ botTriggers.register("channels", async (ctx, change) => {
   }
 });
 botTriggers.register("serverRoles", async (ctx, change) => {
-  if (change.operation === "delete") return;
+  if (change.operation === "delete") {
+    await queueBotEvent(ctx, change.oldDoc.serverId, "role.deleted", {
+      id: change.id,
+      serverId: change.oldDoc.serverId,
+    });
+    return;
+  }
   const role = change.newDoc;
   await queueBotEvent(
     ctx,
@@ -241,5 +282,63 @@ botTriggers.register("serverRoles", async (ctx, change) => {
       color: role.color ?? null,
       position: role.position,
     },
+  );
+});
+botTriggers.register("reactions", async (ctx, change) => {
+  if (change.operation === "update") return;
+  const reaction = change.newDoc ?? change.oldDoc,
+    message = await ctx.db.get(reaction.messageId);
+  if (!message || message.containerType !== "channel") return;
+  const channelId = ctx.db.normalizeId("channels", message.containerId),
+    channel = channelId ? await ctx.db.get(channelId) : null;
+  if (channel)
+    await queueBotEvent(
+      ctx,
+      channel.serverId,
+      change.operation === "insert"
+        ? "message.reaction_added"
+        : "message.reaction_removed",
+      {
+        messageId: message._id,
+        channelId: channel._id,
+        userId: reaction.userId,
+        emoji: reaction.emoji,
+      },
+      channel._id,
+    );
+});
+botTriggers.register("bans", async (ctx, change) => {
+  if (change.operation === "update") return;
+  const ban = change.newDoc ?? change.oldDoc;
+  await queueBotEvent(
+    ctx,
+    ban.serverId,
+    change.operation === "insert" ? "member.banned" : "member.unbanned",
+    { id: ban.userId, serverId: ban.serverId },
+  );
+});
+botTriggers.register("uploads", async (ctx, change) => {
+  const upload = change.newDoc ?? change.oldDoc;
+  if (
+    !upload.channelId ||
+    (change.operation !== "delete" &&
+      (upload.claimType !== "message" ||
+        change.oldDoc?.claimId === upload.claimId))
+  )
+    return;
+  const channel = await ctx.db.get(upload.channelId);
+  if (!channel) return;
+  await queueBotEvent(
+    ctx,
+    channel.serverId,
+    change.operation === "delete" ? "attachment.deleted" : "attachment.created",
+    {
+      id: upload.storageId,
+      name: upload.name,
+      size: upload.size,
+      mimeType: upload.mimeType,
+      messageId: upload.claimId ?? null,
+    },
+    channel._id,
   );
 });

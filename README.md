@@ -9,7 +9,11 @@ creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
 
-Application source is maintained in `CrimsonCrown967/Kyro`. Keep credentials,
+The developer ecosystem upgrade adds `/docs`, Mermaid chat diagrams and verified
+file uploads. See the [delivery and deployment report](docs/developer-ecosystem-delivery.md)
+for implemented features, tests, limits, schema changes and required configuration.
+
+Application source is maintained in `adrianeosyne/KyroFree`. Keep credentials,
 local profiles and build outputs out of source control. Distribute Windows
 installers and their SHA-256 checksums through MediaFire or another approved
 download host. See [desktop setup and build instructions](desktop/README.md).

@@ -72,6 +72,13 @@ describe("external bot SDK and webhook security", () => {
       }
       if (path.endsWith("/events"))
         return ok({ events: acknowledged ? [] : [event] });
+      if (path.endsWith("/gateway/sessions") && init?.method === "POST")
+        return ok({ id: "session", heartbeatIntervalMs: 30000 });
+      if (
+        path.endsWith("/gateway/sessions/session") &&
+        init?.method === "DELETE"
+      )
+        return ok({ disconnected: true });
       if (path.endsWith("/messages")) {
         expect(JSON.parse(String(init?.body))).toMatchObject({
           content: "Pong",

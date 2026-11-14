@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNow } from "@/hooks/use-now";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { motion } from "framer-motion";
@@ -37,6 +37,15 @@ import {
 import { useUploadFile } from "@/lib/upload";
 import { toast } from "sonner";
 import {
+  ApplicationSelector,
+  DeveloperSummary,
+  ApplicationMetadata,
+  DeveloperAssets,
+  DeveloperAnalytics,
+  DeveloperSettings,
+  DeveloperSandbox,
+} from "@/components/app/DeveloperTools";
+import {
   BotApiDocumentation,
   BotLoading,
   BotPanel,
@@ -59,6 +68,12 @@ const tabs = [
   "API Documentation",
   "Analytics",
   "Audit Logs",
+  "File Assets",
+  "Events",
+  "Webhooks",
+  "Integrations",
+  "Developer Settings",
+  "Sandbox",
 ];
 export default function Developers() {
   const { applicationId } = useParams();
@@ -81,6 +96,9 @@ export default function Developers() {
           </Link>
           <Link className="text-sm text-indigo-300" to="/dashboard/bots">
             Explore bots <ExternalLink className="ml-1 inline size-3" />
+          </Link>
+          <Link className="text-sm text-indigo-300" to="/docs">
+            Developer documentation
           </Link>
         </div>
         {applicationId ? (
@@ -123,6 +141,7 @@ function Applications() {
           New application
         </Button>
       </div>
+      <DeveloperSummary />
       {apps === undefined ? (
         <BotLoading />
       ) : apps.length === 0 ? (
@@ -288,7 +307,11 @@ function Field({
 }
 function ApplicationEditor({ app }: { app: App }) {
   const now = useNow();
-  const [tab, setTab] = useState("Overview");
+  const [params, setParams] = useSearchParams();
+  const tab = tabs.includes(params.get("section") ?? "")
+    ? params.get("section")!
+    : "Overview";
+  const setTab = (section: string) => setParams({ section });
   const [name, setName] = useState(app.name);
   const [description, setDescription] = useState(app.description);
   const [username, setUsername] = useState(app.username);
@@ -301,6 +324,7 @@ function ApplicationEditor({ app }: { app: App }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [rotateOpen, setRotateOpen] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
   const update = useMutation(api.botApplications.update);
   const rotate = useMutation(api.botApplications.token);
   const remove = useMutation(api.botApplications.remove);
@@ -308,7 +332,11 @@ function ApplicationEditor({ app }: { app: App }) {
   const upload = useUploadFile({ requireRegistration: true });
   const task = useBotTask();
   const navigate = useNavigate();
-  const invite = `${window.location.origin}/dashboard/bots/authorize/${app.id}`;
+  const [redirectUri, setRedirectUri] = useState("");
+  const [installState, setInstallState] = useState<string>(() =>
+    crypto.randomUUID(),
+  );
+  const invite = `${window.location.origin}/dashboard/bots/authorize/${app.id}?${new URLSearchParams({ permissions: permissions.join(","), state: installState, ...(redirectUri ? { redirect_uri: redirectUri } : {}) })}`;
   const save = () =>
     task.run(
       () =>
@@ -337,6 +365,7 @@ function ApplicationEditor({ app }: { app: App }) {
     }, "Image updated");
   return (
     <>
+      <ApplicationSelector applicationId={app.id} />
       <Link
         to="/dashboard/developers"
         className="mb-5 inline-flex items-center gap-2 text-sm text-[#A0A6B5]"
@@ -366,6 +395,30 @@ function ApplicationEditor({ app }: { app: App }) {
           ))}
         </nav>
         <div className="min-w-0 space-y-5">
+          {tab === "General Information" && <ApplicationMetadata app={app} />}
+          {tab === "File Assets" && <DeveloperAssets applicationId={app.id} />}
+          {tab === "Analytics" && <DeveloperAnalytics applicationId={app.id} />}
+          {tab === "Developer Settings" && <DeveloperSettings app={app} />}
+          {tab === "Sandbox" && <DeveloperSandbox app={app} />}
+          {tab === "Integrations" && (
+            <BotPanel
+              title="Connect your infrastructure"
+              description="Use the official SDK or signed event webhooks to connect externally hosted integrations."
+            >
+              <Link to="/docs/sdk" className="text-indigo-300">
+                SDK setup and examples
+              </Link>
+              <Link to="/docs/gateway" className="block text-indigo-300">
+                Gateway connection guide
+              </Link>
+              <Button variant="outline" onClick={() => setTab("Webhooks")}>
+                Configure webhook integration
+              </Button>
+              <Button variant="outline" onClick={() => setTab("Sandbox")}>
+                Test the API
+              </Button>
+            </BotPanel>
+          )}
           {(tab === "Overview" || tab === "Analytics") && (
             <>
               <BotPanel
@@ -568,6 +621,32 @@ function ApplicationEditor({ app }: { app: App }) {
               <Field label="Invitation URL">
                 <Input value={invite} readOnly />
               </Field>
+              <Field label="Registered redirect destination">
+                <select
+                  className="w-full rounded border border-white/10 bg-[#111318] p-2"
+                  value={redirectUri}
+                  onChange={(e) => setRedirectUri(e.target.value)}
+                >
+                  <option value="">Kyro success screen</option>
+                  {app.redirectUris.map((uri) => (
+                    <option key={uri} value={uri}>
+                      {uri}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Installation state">
+                <Input
+                  value={installState}
+                  onChange={(e) => setInstallState(e.target.value)}
+                  minLength={16}
+                  maxLength={200}
+                />
+              </Field>
+              <p className="text-xs text-[#A0A6B5]">
+                For an installation initiated by your site, generate a fresh
+                state per browser session and verify it on return.
+              </p>
               <div className="flex gap-3">
                 <Button
                   onClick={() =>
@@ -580,9 +659,7 @@ function ApplicationEditor({ app }: { app: App }) {
                   Copy invite
                 </Button>
                 <Button variant="outline" asChild>
-                  <Link to={`/dashboard/bots/authorize/${app.id}`}>
-                    Install bot
-                  </Link>
+                  <Link to={invite}>Install bot</Link>
                 </Button>
               </div>
               <div className="space-y-2">
@@ -625,12 +702,7 @@ function ApplicationEditor({ app }: { app: App }) {
                 <Button
                   variant="destructive"
                   disabled={task.busy || !app.tokenConfigured}
-                  onClick={() =>
-                    void task.run(
-                      () => rotate({ applicationId: app.id, tokenHash: null }),
-                      "Token revoked",
-                    )
-                  }
+                  onClick={() => setRevokeOpen(true)}
                 >
                   Revoke token
                 </Button>
@@ -638,8 +710,17 @@ function ApplicationEditor({ app }: { app: App }) {
             </BotPanel>
           )}
           {tab === "Slash Commands" && <Commands app={app} />}
-          {tab === "Webhooks & Events" && <Events app={app} />}
-          {tab === "API Documentation" && <BotApiDocumentation />}
+          {["Webhooks & Events", "Webhooks", "Events"].includes(tab) && (
+            <Events app={app} />
+          )}
+          {tab === "API Documentation" && (
+            <>
+              <Link className="mb-4 block text-indigo-300" to="/docs/api">
+                Open complete developer documentation
+              </Link>
+              <BotApiDocumentation />
+            </>
+          )}
           {(tab === "Audit Logs" || tab === "Analytics") && (
             <BotPanel
               title="Recent activity"
@@ -670,6 +751,29 @@ function ApplicationEditor({ app }: { app: App }) {
         </div>
       </div>
       <TokenDialog token={secret} onClose={() => setSecret("")} />
+      <Dialog open={revokeOpen} onOpenChange={setRevokeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke bot token?</DialogTitle>
+            <DialogDescription>
+              API access stops immediately. Generate a new token to reconnect
+              the bot.
+            </DialogDescription>
+          </DialogHeader>
+          <Button
+            variant="destructive"
+            disabled={task.busy}
+            onClick={() =>
+              void task.run(async () => {
+                await rotate({ applicationId: app.id, tokenHash: null });
+                setRevokeOpen(false);
+              }, "Token revoked")
+            }
+          >
+            Confirm revocation
+          </Button>
+        </DialogContent>
+      </Dialog>
       <Dialog open={rotateOpen} onOpenChange={setRotateOpen}>
         <DialogContent>
           <DialogHeader>
@@ -737,6 +841,10 @@ function Commands({ app }: { app: App }) {
   const [scope, setScope] = useState("");
   const [permissions, setPermissions] = useState<string[]>([]);
   const [options, setOptions] = useState<BotCommand["options"]>([]);
+  const [commandType, setCommandType] = useState<"slash" | "user" | "message">(
+    "slash",
+  );
+  const [subcommands, setSubcommands] = useState("[]");
   return (
     <BotPanel
       title="Slash commands"
@@ -755,6 +863,8 @@ function Commands({ app }: { app: App }) {
                 ...(scope ? { serverId: scope } : {}),
                 permissions,
                 options,
+                type: commandType,
+                subcommands: JSON.parse(subcommands),
               },
             });
             setName("");
@@ -763,6 +873,19 @@ function Commands({ app }: { app: App }) {
           }, "Command saved");
         }}
       >
+        <Field label="Command type">
+          <select
+            className="w-full rounded border border-white/10 bg-[#111318] p-2"
+            value={commandType}
+            onChange={(e) =>
+              setCommandType(e.target.value as typeof commandType)
+            }
+          >
+            <option value="slash">Slash command</option>
+            <option value="user">User context action</option>
+            <option value="message">Message context action</option>
+          </select>
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Command name">
             <Input
@@ -842,7 +965,15 @@ function Commands({ app }: { app: App }) {
                 )
               }
             >
-              {["string", "integer", "boolean", "user"].map((type) => (
+              {[
+                "string",
+                "integer",
+                "number",
+                "boolean",
+                "user",
+                "channel",
+                "role",
+              ].map((type) => (
                 <option key={type}>{type}</option>
               ))}
             </select>
@@ -908,6 +1039,21 @@ function Commands({ app }: { app: App }) {
         </Button>
         <details>
           <summary className="cursor-pointer text-sm">
+            Subcommands and groups
+          </summary>
+          <p className="my-2 text-xs text-[#A0A6B5]">
+            Use a JSON array of name, description, optional group, and options.
+            Keep root arguments empty when using subcommands.
+          </p>
+          <Textarea
+            aria-label="Subcommands JSON"
+            className="font-mono text-xs"
+            value={subcommands}
+            onChange={(e) => setSubcommands(e.target.value)}
+          />
+        </details>
+        <details>
+          <summary className="cursor-pointer text-sm">
             Required member permissions
           </summary>
           <div className="mt-3">
@@ -944,6 +1090,10 @@ function Commands({ app }: { app: App }) {
                     setOptions(command.options);
                     setPermissions(command.permissions);
                     setScope(command.serverId ?? "");
+                    setCommandType(command.type ?? "slash");
+                    setSubcommands(
+                      JSON.stringify(command.subcommands ?? [], null, 2),
+                    );
                   }}
                 >
                   Edit
@@ -984,6 +1134,8 @@ function Events({ app }: { app: App }) {
   const [events, setEvents] = useState(app.events);
   const [mode, setMode] = useState(app.deliveryMode);
   const [url, setUrl] = useState(app.webhookUrl);
+  const [attempts, setAttempts] = useState(app.webhookMaxAttempts);
+  const [retrySeconds, setRetrySeconds] = useState(app.webhookRetrySeconds);
   return (
     <BotPanel
       title="Webhooks & events"
@@ -1009,6 +1161,26 @@ function Events({ app }: { app: App }) {
               onChange={(e) => setUrl(e.target.value)}
             />
           </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Maximum delivery attempts">
+              <Input
+                type="number"
+                min={1}
+                max={6}
+                value={attempts}
+                onChange={(e) => setAttempts(Number(e.target.value))}
+              />
+            </Field>
+            <Field label="Retry base (seconds)">
+              <Input
+                type="number"
+                min={10}
+                max={3600}
+                value={retrySeconds}
+                onChange={(e) => setRetrySeconds(Number(e.target.value))}
+              />
+            </Field>
+          </div>
           <p className="text-xs text-[#A0A6B5]">
             Verify Ed25519 signatures with the public key at
             /api/bots/v1/webhook-key. Delivery requires the platform signing key
@@ -1049,6 +1221,8 @@ function Events({ app }: { app: App }) {
                 events,
                 deliveryMode: mode,
                 webhookUrl: url,
+                webhookMaxAttempts: attempts,
+                webhookRetrySeconds: retrySeconds,
               }),
             "Event delivery saved",
           )

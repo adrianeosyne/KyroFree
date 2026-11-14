@@ -2,6 +2,8 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
 import { botTables } from "./botSchema";
+import { fileTables } from "./fileSchema";
+import { developerTables } from "./developerSchema";
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -297,6 +299,8 @@ const schema = defineSchema(
       muted: v.optional(v.boolean()),
       /** Community timeout: this member cannot post until this timestamp. */
       communicationDisabledUntil: v.optional(v.number()),
+      communicationDisabledReason: v.optional(v.string()),
+      communicationDisabledById: v.optional(v.id("users")),
     })
       .index("by_server", ["serverId"])
       .index("by_user", ["userId"])
@@ -433,6 +437,7 @@ const schema = defineSchema(
 
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
+      components: v.optional(v.array(v.any())),
       embeds: v.optional(
         v.array(
           v.object({
@@ -571,6 +576,16 @@ const schema = defineSchema(
       size: v.number(),
       mimeType: v.string(),
       createdAt: v.number(),
+      status: v.optional(
+        v.union(
+          v.literal("pending"),
+          v.literal("verified"),
+          v.literal("quarantined"),
+        ),
+      ),
+      sha256: v.optional(v.string()),
+      applicationId: v.optional(v.id("botApplications")),
+      channelId: v.optional(v.id("channels")),
       claimType: v.optional(
         v.union(
           v.literal("message"),
@@ -581,6 +596,7 @@ const schema = defineSchema(
           v.literal("server_emoji"),
           v.literal("bot_icon"),
           v.literal("bot_banner"),
+          v.literal("application_asset"),
         ),
       ),
       /** String form of the message, user, or server id that owns the claim. */
@@ -588,7 +604,10 @@ const schema = defineSchema(
     })
       .index("by_storage", ["storageId"])
       .index("by_owner", ["ownerId"])
-      .index("by_claim", ["claimType", "claimId"]),
+      .index("by_claim", ["claimType", "claimId"])
+      .index("by_application", ["applicationId"]),
+    ...fileTables,
+    ...developerTables,
 
     reactions: defineTable({
       messageId: v.id("messages"),

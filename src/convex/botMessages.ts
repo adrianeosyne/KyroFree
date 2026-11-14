@@ -87,6 +87,11 @@ export async function validateBotMessage(
   }
   const text = [
     input.content,
+    ...input.components.map((c) =>
+      c.type === "button"
+        ? c.label
+        : (c.options ?? []).map((o) => o.label).join(" "),
+    ),
     ...input.embeds.map((e) =>
       [
         e.title,
@@ -162,7 +167,7 @@ export async function sendBotMessage(
           .eq("clientId", `bot:${app._id}:${input.nonce}`),
       )
       .first();
-    if (old) return messageDto(ctx, old);
+    if (old) return messageDto(ctx, old, app.botUserId);
   }
   const access = await validateBotMessage(ctx, app, channelId, input);
   const attachments = await Promise.all(
@@ -186,6 +191,7 @@ export async function sendBotMessage(
     authorId: app.botUserId,
     content: input.content.trim(),
     embeds: input.embeds,
+    components: input.components,
     attachments,
     replyToId: input.replyToId
       ? tableId(ctx, "messages", input.replyToId)
@@ -278,5 +284,5 @@ export async function sendBotMessage(
       link: `/dashboard/s/${access.server._id}/c/${channelId}`,
     });
   }
-  return messageDto(ctx, (await ctx.db.get(id))!);
+  return messageDto(ctx, (await ctx.db.get(id))!, app.botUserId);
 }

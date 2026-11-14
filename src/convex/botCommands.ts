@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./functions";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./functions";
-import { commandSchema } from "../lib/botContract";
+import { commandSchema, modalSchema } from "../lib/botContract";
+import { z } from "zod";
 import {
   channelPermissions,
   hasPermission,
@@ -26,6 +27,7 @@ import {
 } from "./botLib";
 import { queueBotEvent } from "./botEvents";
 import { evaluateAutomod } from "./automod";
+import { recordUsage } from "./botAnalytics";
 
 export async function registerCommand(
   ctx: MutationCtx,
@@ -60,6 +62,8 @@ export async function registerCommand(
     description: command.description,
     permissions: command.permissions,
     options: command.options,
+    subcommands: command.subcommands,
+    type: command.type,
     updatedAt: Date.now(),
   };
   if (existing) {
@@ -104,7 +108,7 @@ export const remove = mutation({
     await auditBot(ctx, app._id, "command.delete", app.ownerId);
   },
 });
-async function humanChannel(ctx: Ctx, channelId: Id<"channels">) {
+export async function humanChannel(ctx: Ctx, channelId: Id<"channels">) {
   const { id } = await requireActiveUser(ctx);
   const channel = await ctx.db.get(channelId);
   if (!channel) botError(404, "NOT_FOUND", "Channel not found.");
@@ -168,6 +172,8 @@ export const forChannel = query({
             description: command.description,
             applicationName: app.name,
             options: command.options,
+            type: command.type ?? "slash",
+            subcommands: command.subcommands ?? [],
           });
     }
     return result;
@@ -178,6 +184,8 @@ export const execute = mutation({
     channelId: v.id("channels"),
     commandId: v.id("botCommands"),
     options: v.any(),
+    subcommand: v.optional(v.string()),
+    targetId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const access = await humanChannel(ctx, args.channelId);
@@ -288,18 +296,25 @@ export const execute = mutation({
       )
         botError(429, "SLOW_MODE", "Channel slow mode is active.");
     }
+    const variant = command.subcommands?.find(
+      (s) => `${s.group ? s.group + " " : ""}${s.name}` === args.subcommand,
+    );
+    if (
+      (command.subcommands?.length && !variant) ||
+      (args.subcommand && !variant)
+    )
+      botError(400, "INVALID_SUBCOMMAND", "Select a registered subcommand.");
+    const definition = variant?.options ?? command.options;
     const options = args.options as Record<string, unknown>;
     if (
       !options ||
       typeof options !== "object" ||
       Array.isArray(options) ||
-      Object.keys(options).some(
-        (k) => !command.options.some((o) => o.name === k),
-      )
+      Object.keys(options).some((k) => !definition.some((o) => o.name === k))
     )
       botError(400, "INVALID_OPTIONS", "Unknown command options.");
     const clean: Record<string, string | number | boolean> = {};
-    for (const option of command.options) {
+    for (const option of definition) {
       const value = options[option.name];
       if (value === undefined || value === "") {
         if (option.required)
@@ -314,8 +329,12 @@ export const execute = mutation({
         )
           botError(400, "INVALID_OPTION", `Invalid value for ${option.name}.`);
         clean[option.name] = value;
-      } else if (option.type === "integer") {
-        if (typeof value !== "number" || !Number.isSafeInteger(value))
+      } else if (option.type === "integer" || option.type === "number") {
+        if (
+          typeof value !== "number" ||
+          !Number.isFinite(value) ||
+          (option.type === "integer" && !Number.isSafeInteger(value))
+        )
           botError(400, "INVALID_OPTION", `${option.name} must be an integer.`);
         clean[option.name] = value;
       } else if (option.type === "boolean") {
@@ -325,6 +344,24 @@ export const execute = mutation({
             "INVALID_OPTION",
             `${option.name} must be true or false.`,
           );
+        clean[option.name] = value;
+      } else if (option.type === "channel") {
+        if (typeof value !== "string")
+          botError(400, "INVALID_OPTION", "Use a channel ID.");
+        const target = await humanChannel(ctx, tableId(ctx, "channels", value));
+        if (target.channel.serverId !== access.channel.serverId)
+          botError(
+            400,
+            "INVALID_OPTION",
+            "Channel must belong to this server.",
+          );
+        clean[option.name] = value;
+      } else if (option.type === "role") {
+        if (typeof value !== "string")
+          botError(400, "INVALID_OPTION", "Use a role ID.");
+        const role = await ctx.db.get(tableId(ctx, "serverRoles", value));
+        if (role?.serverId !== access.channel.serverId)
+          botError(400, "INVALID_OPTION", "Role must belong to this server.");
         clean[option.name] = value;
       } else {
         if (typeof value !== "string")
@@ -357,6 +394,24 @@ export const execute = mutation({
     if (!(await limit(ctx, `interactions:${access.id}`, 10)))
       botError(429, "RATE_LIMITED", "Wait before using more commands.");
     const now = Date.now();
+    if (command.type === "user") {
+      const targetId = tableId(ctx, "users", args.targetId ?? "");
+      const member = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server_user", (q) =>
+          q.eq("serverId", access.channel.serverId).eq("userId", targetId),
+        )
+        .first();
+      if (!member) botError(400, "INVALID_TARGET", "Choose a server member.");
+      clean.targetId = targetId;
+    }
+    if (command.type === "message") {
+      const targetId = tableId(ctx, "messages", args.targetId ?? "");
+      const message = await ctx.db.get(targetId);
+      if (message?.containerId !== args.channelId)
+        botError(400, "INVALID_TARGET", "Choose a message in this channel.");
+      clean.targetId = targetId;
+    }
     const interactionId = await ctx.db.insert("botInteractions", {
       applicationId: app._id,
       commandId: command._id,
@@ -366,8 +421,11 @@ export const execute = mutation({
       options: JSON.stringify(clean),
       createdAt: now,
       expiresAt: now + 15 * 60000,
+      acknowledgeBy: now + 15000,
+      kind: "command",
     });
     await ctx.db.patch(app._id, { commandsExecuted: app.commandsExecuted + 1 });
+    await recordUsage(ctx, app._id, "commands");
     await queueBotEvent(
       ctx,
       access.channel.serverId,
@@ -376,11 +434,31 @@ export const execute = mutation({
         id: interactionId,
         commandId: command._id,
         name: command.name,
+        kind: "command",
+        subcommand: args.subcommand ?? null,
+        acknowledgeBy: now + 15000,
         userId: access.id,
         channelId: args.channelId,
         serverId: access.channel.serverId,
         options: clean,
         expiresAt: now + 15 * 60000,
+      },
+      args.channelId,
+      app._id,
+    );
+    await queueBotEvent(
+      ctx,
+      access.channel.serverId,
+      "slash_command.executed",
+      {
+        id: interactionId,
+        commandId: command._id,
+        name: command.name,
+        userId: access.id,
+        channelId: args.channelId,
+        serverId: access.channel.serverId,
+        options: clean,
+        subcommand: args.subcommand ?? null,
       },
       args.channelId,
       app._id,
@@ -407,6 +485,11 @@ export const responses = query({
         ephemeral: r.ephemeral,
         response: r.ephemeral ? r.response : undefined,
         expiresAt: r.expiresAt,
+        acknowledgeBy: r.acknowledgeBy,
+        modal:
+          r.modal && !r.modalSubmittedAt
+            ? (JSON.parse(r.modal) as z.infer<typeof modalSchema>)
+            : null,
       }));
   },
 });

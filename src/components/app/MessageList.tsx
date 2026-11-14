@@ -1,3 +1,6 @@
+import { FileAttachment } from "./FileAttachment";
+import { BotMessageComponents } from "./BotMessageComponents";
+import { BotContextCommands } from "./BotCommandDialog";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import {
   AlertTriangle,
@@ -13,7 +16,6 @@ import {
   Link2,
   Lock,
   Loader2,
-  Mic,
   Pencil,
   Pin,
   Phone,
@@ -98,6 +100,7 @@ export interface MessageAuthor {
 }
 
 export interface MessageDto {
+  components?: unknown[];
   embeds?: {
     title?: string;
     description?: string;
@@ -488,6 +491,8 @@ function EmptyConversation({
 
 function MessageRow({
   message,
+  containerType,
+  containerId,
   grouped,
   currentUserId,
   canManageMessages,
@@ -531,6 +536,7 @@ function MessageRow({
   const [reactionEmojisLoaded, setReactionEmojisLoaded] = useState(false);
   const [reactionOpen, setReactionOpen] = useState(false);
   const [translated, setTranslated] = useState<string | null>(null);
+  const [botActionsOpen, setBotActionsOpen] = useState(false);
 
   const loadReactionEmojis = () => {
     if (reactionEmojisLoaded) return;
@@ -675,6 +681,16 @@ function MessageRow({
     destructive?: boolean;
     separatorBefore?: boolean;
   }[] = [
+    ...(containerType === "channel"
+      ? [
+          {
+            key: "application-actions",
+            label: "Application actions",
+            icon: <Bot className="size-4" />,
+            onSelect: () => setBotActionsOpen(true),
+          },
+        ]
+      : []),
     {
       key: "reaction",
       label: "Add reaction",
@@ -1096,72 +1112,26 @@ function MessageRow({
               {message.attachments.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {" "}
-                  {message.attachments.map((attachment) =>
-                    attachment.mimeType.startsWith("audio/") &&
-                    attachment.url ? (
-                      <div
-                        key={attachment.storageId}
-                        className="w-full max-w-sm rounded-xl border border-border/70 bg-surface px-3 py-2.5"
-                      >
-                        <p className="mb-2 flex items-center gap-2 text-xs font-semibold">
-                          <span className="flex size-7 items-center justify-center rounded-full bg-primary/12 text-primary">
-                            <Mic className="size-3.5" />
-                          </span>
-                          Voice message
-                        </p>
-                        <audio
-                          src={attachment.url}
-                          controls
-                          preload="metadata"
-                          className="h-9 w-full"
-                        />
-                      </div>
-                    ) : attachment.mimeType.startsWith("video/") &&
-                      attachment.url ? (
-                      <video
-                        key={attachment.storageId}
-                        src={attachment.url}
-                        controls
-                        playsInline
-                        preload="metadata"
-                        className="max-h-72 max-w-xs rounded-lg border border-border/70 bg-black"
-                      />
-                    ) : attachment.mimeType.startsWith("image/") &&
-                      attachment.url ? (
-                      <button
-                        key={attachment.storageId}
-                        type="button"
-                        onClick={() =>
-                          onOpenMedia(attachment.url!, attachment.name)
-                        }
-                        className="block overflow-hidden rounded-lg border border-border/70"
-                      >
-                        <img
-                          src={attachment.url}
-                          alt={attachment.name}
-                          loading="lazy"
-                          className="max-h-72 max-w-xs object-cover"
-                        />
-                      </button>
-                    ) : (
-                      <a
-                        key={attachment.storageId}
-                        href={attachment.url ?? "#"}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex max-w-xs items-center gap-2 rounded-lg border border-border/70 bg-surface px-3 py-2 text-xs hover:border-primary/40"
-                      >
-                        <span className="truncate font-medium">
-                          {attachment.name}
-                        </span>
-                        <span className="shrink-0 text-muted-foreground">
-                          {Math.max(1, Math.round(attachment.size / 1024))} KB
-                        </span>
-                      </a>
-                    ),
-                  )}
+                  {message.attachments.map((attachment) => (
+                    <FileAttachment
+                      key={attachment.storageId}
+                      attachment={attachment}
+                      messageId={message.id}
+                      onOpenMedia={onOpenMedia}
+                      canRemove={isAuthor}
+                      ownerName={author?.name}
+                      createdAt={message.createdAt}
+                    />
+                  ))}
                 </div>
               )}
+              {containerType === "channel" && message.components?.length ? (
+                <BotMessageComponents
+                  components={message.components}
+                  channelId={containerId}
+                  messageId={message.id}
+                />
+              ) : null}
 
               {message.reactions.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -1318,6 +1288,15 @@ function MessageRow({
           </Fragment>
         ))}
       </ContextMenuContent>
+      {botActionsOpen && containerType === "channel" && (
+        <BotContextCommands
+          channelId={containerId as Id<"channels">}
+          messageId={message.id}
+          authorId={message.authorId}
+          members={mentionUsers}
+          onClose={() => setBotActionsOpen(false)}
+        />
+      )}
     </ContextMenu>
   );
 }

@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { fileUrl } from "./fileAccess";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./functions";
 import { CUSTOM_EMOJI_TOKEN, customEmojiIds } from "../lib/emoji";
@@ -327,7 +328,7 @@ export const list = query({
         const attachments = await Promise.all(
           (message.attachments ?? []).map(async (attachment) => ({
             ...attachment,
-            url: await ctx.storage.getUrl(attachment.storageId),
+            url: fileUrl(attachment.storageId, viewerId, message._id),
           })),
         );
         const reply = message.replyToId
@@ -352,6 +353,7 @@ export const list = query({
           id: message._id,
           content: message.content,
           embeds: message.embeds ?? [],
+          components: message.components ?? [],
           /** Call records render as their own system row in the timeline. */
           kind: message.kind ?? null,
           botName: message.botName ?? null,

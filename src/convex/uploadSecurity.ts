@@ -29,7 +29,9 @@ const SAFE_CONTENT_TYPES = new Set([
 export function isAllowedUploadType(contentType: string): boolean {
   const normalized = contentType.toLowerCase().split(";", 1)[0].trim();
   return (
-    normalized.startsWith("image/") ||
+    ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+      normalized,
+    ) ||
     normalized.startsWith("video/") ||
     normalized.startsWith("audio/") ||
     SAFE_CONTENT_TYPES.has(normalized)
@@ -57,12 +59,23 @@ export async function requireOwnedUpload(
   options: { imageOnly?: boolean } = {},
 ): Promise<Doc<"uploads">> {
   const upload = await uploadByStorageId(ctx, storageId);
-  if (!upload || upload.ownerId !== ownerId) {
+  const owner =
+    upload && upload.ownerId !== ownerId ? await ctx.db.get(ownerId) : null;
+  const application =
+    owner?.botApplicationId && upload?.applicationId === owner.botApplicationId
+      ? await ctx.db.get(owner.botApplicationId)
+      : null;
+  if (
+    !upload ||
+    (upload.ownerId !== ownerId && application?.ownerId !== upload.ownerId)
+  ) {
     throw new Error("That upload does not belong to your account.");
   }
   if (options.imageOnly && !isImageUploadType(upload.mimeType)) {
     throw new Error("Choose an image file for that upload.");
   }
+  if (upload.status && upload.status !== "verified")
+    throw new Error("That upload has not passed file verification.");
   const metadata = await ctx.db.system.get("_storage", storageId);
   if (!metadata) {
     throw new Error(
@@ -105,7 +118,27 @@ export async function claimUpload(
     }
     throw new Error("That upload is already being used somewhere else.");
   }
-  await ctx.db.patch(upload._id, { claimType, claimId });
+  const message =
+    claimType === "message"
+      ? await ctx.db.get(ctx.db.normalizeId("messages", claimId)!)
+      : null;
+  const channelId =
+    message?.containerType === "channel"
+      ? (ctx.db.normalizeId("channels", message.containerId) ?? undefined)
+      : undefined;
+  const brandingAppId =
+    claimType === "bot_icon" || claimType === "bot_banner"
+      ? ctx.db.normalizeId("botApplications", claimId)
+      : claimType === "user_avatar"
+        ? (await ctx.db.get(ctx.db.normalizeId("users", claimId)!))
+            ?.botApplicationId
+        : undefined;
+  await ctx.db.patch(upload._id, {
+    claimType,
+    claimId,
+    ...(channelId ? { channelId } : {}),
+    ...(brandingAppId ? { applicationId: brandingAppId } : {}),
+  });
   return upload;
 }
 

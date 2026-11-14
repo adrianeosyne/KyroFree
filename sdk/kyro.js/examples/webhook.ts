@@ -2,10 +2,12 @@ import { createServer } from "node:http";
 import { KyroClient, verifyWebhook, type BotEvent } from "../src/index.js";
 
 // Expose this process behind your HTTPS reverse proxy. Pin the platform public
-// key from GET /api/bots/v1/webhook-key in the host's environment.
+// key from GET /api/v1/webhook-key in the host's environment.
 const client = new KyroClient({ token: process.env.KYRO_BOT_TOKEN });
 const publicKey = process.env.KYRO_WEBHOOK_PUBLIC_KEY;
 if (!publicKey) throw new Error("KYRO_WEBHOOK_PUBLIC_KEY is required");
+const applicationId = process.env.KYRO_APPLICATION_ID;
+if (!applicationId) throw new Error("KYRO_APPLICATION_ID is required");
 const completed = new Set<string>();
 const inFlight = new Map<string, Promise<void>>();
 // This runnable example deduplicates within one process. Replace these maps
@@ -40,6 +42,7 @@ createServer(async (request, response) => {
     if (!verifyWebhook(body, signature, timestamp, publicKey))
       return finish(401);
     const event = JSON.parse(body) as BotEvent;
+    if (event.applicationId !== applicationId) return finish(403);
     if (!event.id || event.id !== request.headers["x-kyro-event-id"])
       return finish(400);
     if (completed.has(event.id)) return finish(204);

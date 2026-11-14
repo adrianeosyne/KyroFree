@@ -1,4 +1,32 @@
-import { verify, createPublicKey } from "node:crypto";
+import { verify, createPublicKey, createHash, randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
+export interface ButtonComponent {
+  type: "button";
+  customId: string;
+  label: string;
+  style?: "primary" | "secondary" | "danger";
+  disabled?: boolean;
+}
+export interface SelectComponent {
+  type: "select";
+  customId: string;
+  placeholder?: string;
+  options: { label: string; value: string }[];
+  disabled?: boolean;
+}
+export type Component = ButtonComponent | SelectComponent;
+export interface Modal {
+  customId: string;
+  title: string;
+  fields: {
+    customId: string;
+    label: string;
+    required?: boolean;
+    multiline?: boolean;
+    maxLength?: number;
+  }[];
+}
 
 export interface Embed {
   title?: string;
@@ -8,6 +36,8 @@ export interface Embed {
   fields?: { name: string; value: string }[];
 }
 export interface MessageInput {
+  files?: (string | { data: Blob; name: string })[];
+  components?: Component[];
   content?: string;
   embeds?: Embed[];
   attachmentIds?: string[];
@@ -15,6 +45,7 @@ export interface MessageInput {
   nonce?: string;
 }
 export interface MessageData {
+  components?: Component[];
   id: string;
   channelId: string;
   content: string;
@@ -33,11 +64,26 @@ export interface MessageData {
 export interface CommandOption {
   name: string;
   description: string;
-  type: "string" | "integer" | "boolean" | "user";
+  type:
+    | "string"
+    | "integer"
+    | "number"
+    | "boolean"
+    | "user"
+    | "channel"
+    | "role";
+  autocomplete?: boolean;
   required?: boolean;
   choices?: string[];
 }
 export interface Command {
+  type?: "slash" | "user" | "message";
+  subcommands?: {
+    name: string;
+    description: string;
+    group?: string;
+    options?: CommandOption[];
+  }[];
   name: string;
   description: string;
   serverId?: string;
@@ -85,8 +131,11 @@ export interface Role {
   managed?: boolean;
 }
 export interface InteractionData {
+  kind?: "command" | "button" | "select" | "modal" | "autocomplete";
+  customId?: string;
+  acknowledgeBy?: number;
   id: string;
-  commandId: string;
+  commandId?: string;
   name: string;
   userId: string;
   channelId: string;
@@ -95,6 +144,9 @@ export interface InteractionData {
   expiresAt: number;
 }
 export interface BotEvent<T = unknown> {
+  applicationId?: string;
+  version?: number;
+  name?: string;
   id: string;
   type: string;
   serverId: string;
@@ -114,6 +166,7 @@ export class KyroApiError extends Error {
   }
 }
 export class KyroMessage implements MessageData {
+  components?: Component[];
   id: string;
   channelId: string;
   content: string;
@@ -128,6 +181,7 @@ export class KyroMessage implements MessageData {
     data: MessageData,
   ) {
     this.id = data.id;
+    this.components = data.components;
     this.channelId = data.channelId;
     this.content = data.content;
     this.embeds = data.embeds;
@@ -167,6 +221,26 @@ export class KyroInteraction {
   get options() {
     return this.data.options;
   }
+  get customId() {
+    return this.data.customId;
+  }
+  get kind() {
+    return this.data.kind ?? "command";
+  }
+  acknowledge() {
+    return this.client.request(
+      "POST",
+      `/interactions/${encodeURIComponent(this.id)}/ack`,
+      {},
+    );
+  }
+  showModal(modal: Modal) {
+    return this.client.request(
+      "POST",
+      `/interactions/${encodeURIComponent(this.id)}/modal`,
+      modal,
+    );
+  }
   get userId() {
     return this.data.userId;
   }
@@ -181,6 +255,50 @@ export class KyroInteraction {
   }
 }
 export interface ClientEvents {
+  "message.created": KyroMessage;
+  "message.updated": KyroMessage;
+  "message.deleted": { id: string; channelId: string };
+  "interaction.created": KyroInteraction;
+  "button.clicked": KyroInteraction;
+  "select_menu.selected": KyroInteraction;
+  "modal.submitted": KyroInteraction;
+  "slash_command.executed": InteractionData;
+  "member.joined": Member;
+  "member.left": Member;
+  "member.updated": Member;
+  "member.banned": { id: string; serverId: string };
+  "member.unbanned": { id: string; serverId: string };
+  "member.timeout": { id: string; communicationDisabledUntil: number | null };
+  "server.created": Partial<Server>;
+  "server.updated": Partial<Server>;
+  "server.deleted": { id: string };
+  "channel.created": Partial<Channel>;
+  "channel.updated": Partial<Channel>;
+  "channel.deleted": { id: string; serverId: string };
+  "role.created": Role;
+  "role.updated": Role;
+  "role.deleted": { id: string; serverId: string };
+  "message.reaction_added": {
+    messageId: string;
+    channelId: string;
+    userId: string;
+    emoji: string;
+  };
+  "message.reaction_removed": {
+    messageId: string;
+    channelId: string;
+    userId: string;
+    emoji: string;
+  };
+  "attachment.created": {
+    id: string;
+    name: string;
+    size: number;
+    mimeType: string;
+    messageId: string | null;
+  };
+  "attachment.deleted": { id: string; messageId: string | null };
+  reconnecting: { attempt: number; delayMs: number };
   ready: BotIdentity;
   error: Error;
   event: BotEvent;
@@ -199,12 +317,18 @@ export interface ClientEvents {
   roleUpdate: Role;
 }
 export interface ClientOptions {
+  gatewaySessions?: boolean;
+  label?: string;
   token: string | undefined;
   baseUrl?: string;
   pollIntervalMs?: number;
   fetch?: typeof fetch;
 }
 export class KyroClient {
+  private readonly useSessions: boolean;
+  private readonly label: string;
+  private sessionId: string | null = null;
+  private lastHeartbeat = 0;
   private readonly token: string;
   private readonly baseUrl: string;
   private readonly transport: typeof fetch;
@@ -219,12 +343,15 @@ export class KyroClient {
   private running = false;
   user: BotIdentity | null = null;
   constructor(options: ClientOptions) {
+    this.useSessions = options.gatewaySessions !== false;
+    this.label = options.label ?? "kyro.js/0.2.0";
     if (!options.token || !/^kyro_bot_[a-f0-9]{64}$/.test(options.token))
       throw new Error("A valid KYRO_BOT_TOKEN is required.");
     this.token = options.token;
-    this.baseUrl = (
-      options.baseUrl ?? "https://kyro-chat.cyou/api/bots/v1"
-    ).replace(/\/$/, "");
+    this.baseUrl = (options.baseUrl ?? "https://kyro-chat.cyou/api/v1").replace(
+      /\/$/,
+      "",
+    );
     const url = new URL(this.baseUrl);
     if (
       url.protocol !== "https:" &&
@@ -296,9 +423,10 @@ export class KyroClient {
     this.user = await this.request<BotIdentity>("GET", "/me");
     this.running = true;
     try {
+      if (this.useSessions) await this.connectSession();
       await this.emit("ready", this.user);
     } catch (error) {
-      this.running = false;
+      await this.destroy();
       throw error;
     }
     this.loop = this.pollLoop();
@@ -308,14 +436,49 @@ export class KyroClient {
     this.running = false;
     this.controller.abort();
     await this.loop;
+    if (this.sessionId)
+      await this.transport(
+        `${this.baseUrl}/gateway/sessions/${encodeURIComponent(this.sessionId)}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bot ${this.token}` },
+          redirect: "error",
+          signal: AbortSignal.timeout(5000),
+        },
+      ).catch(() => undefined);
+    this.sessionId = null;
+  }
+  private async connectSession() {
+    const session = await this.request<{ id: string }>(
+      "POST",
+      "/gateway/sessions",
+      { label: this.label },
+    );
+    this.sessionId = session.id;
+    this.lastHeartbeat = Date.now();
   }
   private async pollLoop() {
+    let failures = 0;
     while (this.running) {
       let delay = this.interval;
       try {
+        if (
+          this.useSessions &&
+          (!this.sessionId || Date.now() - this.lastHeartbeat > 30000)
+        ) {
+          if (!this.sessionId) await this.connectSession();
+          else {
+            await this.request(
+              "POST",
+              `/gateway/sessions/${encodeURIComponent(this.sessionId)}/heartbeat`,
+              {},
+            );
+            this.lastHeartbeat = Date.now();
+          }
+        }
         const { events } = await this.request<{ events: BotEvent[] }>(
           "GET",
-          "/events",
+          `/events${this.sessionId ? `?sessionId=${encodeURIComponent(this.sessionId)}` : ""}`,
         );
         for (const event of events) {
           if (!this.processed.has(event.id)) {
@@ -326,6 +489,7 @@ export class KyroClient {
           }
           await this.request("POST", "/events/ack", { ids: [event.id] });
         }
+        failures = 0;
       } catch (cause) {
         if (!this.running) break;
         const error =
@@ -338,8 +502,9 @@ export class KyroClient {
           /* A throwing error handler must not create an unhandled rejection. */
         }
         if (error instanceof KyroApiError) {
+          if (error.code === "SESSION_EXPIRED") this.sessionId = null;
           if (
-            error.status === 401 ||
+            (error.status === 401 && error.code !== "SESSION_EXPIRED") ||
             error.status === 403 ||
             error.code === "WEBHOOK_MODE"
           ) {
@@ -347,7 +512,16 @@ export class KyroClient {
             break;
           }
           delay = Math.max(delay, error.retryAfter * 1000, 5000);
-        } else delay = 5000;
+        }
+        failures++;
+        delay = Math.max(
+          delay,
+          Math.min(60000, 2000 * 2 ** Math.min(failures, 5)),
+        );
+        await this.emit("reconnecting", {
+          attempt: failures,
+          delayMs: delay,
+        }).catch(() => undefined);
       }
       if (this.running)
         await new Promise<void>((resolve) => {
@@ -366,25 +540,64 @@ export class KyroClient {
   /** Webhook hosts can dispatch a verified envelope through the same handlers. */
   async handleEvent(event: BotEvent) {
     await this.emit("event", event);
-    if (event.type === "messageCreate" || event.type === "messageUpdate")
+    if (event.type === "messageCreate" || event.type === "messageUpdate") {
+      const message = new KyroMessage(this, event.data as MessageData);
+      await this.emit(event.type, message);
+      await this.emit(
+        event.type === "messageCreate" ? "message.created" : "message.updated",
+        message,
+      );
+    } else if (
+      event.type === "interactionCreate" ||
+      [
+        "interaction.created",
+        "button.clicked",
+        "select_menu.selected",
+        "modal.submitted",
+      ].includes(event.type)
+    ) {
+      const interaction = new KyroInteraction(
+        this,
+        event.data as InteractionData,
+      );
+      if (interaction.data.acknowledgeBy) await interaction.acknowledge();
+      await this.emit(event.type as keyof ClientEvents, interaction as never);
+      if (event.type === "interactionCreate")
+        await this.emit("interaction.created", interaction);
+    } else if (
+      event.type === "message.created" ||
+      event.type === "message.updated"
+    )
       await this.emit(
         event.type,
         new KyroMessage(this, event.data as MessageData),
       );
-    else if (event.type === "interactionCreate")
-      await this.emit(
-        "interactionCreate",
-        new KyroInteraction(this, event.data as InteractionData),
-      );
     else if (this.listeners.has(event.type as keyof ClientEvents))
       await this.emit(event.type as keyof ClientEvents, event.data as never);
+    if (
+      event.name &&
+      event.name !== event.type &&
+      !["messageCreate", "messageUpdate", "interactionCreate"].includes(
+        event.type,
+      )
+    )
+      await this.emit(event.name as keyof ClientEvents, event.data as never);
   }
   async sendMessage(channelId: string, input: string | MessageInput) {
     const body = typeof input === "string" ? { content: input } : input;
+    const { files, ...jsonBody } = body;
+    const attachmentIds = [...(body.attachmentIds ?? [])];
+    for (const file of files ?? []) {
+      const data =
+        typeof file === "string"
+          ? { data: new Blob([await readFile(file)]), name: basename(file) }
+          : file;
+      attachmentIds.push(await this.upload(channelId, data.data, data.name));
+    }
     const data = await this.request<MessageData>(
       "POST",
       `/channels/${encodeURIComponent(channelId)}/messages`,
-      { ...body, nonce: body.nonce ?? crypto.randomUUID() },
+      { ...jsonBody, attachmentIds, nonce: body.nonce ?? randomUUID() },
     );
     return new KyroMessage(this, data);
   }
@@ -464,11 +677,66 @@ export class KyroClient {
       messageId: string | null;
     }>("POST", `/interactions/${encodeURIComponent(id)}/response`, response);
   }
+  autocomplete(id: string, choices: { label: string; value: string }[]) {
+    return this.request<{ accepted: boolean }>(
+      "POST",
+      `/interactions/${encodeURIComponent(id)}/choices`,
+      { choices },
+    );
+  }
   addReaction(channelId: string, messageId: string, emoji: string) {
     return this.request(
       "POST",
       `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/reactions`,
       { emoji },
+    );
+  }
+  removeReaction(channelId: string, messageId: string, emoji: string) {
+    return this.request<{ removed: boolean }>(
+      "DELETE",
+      `/channels/${encodeURIComponent(channelId)}/messages/${encodeURIComponent(messageId)}/reactions`,
+      { emoji },
+    );
+  }
+  file(id: string) {
+    return this.request<{
+      id: string;
+      name: string;
+      size: number;
+      mimeType: string;
+      ownerId: string;
+      createdAt: number;
+      url: string | null;
+    }>("GET", `/files/${encodeURIComponent(id)}`);
+  }
+  deleteFile(id: string) {
+    return this.request<{ deleted: boolean }>(
+      "DELETE",
+      `/files/${encodeURIComponent(id)}`,
+    );
+  }
+  timeout(
+    serverId: string,
+    userId: string,
+    durationMinutes: number,
+    reason = "Bot requested timeout",
+  ) {
+    return this.request<{ userId: string; communicationDisabledUntil: number }>(
+      "PUT",
+      `/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/timeout`,
+      { durationMinutes, reason },
+    );
+  }
+  clearTimeout(serverId: string, userId: string) {
+    return this.request<{ userId: string; communicationDisabledUntil: null }>(
+      "DELETE",
+      `/servers/${encodeURIComponent(serverId)}/members/${encodeURIComponent(userId)}/timeout`,
+    );
+  }
+  unban(serverId: string, userId: string) {
+    return this.request<{ unbanned: boolean }>(
+      "DELETE",
+      `/servers/${encodeURIComponent(serverId)}/bans/${encodeURIComponent(userId)}`,
     );
   }
   createPoll(
@@ -571,10 +839,16 @@ export class KyroClient {
     );
   }
   async upload(channelId: string, file: Blob, name: string) {
-    const { uploadUrl, maximumBytes } = await this.request<{
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { uploadUrl, maximumBytes, uploadId } = await this.request<{
       uploadUrl: string;
       maximumBytes: number;
-    }>("POST", `/channels/${encodeURIComponent(channelId)}/uploads`, {});
+      uploadId: string;
+    }>("POST", `/channels/${encodeURIComponent(channelId)}/uploads`, {
+      name,
+      size: file.size,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
     if (file.size > maximumBytes)
       throw new Error("File exceeds Kyro's upload limit.");
     const response = await this.transport(uploadUrl, {
@@ -588,7 +862,7 @@ export class KyroClient {
     await this.request(
       "POST",
       `/channels/${encodeURIComponent(channelId)}/uploads/register`,
-      { storageId, name },
+      { storageId, name, uploadId },
     );
     return storageId;
   }

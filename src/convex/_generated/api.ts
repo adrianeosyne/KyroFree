@@ -17,12 +17,16 @@ import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
 import type * as auth_passwordWithTwoFactor from "../auth/passwordWithTwoFactor.js";
 import type * as automod from "../automod.js";
+import type * as botAnalytics from "../botAnalytics.js";
 import type * as botApi from "../botApi.js";
+import type * as botApiExtra from "../botApiExtra.js";
 import type * as botApplications from "../botApplications.js";
 import type * as botCommands from "../botCommands.js";
 import type * as botDelivery from "../botDelivery.js";
 import type * as botEvents from "../botEvents.js";
+import type * as botGateway from "../botGateway.js";
 import type * as botHttp from "../botHttp.js";
+import type * as botInteractions from "../botInteractions.js";
 import type * as botLib from "../botLib.js";
 import type * as botMessages from "../botMessages.js";
 import type * as bots from "../bots.js";
@@ -33,6 +37,9 @@ import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
+import type * as developerManagement from "../developerManagement.js";
+import type * as developerSandbox from "../developerSandbox.js";
+import type * as developerSchema from "../developerSchema.js";
 import type * as emailDelivery from "../emailDelivery.js";
 import type * as emailDispatchUrl from "../emailDispatchUrl.js";
 import type * as emailOutbox from "../emailOutbox.js";
@@ -40,7 +47,11 @@ import type * as emailRefs from "../emailRefs.js";
 import type * as emailVerification from "../emailVerification.js";
 import type * as emailVerificationInternal from "../emailVerificationInternal.js";
 import type * as emojis from "../emojis.js";
+import type * as fileAccess from "../fileAccess.js";
+import type * as fileHttp from "../fileHttp.js";
 import type * as files from "../files.js";
+import type * as fileSchema from "../fileSchema.js";
+import type * as fileVerification from "../fileVerification.js";
 import type * as forums from "../forums.js";
 import type * as functions from "../functions.js";
 import type * as gifs from "../gifs.js";
@@ -95,12 +106,16 @@ const fullApi: ApiFromModules<{
   "auth/emailOtp": typeof auth_emailOtp,
   "auth/passwordWithTwoFactor": typeof auth_passwordWithTwoFactor,
   "automod": typeof automod,
+  "botAnalytics": typeof botAnalytics,
   "botApi": typeof botApi,
+  "botApiExtra": typeof botApiExtra,
   "botApplications": typeof botApplications,
   "botCommands": typeof botCommands,
   "botDelivery": typeof botDelivery,
   "botEvents": typeof botEvents,
+  "botGateway": typeof botGateway,
   "botHttp": typeof botHttp,
+  "botInteractions": typeof botInteractions,
   "botLib": typeof botLib,
   "botMessages": typeof botMessages,
   "bots": typeof bots,
@@ -111,6 +126,9 @@ const fullApi: ApiFromModules<{
   "cleanup": typeof cleanup,
   "conversations": typeof conversations,
   "crons": typeof crons,
+  "developerManagement": typeof developerManagement,
+  "developerSandbox": typeof developerSandbox,
+  "developerSchema": typeof developerSchema,
   "emailDelivery": typeof emailDelivery,
   "emailDispatchUrl": typeof emailDispatchUrl,
   "emailOutbox": typeof emailOutbox,
@@ -118,7 +136,11 @@ const fullApi: ApiFromModules<{
   "emailVerification": typeof emailVerification,
   "emailVerificationInternal": typeof emailVerificationInternal,
   "emojis": typeof emojis,
+  "fileAccess": typeof fileAccess,
+  "fileHttp": typeof fileHttp,
   "files": typeof files,
+  "fileSchema": typeof fileSchema,
+  "fileVerification": typeof fileVerification,
   "forums": typeof forums,
   "functions": typeof functions,
   "gifs": typeof gifs,

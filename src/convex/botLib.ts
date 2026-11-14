@@ -1,4 +1,5 @@
 import { ConvexError } from "convex/values";
+import { fileUrl } from "./fileAccess";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import {
@@ -102,7 +103,7 @@ export async function botServer(
       q.eq("applicationId", app._id).eq("serverId", serverId),
     )
     .unique();
-  if (!install)
+  if (!install || install.disabled)
     botError(403, "NOT_INSTALLED", "Install this bot in the server first.");
   const access = await requireServerAccess(ctx, serverId, app.botUserId);
   // Installation permissions are a ceiling, even if somebody assigns an administrator role.
@@ -199,6 +200,10 @@ export async function publicBot(ctx: Ctx, app: Doc<"botApplications">) {
     botId: app.botUserId,
     name: app.name,
     description: app.description,
+    website: app.website ?? "",
+    supportUrl: app.supportUrl ?? "",
+    privacyUrl: app.privacyUrl ?? "",
+    termsUrl: app.termsUrl ?? "",
     username: bot?.username ?? "deleted_bot",
     botDescription: bot?.bio ?? "",
     avatarUrl: bot?.avatarStorageId
@@ -232,13 +237,18 @@ export async function publicBot(ctx: Ctx, app: Doc<"botApplications">) {
       (app.lastActiveAt ?? 0) > Date.now() - 90_000,
   };
 }
-export async function messageDto(ctx: Ctx, message: Doc<"messages">) {
+export async function messageDto(
+  ctx: Ctx,
+  message: Doc<"messages">,
+  viewerId?: Id<"users">,
+) {
   const author = await ctx.db.get(message.authorId);
   return {
     id: message._id,
     channelId: message.containerId,
     content: message.content,
     embeds: message.embeds ?? [],
+    components: message.components ?? [],
     replyToId: message.replyToId ?? null,
     createdAt: message.createdAt,
     editedAt: message.editedAt ?? null,
@@ -253,7 +263,8 @@ export async function messageDto(ctx: Ctx, message: Doc<"messages">) {
         name: a.name,
         size: a.size,
         mimeType: a.mimeType,
-        url: await ctx.storage.getUrl(a.storageId),
+        storageId: a.storageId,
+        url: viewerId ? fileUrl(a.storageId, viewerId, message._id) : null,
       })),
     ),
   };

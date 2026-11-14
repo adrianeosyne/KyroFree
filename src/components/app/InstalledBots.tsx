@@ -12,15 +12,48 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { PermissionPicker, useBotTask } from "./BotPlatformShared";
+function InstallationActivity({
+  applicationId,
+  serverId,
+}: {
+  applicationId: Id<"botApplications">;
+  serverId: Id<"servers">;
+}) {
+  const activity = useQuery(api.developerManagement.installationActivity, {
+    applicationId,
+    serverId,
+  });
+  return (
+    <details>
+      <summary className="cursor-pointer text-sm">
+        Recent activity and installation audit
+      </summary>
+      <div className="mt-3 max-h-48 space-y-2 overflow-auto text-xs text-muted-foreground">
+        {activity?.logs.map((l) => (
+          <p key={l.id}>
+            {new Date(l.createdAt).toLocaleString()} · {l.action}
+          </p>
+        ))}
+        {activity?.events.map((e) => (
+          <p key={e.id}>
+            {new Date(e.createdAt).toLocaleString()} · {e.type} · {e.status}
+          </p>
+        ))}
+      </div>
+    </details>
+  );
+}
 export function InstalledBots({ serverId }: { serverId: Id<"servers"> }) {
   const bots = useQuery(api.botApplications.installations, { serverId });
   const update = useMutation(api.botApplications.install);
   const remove = useMutation(api.botApplications.removeInstallation);
+  const changeState = useMutation(api.developerManagement.installationState);
   const task = useBotTask();
   const [selected, setSelected] = useState<{
     applicationId: Id<"botApplications">;
     name: string;
     permissions: string[];
+    disabled?: boolean;
   } | null>(null);
   const [removing, setRemoving] = useState(false);
   return (
@@ -50,7 +83,12 @@ export function InstalledBots({ serverId }: { serverId: Id<"servers"> }) {
               </p>
               <p className="text-xs text-muted-foreground">
                 {bot.permissions.length} permissions ·{" "}
-                {bot.enabled ? "Enabled" : "Unavailable"}
+                {bot.disabled
+                  ? "Disabled in this server"
+                  : bot.enabled
+                    ? "Enabled"
+                    : "Unavailable"}{" "}
+                · Installed {new Date(bot.createdAt).toLocaleDateString()}
               </p>
             </div>
             <Button
@@ -93,6 +131,26 @@ export function InstalledBots({ serverId }: { serverId: Id<"servers"> }) {
               }
             />
           )}
+          {selected && !removing && (
+            <Button
+              variant="outline"
+              disabled={task.busy}
+              onClick={() =>
+                void task.run(async () => {
+                  await changeState({
+                    applicationId: selected.applicationId,
+                    serverId,
+                    disabled: !selected.disabled,
+                  });
+                  setSelected({ ...selected, disabled: !selected.disabled });
+                }, "Installation updated")
+              }
+            >
+              {selected.disabled
+                ? "Enable in this server"
+                : "Disable in this server"}
+            </Button>
+          )}
           <div className="flex gap-3">
             {selected && !removing && (
               <Button
@@ -132,6 +190,12 @@ export function InstalledBots({ serverId }: { serverId: Id<"servers"> }) {
               {removing ? "Confirm removal" : "Remove bot"}
             </Button>
           </div>
+          {selected && !removing && (
+            <InstallationActivity
+              applicationId={selected.applicationId}
+              serverId={serverId}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </section>

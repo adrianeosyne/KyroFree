@@ -79,7 +79,17 @@ export const get = query({
     return {
       ...(await publicBot(ctx, app)),
       tokenConfigured: Boolean(app.tokenHash),
+      webhookMaxAttempts: app.webhookMaxAttempts ?? 6,
+      webhookRetrySeconds: app.webhookRetrySeconds ?? 60,
+      sandboxServerId: app.sandboxServerId ?? null,
       tokenUpdatedAt: app.tokenUpdatedAt,
+      website: app.website ?? "",
+      supportUrl: app.supportUrl ?? "",
+      privacyUrl: app.privacyUrl ?? "",
+      termsUrl: app.termsUrl ?? "",
+      contactEmail: app.contactEmail ?? "",
+      redirectUris: app.redirectUris ?? [],
+      transferTo: app.transferTo ?? null,
       events: app.events,
       webhookUrl: app.webhookUrl ?? "",
       deliveryMode: app.deliveryMode,
@@ -104,6 +114,7 @@ export const get = query({
           name: (await ctx.db.get(i.serverId))?.name ?? "Deleted server",
           permissions: i.permissions,
           createdAt: i.createdAt,
+          disabled: Boolean(i.disabled),
         })),
       ),
     };
@@ -321,6 +332,8 @@ export const events = mutation({
     events: v.array(v.string()),
     deliveryMode: v.union(v.literal("poll"), v.literal("webhook")),
     webhookUrl: v.string(),
+    webhookMaxAttempts: v.optional(v.number()),
+    webhookRetrySeconds: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const app = await ownerApp(ctx, args.applicationId);
@@ -330,6 +343,21 @@ export const events = mutation({
     )
       botError(400, "INVALID_EVENTS", "Select supported events.");
     let webhookUrl: string | undefined;
+    if (
+      (args.webhookMaxAttempts !== undefined &&
+        (!Number.isInteger(args.webhookMaxAttempts) ||
+          args.webhookMaxAttempts < 1 ||
+          args.webhookMaxAttempts > 6)) ||
+      (args.webhookRetrySeconds !== undefined &&
+        (!Number.isInteger(args.webhookRetrySeconds) ||
+          args.webhookRetrySeconds < 10 ||
+          args.webhookRetrySeconds > 3600))
+    )
+      botError(
+        400,
+        "INVALID_RETRY",
+        "Use 1–6 attempts and a retry base of 10–3600 seconds.",
+      );
     if (args.deliveryMode === "webhook") {
       try {
         const url = new URL(args.webhookUrl);
@@ -356,6 +384,10 @@ export const events = mutation({
       events: [...new Set([...args.events, "interactionCreate"])],
       deliveryMode: args.deliveryMode,
       webhookUrl,
+      webhookMaxAttempts:
+        args.webhookMaxAttempts ?? app.webhookMaxAttempts ?? 6,
+      webhookRetrySeconds:
+        args.webhookRetrySeconds ?? app.webhookRetrySeconds ?? 60,
       updatedAt: Date.now(),
     });
     await auditBot(ctx, app._id, "events.configure", app.ownerId);
@@ -525,10 +557,30 @@ export const install = mutation({
     applicationId: v.id("botApplications"),
     serverId: v.id("servers"),
     permissions: v.array(v.string()),
+    authorizationId: v.optional(v.id("botAuthorizations")),
   },
   handler: async (ctx, args) => {
     const permissions = validPermissions(args.permissions);
     const manager = await humanManager(ctx, args.serverId, permissions);
+    if (args.authorizationId) {
+      const authorization = await ctx.db.get(args.authorizationId);
+      if (
+        !authorization ||
+        authorization.usedAt ||
+        authorization.expiresAt < Date.now() ||
+        authorization.userId !== manager.id ||
+        authorization.applicationId !== args.applicationId ||
+        authorization.serverId !== args.serverId ||
+        JSON.stringify([...authorization.permissions].sort()) !==
+          JSON.stringify([...permissions].sort())
+      )
+        botError(
+          400,
+          "INVALID_AUTHORIZATION",
+          "Installation authorization is expired, used or does not match the request.",
+        );
+      await ctx.db.patch(authorization._id, { usedAt: Date.now() });
+    }
     const app = await ctx.db.get(args.applicationId);
     if (!app || !app.enabled || app.suspended || app.deletedAt)
       botError(404, "NOT_FOUND", "Bot unavailable.");
@@ -641,6 +693,8 @@ export const installations = query({
           permissions: row.permissions,
           name: app?.name ?? "Deleted bot",
           enabled: app?.enabled && !app.suspended,
+          disabled: Boolean(row.disabled),
+          createdAt: row.createdAt,
         };
       }),
     );

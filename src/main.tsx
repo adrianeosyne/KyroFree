@@ -23,6 +23,7 @@ const PrivacyPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.PrivacyPage })),
 );
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
+const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
 
 // Simple loading fallback for route transitions
 function RouteLoading() {
@@ -148,7 +149,17 @@ createRoot(document.getElementById("root")!).render(
           <RouteSyncer />
           <Suspense fallback={<RouteLoading />}>
             <Routes>
-              <Route path="/" element={<Landing />} />
+              <Route
+                path="/"
+                element={
+                  window.location.hostname === "docs.kyro-chat.cyou" ? (
+                    <DeveloperDocs />
+                  ) : (
+                    <Landing />
+                  )
+                }
+              />
+              <Route path="/docs/:slug?" element={<DeveloperDocs />} />
               <Route path="/download" element={<DownloadPage />} />
               <Route
                 path="/auth"

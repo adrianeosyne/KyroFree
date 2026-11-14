@@ -1,12 +1,40 @@
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
+const commandOptionValidator = v.object({
+  name: v.string(),
+  description: v.string(),
+  type: v.union(
+    v.literal("string"),
+    v.literal("integer"),
+    v.literal("number"),
+    v.literal("boolean"),
+    v.literal("user"),
+    v.literal("channel"),
+    v.literal("role"),
+  ),
+  required: v.boolean(),
+  choices: v.optional(v.array(v.string())),
+  autocomplete: v.optional(v.boolean()),
+});
+
 export const botTables = {
   botApplications: defineTable({
     ownerId: v.id("users"),
     botUserId: v.id("users"),
     name: v.string(),
     description: v.string(),
+    website: v.optional(v.string()),
+    supportUrl: v.optional(v.string()),
+    privacyUrl: v.optional(v.string()),
+    termsUrl: v.optional(v.string()),
+    contactEmail: v.optional(v.string()),
+    redirectUris: v.optional(v.array(v.string())),
+    transferTo: v.optional(v.id("users")),
+    sandboxServerId: v.optional(v.id("servers")),
+    webhookEnabled: v.optional(v.boolean()),
+    webhookMaxAttempts: v.optional(v.number()),
+    webhookRetrySeconds: v.optional(v.number()),
     iconStorageId: v.optional(v.id("_storage")),
     bannerStorageId: v.optional(v.id("_storage")),
     enabled: v.boolean(),
@@ -30,6 +58,7 @@ export const botTables = {
     updatedAt: v.number(),
   })
     .index("by_owner", ["ownerId"])
+    .index("by_transfer", ["transferTo"])
     .index("by_token", ["tokenHash"])
     .index("by_public", ["discoverable", "createdAt"]),
   botInstallations: defineTable({
@@ -37,6 +66,7 @@ export const botTables = {
     serverId: v.id("servers"),
     roleId: v.id("serverRoles"),
     installedBy: v.id("users"),
+    disabled: v.optional(v.boolean()),
     permissions: v.array(v.string()),
     createdAt: v.number(),
   })
@@ -44,32 +74,40 @@ export const botTables = {
     .index("by_server", ["serverId"])
     .index("by_app_server", ["applicationId", "serverId"]),
   botCommands: defineTable({
+    type: v.optional(
+      v.union(v.literal("slash"), v.literal("user"), v.literal("message")),
+    ),
+    subcommands: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          description: v.string(),
+          group: v.optional(v.string()),
+          options: v.array(commandOptionValidator),
+        }),
+      ),
+    ),
     applicationId: v.id("botApplications"),
     serverId: v.optional(v.id("servers")),
     name: v.string(),
     description: v.string(),
     permissions: v.array(v.string()),
-    options: v.array(
-      v.object({
-        name: v.string(),
-        description: v.string(),
-        type: v.union(
-          v.literal("string"),
-          v.literal("integer"),
-          v.literal("boolean"),
-          v.literal("user"),
-        ),
-        required: v.boolean(),
-        choices: v.optional(v.array(v.string())),
-      }),
-    ),
+    options: v.array(commandOptionValidator),
     updatedAt: v.number(),
   })
     .index("by_app", ["applicationId"])
     .index("by_app_scope_name", ["applicationId", "serverId", "name"]),
   botInteractions: defineTable({
     applicationId: v.id("botApplications"),
-    commandId: v.id("botCommands"),
+    commandId: v.optional(v.id("botCommands")),
+    kind: v.optional(v.string()),
+    customId: v.optional(v.string()),
+    sourceMessageId: v.optional(v.id("messages")),
+    acknowledgedAt: v.optional(v.number()),
+    acknowledgeBy: v.optional(v.number()),
+    modal: v.optional(v.string()),
+    modalSubmittedAt: v.optional(v.number()),
+    choices: v.optional(v.string()),
     userId: v.id("users"),
     serverId: v.id("servers"),
     channelId: v.id("channels"),

@@ -35,10 +35,17 @@ export default async function handler(
     if (incoming.pathname === "/api/bots" && rewrittenPath) {
       if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(rewrittenPath))
         return fail(404, "NOT_FOUND", "Unknown bot API path.");
-      incoming.pathname = `/api/bots/v1/${rewrittenPath}`;
+      incoming.pathname =
+        incoming.searchParams.get("version") === "v1"
+          ? `/api/v1/${rewrittenPath}`
+          : `/api/bots/v1/${rewrittenPath}`;
     }
     incoming.searchParams.delete("botPath");
-    if (!incoming.pathname.startsWith("/api/bots/v1/"))
+    incoming.searchParams.delete("version");
+    if (
+      !incoming.pathname.startsWith("/api/bots/v1/") &&
+      !incoming.pathname.startsWith("/api/v1/")
+    )
       return fail(404, "NOT_FOUND", "Unknown API version.");
     let body: string | undefined;
     if (req.method !== "GET") {

@@ -7,6 +7,18 @@ import {
 
 const crons = cronJobs();
 crons.interval(
+  "clean developer telemetry",
+  { hours: 1 },
+  makeFunctionReference<"mutation">("botAnalytics:cleanup"),
+  {},
+);
+crons.interval(
+  "clean upload reservations",
+  { hours: 1 },
+  makeFunctionReference<"mutation">("files:cleanup"),
+  {},
+);
+crons.interval(
   "expire presence leases",
   { minutes: 1 },
   makeFunctionReference<"mutation">("presence:expire"),

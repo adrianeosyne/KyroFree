@@ -17,9 +17,15 @@ import { messageSchema, pollSchema } from "../lib/botContract";
 import { sendBotMessage, validateBotMessage } from "./botMessages";
 import { registerCommand } from "./botCommands";
 import { deleteChannelData, deleteMessageData } from "./cleanup";
-import { isAllowedUploadType, MAX_UPLOAD_BYTES } from "./uploadSecurity";
+import { MAX_UPLOAD_BYTES } from "./uploadSecurity";
 import { eventDto, eventVisible } from "./botEvents";
 import { renewPresence } from "./presence";
+import { reserveUpload, registerReservedUpload } from "./files";
+import { gatewayRequest } from "./botGateway";
+import { botApiExtra } from "./botApiExtra";
+import { recordUsage } from "./botAnalytics";
+import { interactionApi } from "./botInteractions";
+import { matchApiEndpoint } from "../lib/apiReference";
 
 function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   const result = schema.safeParse(body);
@@ -59,6 +65,15 @@ export const execute = internalMutation({
     const p = args.path.split("/").filter(Boolean);
     const method = args.method;
     const body: unknown = args.body;
+    if (!matchApiEndpoint(method, args.path))
+      botError(404, "NOT_FOUND", "Unknown API endpoint or HTTP method.");
+    if (p[0] === "gateway") return gatewayRequest(ctx, app, method, p, body);
+    const extra = await botApiExtra(ctx, app, method, p, body, args.query);
+    if (extra.handled) return extra.data;
+    if (p[0] === "interactions") {
+      const interaction = await interactionApi(ctx, app, method, p, body);
+      if (interaction.handled) return interaction.data;
+    }
     if (method === "GET" && p.length === 1 && p[0] === "me") {
       const bot = await ctx.db.get(app.botUserId);
       return {
@@ -83,6 +98,8 @@ export const execute = internalMutation({
           description: c.description,
           permissions: c.permissions,
           options: c.options,
+          type: c.type ?? "slash",
+          subcommands: c.subcommands ?? [],
           updatedAt: c.updatedAt,
         }));
       if (method === "POST" && p.length === 1) {
@@ -101,6 +118,22 @@ export const execute = internalMutation({
     }
     if (p[0] === "events") {
       if (method === "GET" && p.length === 1) {
+        const sessionId = args.query?.sessionId;
+        if (sessionId !== undefined) {
+          const id =
+            typeof sessionId === "string"
+              ? ctx.db.normalizeId("botGatewaySessions", sessionId)
+              : null;
+          const session = id ? await ctx.db.get(id) : null;
+          if (
+            !session ||
+            session.applicationId !== app._id ||
+            session.tokenVersion !== app.tokenUpdatedAt ||
+            session.closedAt ||
+            session.expiresAt < Date.now()
+          )
+            botError(401, "SESSION_EXPIRED", "Reconnect to the gateway.");
+        }
         if (app.deliveryMode !== "poll")
           botError(
             409,
@@ -145,7 +178,7 @@ export const execute = internalMutation({
             leaseUntil: now + 60000,
             nextAttemptAt: now + 60000,
           });
-          events.push(eventDto(event));
+          events.push(eventDto(event, app.botUserId));
         }
         return { events };
       }
@@ -158,11 +191,13 @@ export const execute = internalMutation({
           const event = await ctx.db.get(tableId(ctx, "botEvents", value));
           if (!event || event.applicationId !== app._id)
             botError(404, "NOT_FOUND", "Event not found.");
-          if (event.status === "leased")
+          if (event.status === "leased") {
+            await recordUsage(ctx, app._id, "delivered");
             await ctx.db.patch(event._id, {
               status: "delivered",
               deliveredAt: Date.now(),
             });
+          }
         }
         return { acknowledged: ids.length };
       }
@@ -178,6 +213,12 @@ export const execute = internalMutation({
       );
       if (!interaction || interaction.applicationId !== app._id)
         botError(404, "NOT_FOUND", "Interaction not found.");
+      if (interaction.kind === "autocomplete")
+        botError(
+          400,
+          "INVALID_INTERACTION",
+          "Autocomplete interactions accept choices only.",
+        );
       if (interaction.respondedAt)
         botError(
           409,
@@ -186,6 +227,16 @@ export const execute = internalMutation({
         );
       if (interaction.expiresAt < Date.now())
         botError(410, "INTERACTION_EXPIRED", "Interaction expired.");
+      if (
+        interaction.acknowledgeBy &&
+        !interaction.acknowledgedAt &&
+        interaction.acknowledgeBy < Date.now()
+      )
+        botError(
+          410,
+          "INTERACTION_EXPIRED",
+          "Acknowledge interactions within 15 seconds.",
+        );
       const response = parse(
         z
           .object({
@@ -214,6 +265,7 @@ export const execute = internalMutation({
         ).id;
       await ctx.db.patch(interaction._id, {
         respondedAt: Date.now(),
+        acknowledgedAt: interaction.acknowledgedAt ?? Date.now(),
         ephemeral: response.ephemeral,
         response: response.ephemeral ? response.content : undefined,
         messageId,
@@ -575,17 +627,30 @@ export const execute = internalMutation({
       }
       if (p[2] === "uploads" && method === "POST") {
         await botChannel(ctx, app, channelId, "upload_attachments");
-        if (p.length === 3)
-          return {
-            uploadUrl: await ctx.storage.generateUploadUrl(),
-            maximumBytes: MAX_UPLOAD_BYTES,
-          };
+        if (p.length === 3) {
+          const data = parse(
+            z
+              .object({
+                name: z.string().min(1).max(255),
+                size: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+                sha256: z.string().regex(/^[a-f0-9]{64}$/),
+              })
+              .strict(),
+            body,
+          );
+          return reserveUpload(ctx, app.botUserId, {
+            ...data,
+            applicationId: app._id,
+            channelId,
+          });
+        }
         if (p[3] === "register" && p.length === 4) {
           const data = parse(
             z
               .object({
                 storageId: z.string(),
                 name: z.string().min(1).max(255),
+                uploadId: z.string().optional(),
               })
               .strict(),
             body,
@@ -602,28 +667,34 @@ export const execute = internalMutation({
                 "UPLOAD_OWNERSHIP",
                 "Upload belongs to another account.",
               );
-            return { storageId };
+            if (!data.uploadId)
+              botError(
+                400,
+                "RESERVATION_REQUIRED",
+                "Supply the upload reservation ID.",
+              );
           }
-          const meta = await ctx.db.system.get("_storage", storageId);
-          if (
-            !meta ||
-            meta.size > MAX_UPLOAD_BYTES ||
-            !isAllowedUploadType(meta.contentType ?? "")
-          )
+          if (!data.uploadId)
             botError(
               400,
-              "INVALID_UPLOAD",
-              "Unsupported file or file exceeds 10 MiB.",
+              "RESERVATION_REQUIRED",
+              "Supply the upload reservation ID.",
             );
-          await ctx.db.insert("uploads", {
+          const uploadId = ctx.db.normalizeId("uploadTickets", data.uploadId);
+          if (!uploadId)
+            botError(404, "NOT_FOUND", "Upload reservation not found.");
+          const ticket = await ctx.db.get(uploadId);
+          if (
+            ticket?.channelId !== channelId ||
+            ticket.applicationId !== app._id
+          )
+            botError(403, "UPLOAD_SCOPE", "Upload belongs to another channel.");
+          return registerReservedUpload(
+            ctx,
+            app.botUserId,
             storageId,
-            ownerId: app.botUserId,
-            name: data.name,
-            size: meta.size,
-            mimeType: meta.contentType!,
-            createdAt: Date.now(),
-          });
-          return { storageId };
+            uploadId,
+          );
         }
       }
       if (p[2] === "messages") {
@@ -652,7 +723,9 @@ export const execute = internalMutation({
             .paginate({ numItems: query.limit, cursor: query.cursor ?? null });
           const rows = page.page;
           return {
-            messages: await Promise.all(rows.map((m) => messageDto(ctx, m))),
+            messages: await Promise.all(
+              rows.map((m) => messageDto(ctx, m, app.botUserId)),
+            ),
             nextCursor: page.isDone ? null : page.continueCursor,
             nextBefore:
               rows.length === query.limit
@@ -665,7 +738,7 @@ export const execute = internalMutation({
           botError(404, "NOT_FOUND", "Message not found.");
         if (p.length === 4 && method === "GET") {
           await botChannel(ctx, app, channelId, "read_message_history");
-          return messageDto(ctx, message);
+          return messageDto(ctx, message, app.botUserId);
         }
         if (p.length === 4 && method === "PATCH") {
           if (message.authorId !== app.botUserId)
@@ -685,9 +758,14 @@ export const execute = internalMutation({
           await ctx.db.patch(message._id, {
             content: input.content,
             embeds: input.embeds,
+            components: input.components,
             editedAt: Date.now(),
           });
-          return messageDto(ctx, (await ctx.db.get(message._id))!);
+          return messageDto(
+            ctx,
+            (await ctx.db.get(message._id))!,
+            app.botUserId,
+          );
         }
         if (p.length === 4 && method === "DELETE") {
           if (message.authorId !== app.botUserId)

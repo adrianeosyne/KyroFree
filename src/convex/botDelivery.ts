@@ -3,6 +3,7 @@ import { makeFunctionReference } from "convex/server";
 import { internalMutation, internalQuery, mutation } from "./functions";
 import { activeBot, botError, ownerApp } from "./botLib";
 import { eventDto, eventVisible } from "./botEvents";
+import { recordUsage } from "./botAnalytics";
 
 export const claim = internalMutation({
   args: { eventId: v.id("botEvents") },
@@ -23,7 +24,11 @@ export const claim = internalMutation({
     } catch {
       /* Deleted, suspended or revoked applications cannot receive events. */
     }
-    if (!allowed || event.expiresAt < Date.now() || event.attempts >= 6) {
+    if (
+      !allowed ||
+      event.expiresAt < Date.now() ||
+      event.attempts >= (app.webhookMaxAttempts ?? 6)
+    ) {
       await ctx.db.patch(eventId, {
         status: "dead",
         lastError: "EXPIRED_OR_ACCESS_REVOKED",
@@ -37,7 +42,11 @@ export const claim = internalMutation({
       leaseUntil: Date.now() + 60000,
       nextAttemptAt: Date.now() + 60000,
     });
-    return { url: app.webhookUrl, event: eventDto(event), attempt };
+    return {
+      url: app.webhookUrl,
+      event: eventDto(event, app.botUserId),
+      attempt,
+    };
   },
 });
 export const finish = internalMutation({
@@ -51,6 +60,12 @@ export const finish = internalMutation({
     const event = await ctx.db.get(args.eventId);
     if (!event || event.status !== "leased" || event.attempts !== args.attempt)
       return;
+    const app = await ctx.db.get(event.applicationId);
+    await recordUsage(
+      ctx,
+      event.applicationId,
+      args.success ? "delivered" : "failed",
+    );
     if (args.success)
       await ctx.db.patch(event._id, {
         status: "delivered",
@@ -59,12 +74,13 @@ export const finish = internalMutation({
       });
     else
       await ctx.db.patch(event._id, {
-        status: event.attempts >= 6 ? "dead" : "pending",
+        status:
+          event.attempts >= (app?.webhookMaxAttempts ?? 6) ? "dead" : "pending",
         nextAttemptAt:
           Date.now() +
-          [60000, 300000, 900000, 3600000, 21600000][
-            Math.min(event.attempts - 1, 4)
-          ],
+          (app?.webhookRetrySeconds ?? 60) *
+            1000 *
+            [1, 5, 15, 60, 360][Math.min(event.attempts - 1, 4)],
         lastError: args.error?.slice(0, 100) ?? "DELIVERY_FAILED",
       });
   },

@@ -14,6 +14,7 @@ export const PERMISSIONS = {
   MANAGE_MESSAGES: "manage_messages",
   KICK_MEMBERS: "kick_members",
   BAN_MEMBERS: "ban_members",
+  TIMEOUT_MEMBERS: "timeout_members",
   CREATE_INVITES: "create_invites",
   VIEW_CHANNEL: "view_channel",
   SEND_MESSAGES: "send_messages",
@@ -106,6 +107,11 @@ export const PERMISSION_META: Record<
   Permission,
   { label: string; description: string }
 > = {
+  timeout_members: {
+    label: "Timeout members",
+    description:
+      "Temporarily prevent lower-ranking members from communicating.",
+  },
   read_message_history: {
     label: "Read message history",
     description: "Read existing channel messages through the bot API.",

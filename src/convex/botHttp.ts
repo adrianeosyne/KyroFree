@@ -36,7 +36,7 @@ function reply(
 export const botHttp = httpAction(async (ctx, request) => {
   if (
     request.method === "GET" &&
-    new URL(request.url).pathname === "/api/bots/v1/webhook-key"
+    /\/webhook-key$/.test(new URL(request.url).pathname)
   ) {
     try {
       const data = await ctx.runAction(
@@ -68,9 +68,31 @@ export const botHttp = httpAction(async (ctx, request) => {
       },
     });
   const tokenHash = sha256Hex(authorization.slice(4));
+  const started = Date.now();
+  const apiPath = new URL(request.url).pathname.replace(
+    /^\/api\/(?:bots\/)?v1\//,
+    "",
+  );
+  const respond = async (
+    status: number,
+    payload: unknown,
+    extra: Record<string, string> = {},
+  ) => {
+    await ctx.runMutation(
+      makeFunctionReference<"mutation">("botAnalytics:requestFinished"),
+      {
+        tokenHash,
+        method: request.method,
+        path: apiPath,
+        status,
+        durationMs: Date.now() - started,
+      },
+    );
+    return reply(status, payload, extra);
+  };
   try {
     if (!(await ctx.runMutation(authorize, { tokenHash })).allowed)
-      return reply(
+      return respond(
         429,
         {
           ok: false,
@@ -93,7 +115,7 @@ export const botHttp = httpAction(async (ctx, request) => {
         bytes += value.byteLength;
         if (bytes > 65536) {
           await reader.cancel();
-          return reply(413, {
+          return respond(413, {
             ok: false,
             error: {
               code: "PAYLOAD_TOO_LARGE",
@@ -108,7 +130,7 @@ export const botHttp = httpAction(async (ctx, request) => {
         try {
           body = JSON.parse(text);
         } catch {
-          return reply(400, {
+          return respond(400, {
             ok: false,
             error: { code: "INVALID_JSON", message: "Provide valid JSON." },
           });
@@ -116,16 +138,39 @@ export const botHttp = httpAction(async (ctx, request) => {
       }
     }
     const url = new URL(request.url);
-    const path = url.pathname.slice("/api/bots/v1/".length);
+    const path = url.pathname.replace(/^\/api\/(?:bots\/)?v1\//, "");
     const query = Object.fromEntries(url.searchParams);
-    const data = await ctx.runMutation(execute, {
+    let data = await ctx.runMutation(execute, {
       tokenHash,
       method: request.method,
       path,
       body,
       query,
     });
-    return reply(
+    if (
+      request.method === "POST" &&
+      /^channels\/[^/]+\/uploads\/register$/.test(path) &&
+      data &&
+      typeof data === "object" &&
+      "uploadId" in data
+    ) {
+      try {
+        data = await ctx.runAction(
+          makeFunctionReference<"action">("fileVerification:verify"),
+          { uploadId: data.uploadId },
+        );
+      } catch {
+        return respond(400, {
+          ok: false,
+          error: {
+            code: "INVALID_UPLOAD",
+            message:
+              "File verification failed. Check its type, content and SHA-256 digest.",
+          },
+        });
+      }
+    }
+    return respond(
       request.method === "POST" &&
         /^(commands|channels\/[^/]+\/messages)$/.test(path)
         ? 201
@@ -142,12 +187,12 @@ export const botHttp = httpAction(async (ctx, request) => {
       "code" in data &&
       "message" in data
     )
-      return reply(
+      return respond(
         data.status,
         { ok: false, error: { code: data.code, message: data.message } },
         data.status === 429 ? { "Retry-After": "5" } : {},
       );
-    return reply(403, {
+    return respond(403, {
       ok: false,
       error: {
         code: "REQUEST_REJECTED",

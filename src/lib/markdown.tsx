@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
+const MermaidDiagram = lazy(() => import("@/components/app/MermaidDiagram"));
 import type { CustomEmoji } from "@/lib/emoji";
 
 /**
@@ -224,6 +225,18 @@ export function renderMessage(
   const segments = content.split(/```/);
   return segments.map((segment, index) => {
     if (index % 2 === 1) {
+      if (/^mermaid\r?\n/.test(segment)) {
+        return (
+          <Suspense
+            key={`diagram-${index}`}
+            fallback={<pre className="overflow-auto text-xs">{segment}</pre>}
+          >
+            <MermaidDiagram
+              source={segment.replace(/^mermaid\r?\n/, "").trimEnd()}
+            />
+          </Suspense>
+        );
+      }
       const body = segment.replace(/^[a-zA-Z0-9]+\n/, "");
       return (
         <pre

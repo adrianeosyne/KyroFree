@@ -26,12 +26,7 @@ import {
 import type { ReplyTarget } from "@/components/app/MessageList";
 import { formatBytes } from "@/lib/format";
 import { useUiStore } from "@/lib/store";
-import {
-  ACCEPTED_UPLOAD,
-  MAX_ATTACHMENTS,
-  useUploadFile,
-  type PendingAttachment,
-} from "@/lib/upload";
+import { ACCEPTED_UPLOAD, MAX_ATTACHMENTS } from "@/lib/upload";
 import { cn } from "@/lib/utils";
 import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
@@ -43,6 +38,8 @@ import { StyledDisplayName } from "@/components/app/StyledDisplayName";
 import { PollComposerDialog } from "@/components/app/PollComposerDialog";
 import { roleMentionToken } from "@/lib/permissions";
 import { BotCommandDialog, BotInteractionResponses } from "./BotCommandDialog";
+import { MermaidComposer } from "./MermaidComposer";
+import { useUploadQueue } from "@/lib/useUploadQueue";
 
 export interface MentionUser {
   id: string;
@@ -107,15 +104,19 @@ export function Composer({
       ? { channelId: containerId as Id<"channels"> }
       : "skip",
   );
-  const upload = useUploadFile();
+  const uploads = useUploadQueue(draftKey);
+  const { attachments, addFiles: queueFiles } = uploads;
+  const uploading = uploads.jobs.filter(
+    (job) => job.status === "uploading",
+  ).length;
+  const [dragging, setDragging] = useState(false);
   const convex = useConvex();
   const registerGifShare = useAction(api.gifs.registerShare);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [uploading, setUploading] = useState(0);
   const [busy, setBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
+  const [diagramOpen, setDiagramOpen] = useState(false);
   const [customEmojis, setCustomEmojis] = useState<CustomEmoji[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState<number | null>(null);
@@ -135,6 +136,10 @@ export function Composer({
   const discardRecordingRef = useRef(false);
   const recordingIntervalRef = useRef<number | null>(null);
   const recordingTimeoutRef = useRef<number | null>(null);
+
+  const addFiles = (files: FileList | File[] | null) => {
+    if (!busy && !recording) queueFiles(files);
+  };
 
   const updateMentionState = (value: string, cursor: number | null) => {
     if (cursor === null) {
@@ -198,7 +203,10 @@ export function Composer({
   const commandMatch =
     containerType === "channel" ? draft.match(/^\/([a-z0-9_:-]*)$/i) : null;
   const commandOptions = commandMatch
-    ? [...(botCommands ?? []), ...(externalCommands ?? [])]
+    ? [
+        ...(botCommands ?? []),
+        ...(externalCommands ?? []).filter((c) => c.type === "slash"),
+      ]
         .filter((command) =>
           command.name.toLowerCase().startsWith(commandMatch[1].toLowerCase()),
         )
@@ -287,10 +295,18 @@ export function Composer({
   const send = async () => {
     const content = draft.trim();
     if (!content && attachments.length === 0) return;
-    if (busy) return;
+    if (busy || recording || uploads.pending) return;
     setBusy(true);
     const clientId = crypto.randomUUID();
     try {
+      if (
+        containerType === "channel" &&
+        /^\/[a-z0-9_-]+:/i.test(content) &&
+        externalCommands === undefined
+      ) {
+        toast.error("Application commands are loading. Try again in a moment.");
+        return;
+      }
       const installedCommand = externalCommands?.find(
         (entry) =>
           content === `/${entry.name}` || content.startsWith(`/${entry.name} `),
@@ -348,7 +364,7 @@ export function Composer({
       }
       setDraft(draftKey, "");
       setMentionQuery(null);
-      setAttachments([]);
+      uploads.clear();
       onCancelReply();
       onSent?.();
       textareaRef.current?.focus();
@@ -356,27 +372,6 @@ export function Composer({
       toast.error(readableError(error, "Message failed to send."));
     } finally {
       setBusy(false);
-    }
-  };
-
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files || files.length === 0) return;
-    const room = MAX_ATTACHMENTS - attachments.length;
-    if (room <= 0) {
-      toast.error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
-      return;
-    }
-    const chosen = Array.from(files).slice(0, room);
-    setUploading((count) => count + chosen.length);
-    for (const file of chosen) {
-      try {
-        const stored = await upload(file);
-        setAttachments((state) => [...state, stored]);
-      } catch (error) {
-        toast.error(readableError(error, "Upload failed."));
-      } finally {
-        setUploading((count) => count - 1);
-      }
     }
   };
 
@@ -493,7 +488,30 @@ export function Composer({
   }
 
   return (
-    <div className="bg-transparent px-3 pb-4 pt-2 sm:px-5">
+    <div
+      className={cn(
+        "bg-transparent px-3 pb-4 pt-2 sm:px-5",
+        dragging && "ring-2 ring-inset ring-primary",
+      )}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) {
+          event.preventDefault();
+          setDragging(true);
+        }
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setDragging(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setDragging(false);
+        if (!busy && !recording) addFiles(event.dataTransfer.files);
+      }}
+    >
+      {dragging && (
+        <p className="pb-2 text-sm text-primary">Drop files to attach</p>
+      )}
       {containerType === "channel" && (
         <BotInteractionResponses channelId={containerId as Id<"channels">} />
       )}
@@ -529,38 +547,71 @@ export function Composer({
         </div>
       )}
 
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 rounded-t-lg border border-b-0 border-border/70 bg-surface p-2">
-          {attachments.map((attachment) => (
-            <span
-              key={attachment.storageId}
-              className="flex items-center gap-2 rounded-md border border-border/70 bg-panel px-2 py-1 text-xs"
+      {uploads.jobs.length > 0 && (
+        <div
+          className="flex flex-wrap gap-2 rounded-t-lg border border-border/70 bg-surface p-2"
+          aria-label="Pending attachments"
+        >
+          {uploads.jobs.map((job) => (
+            <div
+              key={job.id}
+              className="flex w-full max-w-xs items-center gap-2 rounded-md border border-border/70 bg-panel p-2 text-xs"
             >
-              <span className="max-w-40 truncate">{attachment.name}</span>
-              <span className="text-muted-foreground">
-                {formatBytes(attachment.size)}
-              </span>
+              {job.preview && (
+                <img
+                  src={job.preview}
+                  alt="Attachment preview"
+                  className="size-12 rounded object-cover"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate" title={job.file.name}>
+                  {job.file.name}
+                </p>
+                <p className="text-muted-foreground">
+                  {formatBytes(job.file.size)} ·{" "}
+                  {job.status === "complete"
+                    ? "Ready"
+                    : job.status === "failed"
+                      ? "Failed"
+                      : job.progress >= 90
+                        ? "Verifying…"
+                        : `${job.progress}%`}
+                </p>
+                {job.status === "uploading" && (
+                  <progress
+                    aria-label={`Uploading ${job.file.name}`}
+                    className="w-full"
+                    value={job.progress}
+                    max={100}
+                  />
+                )}
+                {job.error && (
+                  <p role="alert" className="text-destructive">
+                    {job.error}
+                  </p>
+                )}
+                {job.status === "failed" && (
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => uploads.retry(job.id)}
+                  >
+                    Retry {job.file.name}
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
-                aria-label={`Remove ${attachment.name}`}
-                onClick={() =>
-                  setAttachments((state) =>
-                    state.filter(
-                      (item) => item.storageId !== attachment.storageId,
-                    ),
-                  )
-                }
+                aria-label={`${job.status === "uploading" ? "Cancel" : "Remove"} ${job.file.name}`}
+                disabled={busy}
+                onClick={() => uploads.remove(job.id)}
                 className="text-muted-foreground hover:text-destructive"
               >
-                <X className="size-3.5" />
+                <X className="size-4" />
               </button>
-            </span>
+            </div>
           ))}
-          {uploading > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              Uploading {uploading}…
-            </span>
-          )}
         </div>
       )}
 
@@ -595,6 +646,7 @@ export function Composer({
             type="file"
             multiple
             accept={ACCEPTED_UPLOAD}
+            disabled={busy || recording}
             aria-label="Attach files"
             className="sr-only"
             onChange={(event) => {
@@ -640,7 +692,6 @@ export function Composer({
                   commandOptions[commandIndex] ?? commandOptions[0];
                 chooseCommand(selected.name);
                 setCommandIndex(0);
-                requestAnimationFrame(() => textareaRef.current?.focus());
                 return;
               }
             }
@@ -902,6 +953,16 @@ export function Composer({
           <BarChart3 className="size-4" />
         </button>
 
+        <button
+          type="button"
+          aria-label="Create Mermaid diagram"
+          title="Code and diagrams"
+          onClick={() => setDiagramOpen(true)}
+          className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground"
+        >
+          <Code className="size-4" />
+        </button>
+
         <Button
           size="icon"
           variant="ghost"
@@ -909,7 +970,7 @@ export function Composer({
           disabled={
             busy ||
             recording ||
-            uploading > 0 ||
+            uploads.pending ||
             (!draft.trim() && attachments.length === 0)
           }
           aria-label="Send message"
@@ -932,6 +993,13 @@ export function Composer({
         onOpenChange={setPollOpen}
         containerType={containerType}
         containerId={containerId}
+      />
+      <MermaidComposer
+        open={diagramOpen}
+        onOpenChange={setDiagramOpen}
+        onInsert={(content) =>
+          setDraft(draftKey, `${draft}${draft ? "\n" : ""}${content}`)
+        }
       />
     </div>
   );
