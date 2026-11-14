@@ -9,7 +9,11 @@ import {
   MonitorSmartphone,
 } from "@/components/icons";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
-import { DESKTOP_VERSION, WINDOWS_DOWNLOAD_URL } from "@/lib/desktop";
+import {
+  DESKTOP_SOURCE_URL,
+  DESKTOP_VERSION,
+  WINDOWS_DOWNLOAD_URL,
+} from "@/lib/desktop";
 
 export default function DownloadPage() {
   const reducedMotion = useReducedMotion();
@@ -58,13 +62,21 @@ export default function DownloadPage() {
               Windows 10 / 11 · 64-bit (x64) · Version {DESKTOP_VERSION}
             </p>
             <p className="mt-2 max-w-md text-xs leading-5 text-[#A0A6B5]">
-              The download opens on MediaFire. No GitHub account is needed.
+              Download the installer from our public GitHub releases. No account
+              needed.{" "}
+              <a
+                href={DESKTOP_SOURCE_URL}
+                className="text-indigo-300 underline underline-offset-4"
+              >
+                View the source code
+              </a>
+              .
             </p>
             <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300">
               {[
                 "Free to download",
                 "Your existing account",
-                "Desktop & Start menu shortcuts",
+                "Automatic updates & system tray",
               ].map((text) => (
                 <span key={text} className="flex items-center gap-2">
                   <Check className="size-4 text-indigo-300" />
@@ -185,8 +197,8 @@ export default function DownloadPage() {
             },
             {
               icon: MonitorSmartphone,
-              title: "Make room for your people",
-              text: "Pin Kyro to your taskbar and keep your communities beside everything else you do.",
+              title: "Stay connected in the tray",
+              text: "Closing the window keeps calls and notifications running. Use the tray icon to reopen or quit Kyro.",
             },
           ].map((feature) => (
             <div
@@ -220,9 +232,12 @@ export default function DownloadPage() {
             ))}
           </ol>
           <p className="mt-6 border-t border-white/5 pt-5 text-xs leading-6 text-[#A0A6B5]">
-            Internet connection required. This first release is not code signed,
-            so Windows may identify the publisher as unknown. Download only from
-            the download linked on this page.
+            Using version 1.0.0? Install this update once to fix the connection
+            screen and enable automatic desktop updates. Your account stays
+            signed in. Web updates apply automatically when you are idle, with
+            calls and drafts protected. Internet connection required. This
+            release is not code signed, so Windows may identify the publisher as
+            unknown. Download only from the download linked on this page.
           </p>
         </section>
       </main>

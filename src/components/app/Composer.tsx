@@ -493,7 +493,12 @@ export function Composer({
   }
 
   return (
-    <div className="bg-transparent px-3 pb-4 pt-2 sm:px-5">
+    <div
+      className="bg-transparent px-3 pb-4 pt-2 sm:px-5"
+      data-kyro-update-blocked={Boolean(
+        draft || reply || attachments.length || uploading || busy || recording,
+      )}
+    >
       {containerType === "channel" && (
         <BotInteractionResponses channelId={containerId as Id<"channels">} />
       )}

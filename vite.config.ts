@@ -2,11 +2,20 @@ import { vlyPlugin } from "@vly-ai/integrations";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import { randomUUID } from "node:crypto";
 import { defineConfig } from "vite";
+
+const webBuild = randomUUID();
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), vlyPlugin(), tailwindcss()],
+  define: { __KYRO_WEB_BUILD__: JSON.stringify(webBuild) },
+  plugins: [react(), vlyPlugin(), tailwindcss(), {
+    name: "desktop-web-version",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "desktop-version.json", source: JSON.stringify({ build: webBuild }) });
+    },
+  }],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

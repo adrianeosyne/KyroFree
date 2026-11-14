@@ -1,105 +1,91 @@
 # Kyro for Windows
 
-An Electron desktop client for [Kyro](https://kyro-chat.cyou). The app opens the
-live Kyro service in a dedicated window, using the existing account, messaging,
-community and voice features. An internet connection is required.
+The desktop app opens the live [Kyro service](https://www.kyro-chat.cyou/dashboard)
+in a sandboxed Electron window. Windows 10 or 11 (x64) and an internet connection
+are required. Accounts and browser storage persist between upgrades.
 
-## 1.0.1 connection repair
+- [Download the latest installer](https://github.com/CrimsonCrown967/Kyro/releases/latest)
+- [Browse the source](https://github.com/CrimsonCrown967/Kyro/tree/main/desktop)
 
-The desktop client now opens `https://www.kyro-chat.cyou/dashboard` and trusts
-both exact HTTPS Kyro origins. The previous build blocked Vercel's apex-to-www
-redirect and showed an offline screen even with a working internet connection.
-External origins and insecure URLs remain blocked in the app.
+## Upgrade from 1.0.0
 
-Temporary load failures show a local recovery screen that retries every 15 seconds
-and when the network returns, retaining the failed route and saved profile.
-Certificate failures show separate guidance and require a manual retry. Aborted
-navigations and failed subframes do not replace a working page.
-Screen-sharing pickers are always released after selection or cancellation,
-including when Chromium rejects the capture request.
+Install `Kyro-Setup-1.1.0-x64.exe` over the old app once. Version 1.0.0 has no
+native updater and blocks the website's redirect from the apex domain to `www`,
+causing its connection screen. Version 1.1.0 trusts both exact official HTTPS
+origins and opens the canonical `www` address. No deployment-specific Vercel
+hostname is embedded in the app. Temporary failures retry every 15 seconds;
+certificate errors require manual retry and never bypass certificate validation.
 
-Build the new installer with `npm run build:desktop`; it is written to
-`desktop/release/Kyro-Setup-1.0.1-x64.exe`. Install it over the previous version.
-The web interface is served live: deploy the root Vite build separately for the
-refreshed friends hub, navigation and chat appearance to reach installed clients.
-The website download link should be updated after the new installer is published.
+## Tray and updates
 
-## Install
+Closing the main window hides it in the Windows system tray. Calls, notifications,
+and the signed-in session keep running. Click the tray icon to reopen, or choose
+**Quit Kyro** from its menu to exit completely. A second launch opens the existing
+window. If Windows cannot create a tray icon, closing the window exits normally.
+No automatic launch-at-login entry is installed.
 
-The repaired local installer is `desktop/release/Kyro-Setup-1.0.1-x64.exe`.
-Distribute it and `SHA256SUMS.txt` through MediaFire or another approved download
-host. Keep installers and profiles out of source control. Build commands use
-`--publish never`; nothing is published automatically.
-Supports Windows 10 and 11, x64. Installation is per user, without administrator
-rights, with an installation directory chooser and desktop/Start menu shortcuts.
-Uninstall through Windows Settings. Account data is retained for reinstalling.
+The website checks for a new deployed build every five minutes (first check after
+one minute). Updates refresh the desktop automatically after one minute without
+interaction, once calls, drafts, uploads, recordings, media playback and dialogs
+are clear. Drafts in other conversations also delay updates. Failed version checks
+leave the running page alone. The regular browser experience is unchanged.
 
-This initial release is unsigned. Windows may display an unknown publisher or
-SmartScreen warning. The release includes `SHA256SUMS.txt`; verify a download with
-`Get-FileHash .\Kyro-Setup-1.0.1-x64.exe -Algorithm SHA256`.
+Native desktop updates are checked at launch and every four hours using the public
+GitHub release feed. Downloads run in the background; installation happens when
+the user actually quits. Closing to the tray does not install or interrupt a call.
+Use **Kyro > Check for updates** or **Restart to update** for manual control.
+The remote website has no native IPC bridge and cannot choose the update feed.
 
-## Develop and build
+## Develop and verify
 
 Use Node.js 24 and npm on Windows:
 
 ```powershell
+npm ci
 npm --prefix desktop ci
-npm exec --prefix desktop -- install-electron
 npm run test:desktop
-npm --prefix desktop start
+node scripts/desktop-update-smoke.mjs
+npm run typecheck
+npm run build
 npm run build:desktop
-```
-
-The NSIS installer and unpacked application are generated in `desktop/release/`
-and excluded from Git. Electron-builder downloads Electron and NSIS build tools.
-The desktop package has its own lockfile and TypeScript configuration; the web
-build does not install or bundle Electron.
-
-From the repository root, with root dependencies installed, run the packaged
-application smoke checks:
-
-```powershell
 node scripts/desktop-smoke.mjs
 ```
 
-The checks use a temporary, isolated profile and hidden windows. They verify
-renderer isolation, session persistence, permission denial, the screen picker,
-and offline recovery without creating accounts or joining calls.
-
-## Security and behavior
-
-- Only `https://kyro-chat.cyou` and `https://www.kyro-chat.cyou` can navigate the main window. External HTTP(S) and
-  email links open the default browser. File, executable and custom OS protocols
-  are blocked. Redirects to other origins are blocked.
-- The remote renderer is sandboxed, with context isolation, no Node integration,
-  no preload bridge, no webviews, and normal web security enabled.
-- Microphone, camera and notifications require native consent for the Kyro main
-  frame. Consent is session-scoped and can be reset in Help. Screen sharing uses a
-  separate local picker with a narrowly scoped IPC bridge and explicit selection.
-  Optional system audio includes all computer audio, not only the selected window.
-- Credentials and browser storage live in Electron's per-user profile, separate
-  from the browser. The app uses Kyro's existing password/email authentication.
-- Downloads show a Save dialog. The app never executes downloaded files.
-- Window dimensions are restored. A second launch focuses the existing window.
-- Closing the window quits the app; notifications and calls require it to remain
-  open. There is no tray mode, startup registration, or automatic binary updater.
-- Web features update through the live website. Use **Kyro > Downloads & updates**
-  for new desktop installers. Reinstall to update the desktop runtime.
+The desktop has a separate package and lockfile. Build output is under
+`desktop/release/` and excluded from Git. Packaged smoke checks use hidden windows
+and an isolated temporary profile; native update downloads are disabled there.
+They cover live startup, redirects, profile persistence, close-to-tray, renderer
+isolation, permissions, screen-picker cancellation, and connection recovery.
+Browser update checks simulate new deployments, calls, uploads and drafts without
+real accounts. These checks do not establish multi-user voice/video quality.
 
 ## Release
 
-1. Update `desktop/package.json` and its lockfile. Update `src/lib/desktop.ts`
-   after the matching installer is published so downloads never point to a
-   missing or older artifact.
-2. Run desktop tests, the installer build and packaged smoke checks; run the web
-   typecheck, lint and production build when changing download links.
-3. Generate `SHA256SUMS.txt` alongside the installer using SHA-256.
-4. Upload the installer and checksum to the approved download host (currently
-   MediaFire). Do not use GitHub. Upload assets before updating the version and
-   download URL in `src/lib/desktop.ts`.
-5. Deploy the Vite web build directly to the website host and verify `/download`
-   and the new installer URL. A desktop installer build does not deploy the UI.
+1. Bump the desktop package version and lockfile. Update the download-page version
+   and these release notes. Run the checks above.
+2. Build the NSIS installer, `*.exe.blockmap` and `latest.yml`. The latter contains
+   the SHA-512 integrity value used by the updater. Keep these files together in
+   the **same GitHub release**; never replace an installer for a published version.
+3. Generate `SHA256SUMS.txt` using `Get-FileHash` and include it in the release.
+4. Publish a stable `desktop-v<version>` release in `CrimsonCrown967/Kyro` only
+   after all assets are uploaded and checked. Pre-releases do not reach stable
+   clients. GitHub's automatic source archive corresponds to the release tag.
+5. Deploy the website changes separately. Every Vite build emits a fresh
+   `desktop-version.json`; Vercel serves it with `Cache-Control: no-store`.
 
-Release binaries are unsigned unless a maintainer configures a code-signing
-certificate through electron-builder's signing environment. Never commit signing
-credentials, user profiles, build outputs, or environment files.
+The Windows GitHub Actions workflow creates a **draft** release on `desktop-v*`
+tags or manual dispatch. Review and publish the draft to deliver future native
+updates. Local builds use `--publish never` and never upload artifacts themselves.
+
+The current installer is unsigned and Windows may show an unknown publisher.
+Configure electron-builder signing credentials in CI to sign future releases;
+never commit them. Keep credentials, profiles and build outputs out of Git.
+
+## Security
+
+Only the exact `https://kyro-chat.cyou` and `https://www.kyro-chat.cyou` origins can
+navigate the app. Other HTTP(S) and email links open the default browser; executable
+and custom OS protocols are blocked. The renderer has a sandbox, context isolation,
+normal web security, no Node integration and no preload bridge. Native microphone,
+camera and notification consent is session-scoped. Screen sharing uses a separate
+local picker and requires explicit source selection. Downloads never auto-execute.

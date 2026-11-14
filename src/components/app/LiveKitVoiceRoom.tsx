@@ -219,6 +219,14 @@ export function LiveKitVoiceRoom({
 
   useEffect(() => {
     if (!active) return;
+    const blocker = document.createElement("meta");
+    blocker.dataset.kyroUpdateBlocked = "true";
+    document.head.appendChild(blocker);
+    return () => blocker.remove();
+  }, [active]);
+
+  useEffect(() => {
+    if (!active) return;
     leaveSignaledRef.current = false;
     let disposed = false;
     let heartbeat = 0;
