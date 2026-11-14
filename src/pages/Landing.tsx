@@ -905,6 +905,9 @@ export default function Landing() {
                 <Link className="block hover:text-white" to="/privacy">
                   Privacy
                 </Link>
+                <Link className="block hover:text-white" to="/copyright">
+                  Copyright
+                </Link>
                 <Link className="block hover:text-white" to="/auth">
                   Sign in
                 </Link>

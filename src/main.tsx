@@ -22,6 +22,9 @@ const TermsPage = lazy(() =>
 const PrivacyPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.PrivacyPage })),
 );
+const CopyrightPage = lazy(() =>
+  import("./pages/Legal.tsx").then((m) => ({ default: m.CopyrightPage })),
+);
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
 const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
 
@@ -175,6 +178,7 @@ createRoot(document.getElementById("root")!).render(
               />
               <Route path="/terms" element={<TermsPage />} />
               <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/copyright" element={<CopyrightPage />} />
               <Route path="/invite/:code" element={<InviteRoute />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

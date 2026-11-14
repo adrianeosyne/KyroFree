@@ -668,6 +668,13 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                 >
                   Privacy
                 </Link>
+                {" "}·{" "}
+                <Link
+                  to="/copyright"
+                  className="underline transition-colors hover:text-primary"
+                >
+                  Copyright
+                </Link>
               </div>
             </>
           ) : step === "register" ? (
