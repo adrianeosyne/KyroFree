@@ -32,6 +32,7 @@ import {
   useUploadFile,
   type PendingAttachment,
 } from "@/lib/upload";
+import { audioCapturePreferences } from "@/lib/audioPreferences";
 import { cn } from "@/lib/utils";
 import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
@@ -86,6 +87,8 @@ export function Composer({
   const draftKey = `${containerType}:${containerId}`;
   const draft = useUiStore((state) => state.drafts[draftKey] ?? "");
   const setDraft = useUiStore((state) => state.setDraft);
+  const sendOnEnter = useUiStore((state) => state.sendOnEnter);
+  const showTyping = useUiStore((state) => state.showTyping);
   const sendMessage = useMutation(api.messages.send);
   const runBotCommand = useMutation(api.bots.execute);
   const externalCommands = useQuery(
@@ -412,11 +415,7 @@ export function Composer({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: audioCapturePreferences(),
       });
       const preferredTypes = [
         "audio/webm;codecs=opus",
@@ -617,7 +616,7 @@ export function Composer({
             setDraft(draftKey, event.target.value);
             updateMentionState(event.target.value, event.target.selectionStart);
             const now = Date.now();
-            if (now - lastTypingRef.current > 4000) {
+            if (showTyping && now - lastTypingRef.current > 4000) {
               lastTypingRef.current = now;
               void setTyping({ containerType, containerId }).catch(
                 () => undefined,
@@ -628,6 +627,7 @@ export function Composer({
           onMouseUp={updateSelection}
           onKeyUp={updateSelection}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
             if (commandOptions.length > 0) {
               if (event.key === "ArrowDown" || event.key === "ArrowUp") {
                 event.preventDefault();
@@ -673,7 +673,11 @@ export function Composer({
                 return;
               }
             }
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (
+              event.key === "Enter" &&
+              !event.shiftKey &&
+              (sendOnEnter || event.ctrlKey || event.metaKey)
+            ) {
               event.preventDefault();
               void send();
             }
@@ -689,7 +693,7 @@ export function Composer({
           }}
           placeholder="Message…"
           aria-label="Message"
-          className="order-first max-h-56 min-h-9 min-w-0 flex-1 basis-full resize-none bg-transparent px-1 py-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground sm:order-none sm:basis-0 sm:px-0"
+          className="chat-text order-first max-h-56 min-h-9 min-w-0 flex-1 basis-full resize-none bg-transparent px-1 py-1.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground sm:order-none sm:basis-0 sm:px-0"
         />
 
         {selection && mentionQuery === null ? (
@@ -925,10 +929,12 @@ export function Composer({
       </div>
 
       <p className="mt-1 hidden text-[11px] text-muted-foreground sm:block">
-        <span className="rounded border border-border/70 px-1">Enter</span> to
-        send ·{" "}
         <span className="rounded border border-border/70 px-1">
-          Shift+Enter
+          {sendOnEnter ? "Enter" : "Ctrl / ⌘ + Enter"}
+        </span>{" "}
+        to send ·{" "}
+        <span className="rounded border border-border/70 px-1">
+          {sendOnEnter ? "Shift+Enter" : "Enter"}
         </span>{" "}
         for a new line · Markdown and code blocks supported
       </p>

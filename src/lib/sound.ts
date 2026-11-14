@@ -3,6 +3,8 @@
  * audio asset has to ship or load. Respects the user's mute preference at the
  * call site (see AppShell).
  */
+import { useUiStore } from "./store";
+
 let context: AudioContext | null = null;
 
 export function playNotificationPing(): void {
@@ -18,6 +20,10 @@ export function playNotificationPing(): void {
     if (ctx.state === "suspended") void ctx.resume();
 
     const start = ctx.currentTime;
+    const volume =
+      Math.max(0, Math.min(100, useUiStore.getState().notificationVolume)) /
+      100;
+    if (volume === 0) return;
     const notes = [880, 1174.66]; // A5 → D6
     notes.forEach((frequency, index) => {
       const oscillator = ctx.createOscillator();
@@ -26,7 +32,7 @@ export function playNotificationPing(): void {
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(frequency, at);
       gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.12, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.2 * volume, at + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
       oscillator.connect(gain).connect(ctx.destination);
       oscillator.start(at);

@@ -5,6 +5,7 @@ import { chromium, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs/promises";
 import assert from "node:assert/strict";
+import { checkSettings } from "../tests/ui/settings-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -35,13 +36,19 @@ const server = await createServer({
   },
   server: { host: "127.0.0.1", port: 5187, strictPort: true },
   optimizeDeps: {
-    noDiscovery: true,
+    entries: ["tests/ui/index.html"],
     include: ["react", "react-dom/client", "react/jsx-runtime", "react-router"],
   },
 });
 await server.listen();
 await fs.mkdir("test-results", { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  args: [
+    "--use-fake-device-for-media-stream",
+    "--use-fake-ui-for-media-stream",
+  ],
+});
 const context = await browser.newContext({
   viewport: { width: 1440, height: 960 },
   reducedMotion: "reduce",
@@ -61,6 +68,7 @@ try {
     page.getByRole("heading", { name: /Good to see you/ }),
   ).toBeVisible({ timeout: 120000 });
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
+  await checkSettings(page, context);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();

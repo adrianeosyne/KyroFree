@@ -6,6 +6,9 @@ import type {
 } from "convex/server";
 import {
   AlertTriangle,
+  Bell,
+  Check,
+  Code,
   Copy,
   Download,
   Eye,
@@ -13,11 +16,16 @@ import {
   Link2,
   Loader2,
   LogOut,
+  Headphones,
+  MessageCircle,
   Monitor,
   Moon,
   Palette,
   Plus,
   ShieldCheck,
+  Search,
+  Settings as SettingsIcon,
+  Sparkles,
   Sun,
   Trash2,
   User as UserIcon,
@@ -41,6 +49,7 @@ import { ConfirmDangerDialog } from "@/components/app/dialogs";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -77,6 +86,14 @@ import {
   rememberedAccounts,
 } from "@/lib/accounts";
 import { toast } from "sonner";
+import {
+  AccessibilitySettings,
+  ChatSettings,
+  KeybindSettings,
+  NotificationSettings,
+  SettingsHelp,
+  VoiceSettings,
+} from "./SettingsPreferences";
 
 type ProfileLink = { label: string; url: string };
 
@@ -84,17 +101,121 @@ type TabId =
   | "account"
   | "profile"
   | "appearance"
+  | "chat"
+  | "voice"
+  | "notifications"
+  | "accessibility"
+  | "keybinds"
+  | "help"
   | "privacy"
   | "security"
   | "data";
 
-const TABS: { id: TabId; label: string; icon: typeof UserIcon }[] = [
-  { id: "account", label: "My Account", icon: UserIcon },
-  { id: "profile", label: "My Profile", icon: Palette },
-  { id: "appearance", label: "Appearance", icon: Monitor },
-  { id: "privacy", label: "Privacy & safety", icon: ShieldCheck },
-  { id: "security", label: "Sessions", icon: ShieldCheck },
-  { id: "data", label: "Data", icon: Download },
+const TABS: {
+  id: TabId;
+  label: string;
+  icon: typeof UserIcon;
+  group: string;
+  description: string;
+  keywords: string;
+}[] = [
+  {
+    id: "account",
+    label: "My Account",
+    icon: UserIcon,
+    group: "Your account",
+    description:
+      "Your identity, account details and security, all in one place.",
+    keywords: "email password username authentication 2fa",
+  },
+  {
+    id: "profile",
+    label: "My Profile",
+    icon: Palette,
+    group: "Your account",
+    description: "A little more you. Customize how you appear across Kyro.",
+    keywords: "avatar banner bio pronouns status decorations links",
+  },
+  {
+    id: "privacy",
+    label: "Privacy & Safety",
+    icon: ShieldCheck,
+    group: "Your account",
+    description: "Decide who can reach you and what you share.",
+    keywords: "friends messages requests presence activity",
+  },
+  {
+    id: "security",
+    label: "Devices & Sessions",
+    icon: Monitor,
+    group: "Your account",
+    description: "Keep track of where you’re signed in.",
+    keywords: "security logout revoke",
+  },
+  {
+    id: "appearance",
+    label: "Appearance",
+    icon: Palette,
+    group: "App settings",
+    description: "Set the mood. Make this space feel like yours.",
+    keywords: "theme dark light colours tint density layout",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    icon: MessageCircle,
+    group: "App settings",
+    description: "Find your flow, from the first keystroke to the last reply.",
+    keywords: "enter typing images gif previews font text size",
+  },
+  {
+    id: "voice",
+    label: "Voice & Audio",
+    icon: Headphones,
+    group: "App settings",
+    description: "Sound your best before you join the conversation.",
+    keywords: "microphone test noise suppression input gain",
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    group: "App settings",
+    description: "Stay connected, at your own volume.",
+    keywords: "sounds volume alerts mentions replies calls unread bubbles",
+  },
+  {
+    id: "accessibility",
+    label: "Accessibility",
+    icon: Sparkles,
+    group: "App settings",
+    description: "A few thoughtful adjustments for a more comfortable Kyro.",
+    keywords: "reduce motion animations underline links reading",
+  },
+  {
+    id: "keybinds",
+    label: "Keybinds",
+    icon: Code,
+    group: "App settings",
+    description: "Get around without lifting a finger from your keyboard.",
+    keywords: "shortcuts keyboard ctrl command enter",
+  },
+  {
+    id: "data",
+    label: "Data & Storage",
+    icon: Download,
+    group: "Resources",
+    description: "Your data belongs to you. Export it or manage your account.",
+    keywords: "export download delete account",
+  },
+  {
+    id: "help",
+    label: "Help & Feedback",
+    icon: MessageCircle,
+    group: "Resources",
+    description: "Find your way, share an idea or help us make Kyro better.",
+    keywords: "bugs reports support docs developer download",
+  },
 ];
 
 /** Mirrors USERNAME_COOLDOWN_MS in src/convex/users.ts — shown as a hint. */
@@ -125,69 +246,178 @@ export function SettingsDialog({
   onOpenChange: (open: boolean) => void;
   initialTab?: string;
 }) {
-  const [tab, setTab] = useState<TabId>(
-    (TABS.find((entry) => entry.id === initialTab)?.id as TabId) ?? "account",
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[92vh] w-[calc(100vw-1.5rem)] max-w-6xl flex-col gap-0 overflow-hidden p-0 sm:h-[88vh] sm:max-w-[1200px]">
-        <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
-          <nav className="shrink-0 gap-1.5 border-b border-border/60 bg-panel/40 p-4 sm:w-72 sm:border-b-0 sm:border-r">
-            <DialogHeader className="mb-4 px-2 text-left">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
-                User settings
+      {open && <SettingsContent initialTab={initialTab} />}
+    </Dialog>
+  );
+}
+
+function SettingsContent({ initialTab }: { initialTab: string }) {
+  const [tab, setTab] = useState<TabId>(
+    TABS.find((entry) => entry.id === initialTab)?.id ?? "account",
+  );
+  const [search, setSearch] = useState("");
+  const activeTab = TABS.find((entry) => entry.id === tab)!;
+  const query = search.trim().toLowerCase();
+  const visibleTabs = TABS.filter((entry) =>
+    `${entry.label} ${entry.description} ${entry.keywords}`
+      .toLowerCase()
+      .includes(query),
+  );
+  const localTab = [
+    "appearance",
+    "chat",
+    "voice",
+    "notifications",
+    "accessibility",
+    "keybinds",
+  ].includes(tab);
+
+  return (
+    <DialogContent
+      showCloseButton={false}
+      overlayClassName="bg-black/65 backdrop-blur-sm"
+      className="settings-dialog flex h-[94dvh] w-[calc(100vw-1rem)] flex-col gap-0 overflow-hidden rounded-2xl border-border/80 p-0 shadow-2xl sm:h-[90dvh] sm:w-[calc(100vw-3rem)] sm:max-w-[1280px]"
+    >
+      <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
+        <aside className="flex shrink-0 flex-col border-b border-border/70 bg-sidebar p-3 sm:w-[248px] sm:border-b-0 sm:border-r sm:p-4">
+          <div className="mb-3 flex items-center gap-2.5 px-2 sm:mb-5 sm:mt-2">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <SettingsIcon className="size-4" />
+            </span>
+            <span className="text-sm font-semibold tracking-tight">
+              User settings
+            </span>
+            <DialogClose
+              aria-label="Close settings"
+              className="ml-auto rounded-lg p-2 text-muted-foreground hover:bg-surface sm:hidden"
+            >
+              <X className="size-4" />
+            </DialogClose>
+          </div>
+          <div className="relative mb-3 sm:mb-5">
+            <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+            <Input
+              aria-label="Search settings"
+              placeholder="Search settings"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="h-10 rounded-lg border-border/80 bg-background/60 pl-9 pr-8 text-xs"
+            />
+            {search && (
+              <button
+                type="button"
+                aria-label="Clear settings search"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-2 rounded p-1 text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          <nav
+            aria-label="Settings sections"
+            className="flex min-h-0 gap-1 overflow-x-auto pb-1 sm:flex-1 sm:flex-col sm:overflow-x-hidden sm:overflow-y-auto sm:pb-3"
+          >
+            {["Your account", "App settings", "Resources"].map((group) => {
+              const entries = visibleTabs.filter(
+                (entry) => entry.group === group,
+              );
+              return (
+                entries.length > 0 && (
+                  <div
+                    key={group}
+                    className="flex shrink-0 gap-1 sm:mb-4 sm:flex-col"
+                  >
+                    <p className="mb-2 hidden px-3 text-[10px] font-bold uppercase tracking-[0.13em] text-muted-foreground/70 sm:block">
+                      {group}
+                    </p>
+                    {entries.map((entry) => (
+                      <SettingsNavItem
+                        key={entry.id}
+                        entry={entry}
+                        active={tab === entry.id}
+                        onClick={() => setTab(entry.id)}
+                      />
+                    ))}
+                  </div>
+                )
+              );
+            })}
+            {visibleTabs.length === 0 && (
+              <p
+                role="status"
+                className="px-3 py-3 text-xs leading-relaxed text-muted-foreground"
+              >
+                No settings found. Try “sounds”, “profile” or “chat”.
               </p>
-              <DialogDescription className="sr-only">
-                Account, appearance and privacy preferences.
+            )}
+          </nav>
+          <div className="hidden items-center gap-2 border-t border-border/70 px-3 pt-4 text-[11px] text-muted-foreground sm:flex">
+            <span className="size-1.5 rounded-full bg-success" />A space that
+            feels like you.
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-background">
+          <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border/50 px-5 py-4 sm:px-9 sm:py-6">
+            <DialogHeader className="min-w-0 text-left">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/65">
+                {activeTab.group}
+              </p>
+              <DialogTitle className="text-xl font-bold tracking-tight sm:text-2xl">
+                {activeTab.label}
+              </DialogTitle>
+              <DialogDescription className="text-xs leading-relaxed">
+                {activeTab.description}
               </DialogDescription>
             </DialogHeader>
-            {/* Horizontal chip scroller on mobile; grouped sections on desktop. */}
-            <div className="flex gap-1.5 overflow-x-auto pb-1 sm:flex-col sm:overflow-visible sm:pb-0">
-              <div className="flex gap-1.5 sm:flex-col">
-                {TABS.slice(0, 2).map((entry) => (
-                  <SettingsNavItem
-                    key={entry.id}
-                    entry={entry}
-                    active={tab === entry.id}
-                    onClick={() => setTab(entry.id)}
-                  />
-                ))}
-              </div>
-              <p className="hidden shrink-0 px-3 pt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/50 sm:block">
-                App settings
-              </p>
-              <div className="flex gap-1.5 sm:flex-col">
-                {TABS.slice(2).map((entry) => (
-                  <SettingsNavItem
-                    key={entry.id}
-                    entry={entry}
-                    active={tab === entry.id}
-                    onClick={() => setTab(entry.id)}
-                  />
-                ))}
-              </div>
+            <div className="hidden shrink-0 flex-col items-center gap-1 sm:flex">
+              <DialogClose
+                aria-label="Close settings"
+                className="flex size-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/50 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <X className="size-4" />
+              </DialogClose>
+              <span className="text-[9px] uppercase text-muted-foreground/60">
+                Esc
+              </span>
             </div>
-            <p className="hidden px-3 pt-8 text-[11px] leading-relaxed text-muted-foreground/60 sm:block">
-              Tip: everything here only affects your account — no one else can
-              change it.
-            </p>
-          </nav>
-
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8 sm:py-8">
+          </header>
+          <div
+            key={tab}
+            className="settings-content min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-9 sm:py-7"
+          >
+            {localTab && (
+              <div className="mb-6 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Check className="size-3 text-success" />
+                Preferences save automatically on this device
+              </div>
+            )}
             {tab === "account" && (
               <AccountTab onEditProfile={() => setTab("profile")} />
             )}
             {tab === "profile" && <ProfileTab />}
             {tab === "appearance" && <AppearanceTab />}
+            {tab === "chat" && <ChatSettings />}
+            {tab === "voice" && <VoiceSettings />}
+            {tab === "notifications" && <NotificationSettings />}
+            {tab === "accessibility" && <AccessibilitySettings />}
+            {tab === "keybinds" && <KeybindSettings />}
             {tab === "privacy" && <PrivacyTab />}
             {tab === "security" && <SessionsTab />}
             {tab === "data" && <DataTab />}
+            {tab === "help" && (
+              <SettingsHelp>
+                <BugHunting />
+              </SettingsHelp>
+            )}
           </div>
         </div>
-        <AdBanner />
-      </DialogContent>
-    </Dialog>
+      </div>
+      <AdBanner />
+    </DialogContent>
   );
 }
 
@@ -204,11 +434,12 @@ function SettingsNavItem({
   return (
     <button
       type="button"
+      aria-current={active ? "page" : undefined}
       onClick={onClick}
       className={cn(
-        "relative flex shrink-0 items-center gap-2.5 overflow-hidden rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-150",
+        "relative flex shrink-0 items-center gap-3 overflow-hidden rounded-lg px-3 py-2.5 text-left text-[13px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-ring",
         active
-          ? "bg-surface font-medium text-foreground shadow-sm ring-1 ring-border/70"
+          ? "bg-primary/10 font-semibold text-primary ring-1 ring-primary/15"
           : "text-muted-foreground hover:bg-surface/60 hover:text-foreground",
       )}
     >
@@ -257,12 +488,12 @@ function AccountRow({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 px-4 py-3.5">
-      <div className="min-w-0 flex-1">
+    <div className="flex flex-col items-start gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+      <div className="w-full min-w-0 flex-1 sm:w-auto">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           {label}
         </p>
-        <div className="mt-1 truncate text-sm">{children}</div>
+        <div className="mt-1 break-words text-sm">{children}</div>
         {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </div>
       {action}
@@ -932,7 +1163,6 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
   const [busy, setBusy] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
-  const updatePrivacy = useMutation(api.users.updatePrivacy);
   const revokeOthers = useMutation(api.users.revokeOtherSessions);
 
   const logoutEverywhere = async () => {
@@ -1002,13 +1232,7 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
 
   return (
     <>
-      <h2 className="mb-4 text-xl font-semibold tracking-tight sm:text-2xl">
-        My account
-      </h2>
-      {/* Two-column account page: live profile preview on the left, editable
-          rows on the right. Mobile stacks preview first. `min-w-0` keeps
-          long names and handles wrapping cleanly instead of overflowing. */}
-      <div className="mb-7 grid items-start gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="mb-7 grid items-start gap-5">
         <ProfilePreviewCard me={me} onEditProfile={onEditProfile} />
 
         <div className="grid gap-3">
@@ -1197,7 +1421,7 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
             >
               <span className="text-muted-foreground">••••••••</span>
               <span className="ml-1.5 text-xs text-muted-foreground/70">
-                updated to a new value on change — never shown
+                Choose a strong, unique password
               </span>
             </AccountRow>
           </div>
@@ -1227,55 +1451,6 @@ function AccountTab({ onEditProfile }: { onEditProfile: () => void }) {
       </div>
 
       <AccountStanding />
-
-      <Section title="Privacy">
-        <div className="grid gap-3">
-          <div className="rounded-xl border border-border/70 bg-surface p-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Who can message you
-            </p>
-            <select
-              value={me.dmPolicy}
-              aria-label="Who can message you"
-              className="mt-2 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
-              onChange={(event) =>
-                void updatePrivacy({
-                  dmPolicy: event.target.value as
-                    | "everyone"
-                    | "friends"
-                    | "nobody",
-                })
-              }
-            >
-              <option value="everyone">Everyone</option>
-              <option value="friends">Friends only</option>
-              <option value="nobody">No one</option>
-            </select>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Friends can always message you. Blocked people never can.
-            </p>
-          </div>
-          <label className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-surface p-4">
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold">
-                Suggest me to people with similar interests
-              </span>
-              <span className="block text-xs text-muted-foreground">
-                Shows you under Friends → Suggested for people who share your
-                communities. Hidden connections never count.
-              </span>
-            </span>
-            <Switch
-              checked={me.suggestible}
-              onCheckedChange={(checked) =>
-                void updatePrivacy({ suggestible: checked })
-              }
-            />
-          </label>
-        </div>
-      </Section>
-
-      <BugHunting />
 
       <ChangePasswordDialog
         open={passwordOpen}
@@ -1326,62 +1501,97 @@ function ProfilePreviewCard({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-border/70 bg-surface shadow-sm">
-      {/* Banner: uploaded picture, or the profile colour theme, or a default. */}
       <div
         className={cn(
-          "relative h-24",
-          !me.bannerUrl && "bg-gradient-to-r",
+          "relative h-36 overflow-hidden sm:h-52",
+          !me.bannerUrl && "bg-gradient-to-br",
           !me.bannerUrl &&
             (PROFILE_THEMES.find((theme) => theme.id === me.profileTheme)
               ?.gradient ??
-              "from-brand/60 via-brand/30 to-cyan/40"),
+              "from-indigo-950 via-violet-950 to-slate-900"),
         )}
       >
-        {me.bannerUrl && (
+        {me.bannerUrl ? (
           <img
             src={me.bannerUrl}
             alt=""
             className="absolute inset-0 size-full object-cover"
           />
+        ) : (
+          <>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 900 260"
+              preserveAspectRatio="xMidYMid slice"
+              className="absolute inset-0 size-full text-white/15"
+            >
+              {Array.from({ length: 12 }, (_, index) => (
+                <path
+                  key={index}
+                  d={`M ${-80 + index * 22} -30 C ${200 + index * 18} ${80 + index * 16}, ${100 + index * 23} ${210 + index * 13}, ${430 + index * 24} 300 M ${440 + index * 24} -40 C ${490 + index * 26} ${120 + index * 8}, ${830 + index * 19} ${20 + index * 15}, ${940 + index * 25} 280`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={index % 3 === 0 ? 1.5 : 0.65}
+                />
+              ))}
+            </svg>
+            <div className="absolute right-7 top-7 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-white/50">
+              <Sparkles className="size-3" />
+              Your corner of Kyro
+            </div>
+          </>
         )}
-        <span
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.18),transparent_60%)]"
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent"
         />
       </div>
-
-      <div className="px-4 pb-4">
-        <div className="-mt-10 min-w-0">
-          <div className="inline-block rounded-full bg-surface p-1.5 shadow-lg ring-1 ring-border/60">
-            <UserAvatar user={me} size="2xl" />
+      <div className="relative px-5 pb-5 sm:px-7 sm:pb-6">
+        <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
+          <div className="-mt-10 flex min-w-0 flex-1 basis-full items-end gap-3 sm:-mt-11 sm:basis-auto sm:gap-4">
+            <div className="relative z-10 shrink-0 rounded-full bg-surface p-1.5 shadow-lg">
+              <UserAvatar
+                user={me}
+                size="xl"
+                className="size-20 text-3xl sm:size-32 sm:text-5xl"
+              />
+            </div>
+            <div className="min-w-0 pb-1 pt-12">
+              <h3 className="break-words text-xl font-bold tracking-tight sm:text-2xl">
+                <StyledDisplayName user={me} />
+              </h3>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="truncate">
+                  @{me.username ?? "no username"}
+                </span>
+                {me.pronouns && (
+                  <>
+                    <span>·</span>
+                    <span>{me.pronouns}</span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  aria-label="Copy handle"
+                  className="rounded p-1 hover:text-foreground"
+                  onClick={() => {
+                    void navigator.clipboard
+                      .writeText(`@${me.username ?? ""}`)
+                      .then(() => toast.success("Handle copied"))
+                      .catch(() => toast.error("Could not copy."));
+                  }}
+                >
+                  <Copy className="size-3" />
+                </button>
+              </div>
+            </div>
           </div>
-
-          <h3 className="mt-2 break-words text-lg font-semibold leading-snug">
-            {me.name}
-          </h3>
-          <div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <PresenceDot presence={me.presence} size="sm" ringClassName="" />
-            <span className="min-w-0 truncate">
-              @{me.username ?? "no username"}
-            </span>
-            <button
-              type="button"
-              title="Copy handle"
-              aria-label="Copy handle"
-              className="shrink-0 rounded p-0.5 text-muted-foreground/70 transition-colors hover:text-foreground"
-              onClick={() => {
-                const handle = `@${me.username ?? ""}`;
-                void navigator.clipboard
-                  .writeText(handle)
-                  .then(() => toast.success("Handle copied"))
-                  .catch(() => toast.error("Could not copy."));
-              }}
-            >
-              <Copy className="size-3.5" />
-            </button>
-          </div>
-
-          {/* Custom status: saves on Enter or focus-out, clears empty. */}
+          <Button onClick={onEditProfile} size="sm" className="mb-1">
+            <Palette className="mr-2 size-4" />
+            Edit profile
+          </Button>
+        </div>
+        <div className="mt-5 grid gap-3 border-t border-border/60 pt-4 sm:grid-cols-[minmax(0,1fr)_180px]">
           <Input
             value={statusValue}
             onChange={(event) => setStatusDraft(event.target.value)}
@@ -1396,72 +1606,51 @@ function ProfilePreviewCard({
             maxLength={100}
             placeholder="Set a custom status…"
             aria-label="Custom status"
-            className="mt-2.5 h-8 bg-panel/60 text-xs"
+            className="h-9 bg-background/60 text-xs"
           />
-
-          {me.badges.length > 0 && (
-            <div className="mt-3 border-t border-border/60 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
-                Badges
-              </p>
-              <BadgeTray
-                badges={me.badges}
-                primaryBadge={me.primaryBadge}
-                official={me.official}
-                className="mt-1.5"
-              />
-            </div>
-          )}
-
-          <div className="mt-3 border-t border-border/60 pt-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
-              Status
-            </p>
-            <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-              {PRESENCE_CHOICES.map((choice) => (
-                <button
-                  key={choice.value}
-                  type="button"
-                  onClick={() =>
-                    void setPresence({ status: choice.value }).catch((error) =>
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not update your status.",
-                      ),
-                    )
-                  }
-                  className={cn(
-                    "flex items-center gap-1.5 justify-center rounded-lg border px-2 py-1.5 text-xs transition-colors",
-                    me.presence === choice.value
-                      ? "border-brand/50 bg-brand/10 text-foreground"
-                      : "border-border/70 text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <PresenceDot
-                    presence={choice.value}
-                    size="xs"
-                    ringClassName=""
-                  />
-                  <span className="truncate">{choice.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-3.5 grid gap-2">
-            <Button onClick={onEditProfile} className="w-full">
-              <Palette className="mr-1.5 size-4" /> Edit profile
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => navigate(`/dashboard?user=${me.id}`)}
+          <label className="flex items-center gap-2 rounded-lg border border-border/70 bg-background/60 px-3">
+            <PresenceDot presence={me.presence} size="sm" ringClassName="" />
+            <select
+              value={me.presence === "offline" ? "invisible" : me.presence}
+              aria-label="Your status"
+              className="h-9 min-w-0 flex-1 bg-transparent text-xs outline-none"
+              onChange={(event) => {
+                void setPresence({
+                  status: event.target.value as
+                    | "online"
+                    | "idle"
+                    | "dnd"
+                    | "invisible",
+                }).catch((error) =>
+                  toast.error(
+                    readableError(error, "Could not update your status."),
+                  ),
+                );
+              }}
             >
-              View my profile
-            </Button>
-          </div>
+              {PRESENCE_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+        {me.badges.length > 0 && (
+          <BadgeTray
+            badges={me.badges}
+            primaryBadge={me.primaryBadge}
+            official={me.official}
+            className="mt-4"
+          />
+        )}
+        <button
+          type="button"
+          className="mt-3 text-xs font-medium text-primary hover:underline"
+          onClick={() => navigate(`/dashboard?user=${me.id}`)}
+        >
+          View my profile ↗
+        </button>
       </div>
     </section>
   );
@@ -1579,9 +1768,6 @@ function ProfileTab() {
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="grid min-w-0 gap-6">
-        <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
-          My profile
-        </h2>
         <ProfilePromoCard />
 
         <section>
@@ -2798,7 +2984,7 @@ function PrivacyTab() {
     <>
       <Section
         title="Direct messages"
-        description="Enforced on the server, not just in the interface."
+        description="Choose who can start a conversation with you."
       >
         <div className="flex flex-wrap gap-2">
           {(["everyone", "friends", "nobody"] as const).map((policy) => (
@@ -2828,6 +3014,26 @@ function PrivacyTab() {
               onCheckedChange={(checked) =>
                 void update({ allowFriendRequests: checked })
               }
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4 rounded-lg border border-border/70 bg-surface px-4 py-3">
+            <span className="text-sm">
+              Suggest me to people with similar interests
+              <span className="block text-xs text-muted-foreground">
+                Help people in shared communities find you in Friends
+                suggestions.
+              </span>
+            </span>
+            <Switch
+              checked={me.suggestible}
+              onCheckedChange={(checked) =>
+                void update({ suggestible: checked }).catch((error) =>
+                  toast.error(
+                    readableError(error, "Could not save your preference."),
+                  ),
+                )
+              }
+              aria-label="Suggest me to people with similar interests"
             />
           </label>
           <label className="flex items-center justify-between gap-4 rounded-lg border border-border/70 bg-surface px-4 py-3">

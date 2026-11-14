@@ -41,6 +41,16 @@ export interface Preferences {
   useServerColours: boolean;
   /** Show people who just DM'd you as bubbles under Home in the rail. */
   unreadDmBubbles: boolean;
+  sendOnEnter: boolean;
+  showTyping: boolean;
+  mediaPreviews: boolean;
+  chatFontSize: number;
+  notificationVolume: number;
+  callSounds: boolean;
+  reducedMotion: boolean;
+  underlineLinks: boolean;
+  noiseSuppression: boolean;
+  autoGainControl: boolean;
 }
 
 const DEFAULT_PREFS: Preferences = {
@@ -55,6 +65,16 @@ const DEFAULT_PREFS: Preferences = {
   tintIntensity: 75,
   useServerColours: false,
   unreadDmBubbles: true,
+  sendOnEnter: true,
+  showTyping: true,
+  mediaPreviews: true,
+  chatFontSize: 14,
+  notificationVolume: 60,
+  callSounds: true,
+  reducedMotion: false,
+  underlineLinks: false,
+  noiseSuppression: true,
+  autoGainControl: true,
 };
 
 function loadPrefs(): Preferences {
@@ -62,7 +82,16 @@ function loadPrefs(): Preferences {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_PREFS;
-    return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Preferences>) };
+    const saved = JSON.parse(raw) as Partial<Preferences>;
+    return {
+      ...DEFAULT_PREFS,
+      ...saved,
+      // Preserve the previous shared sound toggle until calls are configured separately.
+      callSounds:
+        saved.callSounds ??
+        saved.notificationSounds ??
+        DEFAULT_PREFS.callSounds,
+    };
   } catch {
     return DEFAULT_PREFS;
   }
@@ -138,6 +167,9 @@ export function applyPreferences(prefs: Preferences) {
   root.classList.toggle("dark", dark);
   root.dataset.accent = prefs.accent === "default" ? "" : prefs.accent;
   root.dataset.density = prefs.density;
+  root.dataset.reducedMotion = String(prefs.reducedMotion);
+  root.dataset.underlineLinks = String(prefs.underlineLinks);
+  root.style.setProperty("--chat-font-size", `${prefs.chatFontSize}px`);
   applyTint(prefs);
 }
 
@@ -172,6 +204,16 @@ function pickPrefs(state: AppState): Preferences {
     tintIntensity: state.tintIntensity,
     useServerColours: state.useServerColours,
     unreadDmBubbles: state.unreadDmBubbles,
+    sendOnEnter: state.sendOnEnter,
+    showTyping: state.showTyping,
+    mediaPreviews: state.mediaPreviews,
+    chatFontSize: state.chatFontSize,
+    notificationVolume: state.notificationVolume,
+    callSounds: state.callSounds,
+    reducedMotion: state.reducedMotion,
+    underlineLinks: state.underlineLinks,
+    noiseSuppression: state.noiseSuppression,
+    autoGainControl: state.autoGainControl,
   };
 }
 
@@ -189,14 +231,20 @@ export const useUiStore = create<AppState>((set, get) => ({
     const prefs = pickPrefs(next);
     persist(prefs);
     applyPreferences(prefs);
-    set({ [key]: value } as Partial<AppState>);
+    set({
+      [key]: value,
+      ...(key === "showMemberList" ? { memberListOpen: value as boolean } : {}),
+    } as Partial<AppState>);
   },
   setMobileNav: (open) => set({ mobileNavOpen: open }),
   toggleMemberList: () =>
     set((state) => {
       const next = { ...state, showMemberList: !state.showMemberList };
       persist(pickPrefs(next));
-      return { memberListOpen: next.showMemberList };
+      return {
+        showMemberList: next.showMemberList,
+        memberListOpen: next.showMemberList,
+      };
     }),
   setSearchOpen: (open) => set({ searchOpen: open }),
   setInboxOpen: (open) => set({ inboxOpen: open }),
