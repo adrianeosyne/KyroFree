@@ -25,8 +25,8 @@ export class DesktopUpdates {
     // Updates come only from this app's public GitHub release feed.
     autoUpdater.setFeedURL({
       provider: "github",
-      owner: "CrimsonCrown967",
-      repo: "Kyro",
+      owner: "adrianeosyne",
+      repo: "KyroFree",
     });
     autoUpdater.on("error", () => {
       /* Retry on the next scheduled check. */

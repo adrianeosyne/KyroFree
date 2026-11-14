@@ -65,8 +65,8 @@ test("release updates use the public feed, download automatically and wait for q
   const s = setup();
   s.updates.start();
   await new Promise(setImmediate);
-  assert.equal(s.updater.feed.owner, "CrimsonCrown967");
-  assert.equal(s.updater.feed.repo, "Kyro");
+  assert.equal(s.updater.feed.owner, "adrianeosyne");
+  assert.equal(s.updater.feed.repo, "KyroFree");
   assert.equal(s.updater.autoDownload, true);
   assert.equal(s.updater.autoInstallOnAppQuit, true);
   assert.equal(s.updater.allowDowngrade, false);

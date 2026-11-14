@@ -9,10 +9,10 @@ creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
 
-Application source is maintained in `CrimsonCrown967/Kyro`. Keep credentials,
+Application source is maintained in `adrianeosyne/KyroFree`. Keep credentials,
 local profiles and build outputs out of source control. Distribute Windows
 installers and their SHA-256 checksums through the public
-[GitHub releases](https://github.com/CrimsonCrown967/Kyro/releases/latest).
+[GitHub releases](https://github.com/adrianeosyne/KyroFree/releases/latest).
 See [desktop setup and build instructions](desktop/README.md).
 
 For the replacement Vercel project, follow [email setup](docs/email-notifications.md).

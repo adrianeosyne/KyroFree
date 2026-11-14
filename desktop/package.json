@@ -21,8 +21,8 @@
   "build": {
     "publish": {
       "provider": "github",
-      "owner": "CrimsonCrown967",
-      "repo": "Kyro",
+      "owner": "adrianeosyne",
+      "repo": "KyroFree",
       "releaseType": "release"
     },
     "appId": "org.kyro.chat",
