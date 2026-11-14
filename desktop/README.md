@@ -4,8 +4,8 @@ The desktop app opens the live [Kyro service](https://www.kyro-chat.cyou/dashboa
 in a sandboxed Electron window. Windows 10 or 11 (x64) and an internet connection
 are required. Accounts and browser storage persist between upgrades.
 
-- [Download the latest installer](https://github.com/CrimsonCrown967/Kyro/releases/latest)
-- [Browse the source](https://github.com/CrimsonCrown967/Kyro/tree/main/desktop)
+- [Download the latest installer](https://github.com/adrianeosyne/KyroFree/releases/latest)
+- [Browse the source](https://github.com/adrianeosyne/KyroFree/tree/main/desktop)
 
 ## Upgrade from 1.0.0
 
@@ -67,7 +67,7 @@ real accounts. These checks do not establish multi-user voice/video quality.
    the SHA-512 integrity value used by the updater. Keep these files together in
    the **same GitHub release**; never replace an installer for a published version.
 3. Generate `SHA256SUMS.txt` using `Get-FileHash` and include it in the release.
-4. Publish a stable `desktop-v<version>` release in `CrimsonCrown967/Kyro` only
+4. Publish a stable `desktop-v<version>` release in `adrianeosyne/KyroFree` only
    after all assets are uploaded and checked. Pre-releases do not reach stable
    clients. GitHub's automatic source archive corresponds to the release tag.
 5. Deploy the website changes separately. Every Vite build emits a fresh
