@@ -1,5 +1,11 @@
 ## Overview
 
+Copyright © 2026 Adrian Eosyne. Kyro's original materials are source-available,
+with reuse restricted by [LICENSE](LICENSE). Public access does not grant
+permission to use Kyro files to launch another service. Third-party licences
+and applicable statutory rights are preserved. See the
+[Copyright Policy](https://kyro-chat.cyou/copyright).
+
 Kyro is a React community chat application with a Convex backend. Start with
 the [technical architecture overview](docs/architecture.md) for the framework,
 database/schema, authentication, API structure, features and dependencies.

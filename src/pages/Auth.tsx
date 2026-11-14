@@ -25,6 +25,14 @@ import {
 } from "@/components/icons";
 import { Link } from "react-router";
 import { useAction, useMutation } from "convex/react";
+import { LEGAL_POLICY_VERSIONS } from "@/lib/legalPolicies";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   forgetAccount,
   rememberAccount,
@@ -32,6 +40,9 @@ import {
 } from "@/lib/accounts";
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,32}$/;
+const LegalPolicyContent = React.lazy(() =>
+  import("./Legal").then((module) => ({ default: module.LegalPolicyContent })),
+);
 
 function resolveRedirectAfterAuth(
   returnTo: string | null,
@@ -86,6 +97,15 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [showNewPassword, setShowNewPassword] = React.useState(false);
   const [verificationCode, setVerificationCode] = React.useState("");
+  const [acceptedPolicies, setAcceptedPolicies] = React.useState({
+    terms: false,
+    privacy: false,
+    copyright: false,
+  });
+  const allPoliciesAccepted = Object.values(acceptedPolicies).every(Boolean);
+  const [reviewPolicy, setReviewPolicy] = React.useState<
+    "terms" | "privacy" | "copyright" | null
+  >(null);
 
   React.useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -145,11 +165,25 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   ) => {
     event.preventDefault();
     if (isLoading) return;
+    if (!allPoliciesAccepted) {
+      setError(
+        "Accept the Terms of Service, Privacy Policy and Copyright Policy before creating an account.",
+      );
+      return;
+    }
     setIsLoading(true);
     setError(null);
     const normalizedEmail = email.trim().toLowerCase();
     const handle = username.trim().toLowerCase();
     const displayNameValue = displayName.trim() || handle;
+    const legalAcceptance = {
+      termsAccepted: acceptedPolicies.terms,
+      privacyAccepted: acceptedPolicies.privacy,
+      copyrightAccepted: acceptedPolicies.copyright,
+      termsVersion: LEGAL_POLICY_VERSIONS.terms,
+      privacyVersion: LEGAL_POLICY_VERSIONS.privacy,
+      copyrightVersion: LEGAL_POLICY_VERSIONS.copyright,
+    };
     try {
       if (!USERNAME_PATTERN.test(handle)) {
         setError(
@@ -172,6 +206,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           password,
           username: handle,
           name: displayNameValue,
+          legalAcceptance,
         });
         if (created.verificationRequired) {
           setVerificationCode("");
@@ -214,6 +249,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           flow: "signUp",
           email: normalizedEmail,
           password,
+          legalAcceptance,
         });
         rememberAccount({
           email: normalizedEmail,
@@ -243,6 +279,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   };
 
   const startRegister = () => {
+    setAcceptedPolicies({ terms: false, privacy: false, copyright: false });
     setStep("register");
     setError(null);
     setTwoFactorRequired(false);
@@ -667,6 +704,13 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                   className="underline transition-colors hover:text-primary"
                 >
                   Privacy
+                </Link>{" "}
+                ·{" "}
+                <Link
+                  to="/copyright"
+                  className="underline transition-colors hover:text-primary"
+                >
+                  Copyright
                 </Link>
               </div>
             </>
@@ -769,6 +813,61 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                       autoComplete="name"
                     />
                   </div>
+                  <fieldset className="space-y-3 rounded-lg border border-border/70 p-4">
+                    <legend className="px-1 text-sm font-semibold">
+                      Review and accept
+                    </legend>
+                    {(
+                      [
+                        ["terms", "Terms of Service", "/terms"],
+                        ["privacy", "Privacy Policy", "/privacy"],
+                        ["copyright", "Copyright Policy", "/copyright"],
+                      ] as const
+                    ).map(([key, label, href]) => (
+                      <div key={key} className="flex items-start gap-3 text-sm">
+                        <input
+                          id={`accept-${key}`}
+                          type="checkbox"
+                          required
+                          disabled={isLoading}
+                          checked={acceptedPolicies[key]}
+                          onChange={(event) =>
+                            setAcceptedPolicies((current) => ({
+                              ...current,
+                              [key]: event.target.checked,
+                            }))
+                          }
+                          className="mt-1 size-4 shrink-0 accent-primary"
+                        />
+                        <label htmlFor={`accept-${key}`} className="leading-6">
+                          I have read and accept the{" "}
+                          <Link
+                            to={href}
+                            onClick={(event) => {
+                              if (
+                                event.ctrlKey ||
+                                event.metaKey ||
+                                event.shiftKey ||
+                                event.altKey
+                              )
+                                return;
+                              event.preventDefault();
+                              setReviewPolicy(key);
+                            }}
+                            className="text-primary underline underline-offset-4"
+                          >
+                            {label}
+                          </Link>
+                          .
+                        </label>
+                      </div>
+                    ))}
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Review each policy here without losing your registration
+                      details. Privacy acceptance does not opt you into optional
+                      advertising or marketing.
+                    </p>
+                  </fieldset>
                 </CardContent>
                 <div className="space-y-3">
                   {error && (
@@ -789,7 +888,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                     >
                       Back to sign-in
                     </Button>
-                    <Button type="submit" disabled={isLoading}>
+                    <Button
+                      type="submit"
+                      disabled={isLoading || !allPoliciesAccepted}
+                    >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
@@ -800,6 +902,27 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                   </div>
                 </div>
               </form>
+              <Dialog
+                open={reviewPolicy !== null}
+                onOpenChange={(open) => {
+                  if (!open) setReviewPolicy(null);
+                }}
+              >
+                <DialogContent className="max-h-[85dvh] max-w-3xl overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Review policy</DialogTitle>
+                    <DialogDescription>
+                      Close this review to return to your registration.
+                      Acceptance is your choice using the checkboxes.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <React.Suspense fallback={<p>Loading policy…</p>}>
+                    {reviewPolicy && (
+                      <LegalPolicyContent policy={reviewPolicy} />
+                    )}
+                  </React.Suspense>
+                </DialogContent>
+              </Dialog>
             </>
           ) : step === "verifyEmail" ? (
             <form onSubmit={handleVerifyEmail} className="space-y-4">

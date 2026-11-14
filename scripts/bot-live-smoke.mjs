@@ -66,17 +66,24 @@ const password = randomBytes(24).toString("base64url");
 const client = new ConvexHttpClient(url);
 const ownerEmail = `owner_${suffix}@kyro-test.invalid`;
 const otherEmail = `other_${suffix}@kyro-test.invalid`;
+// Explicit acceptance is required even for disposable local fixture accounts.
+const legalAcceptance = {
+  termsAccepted: true, privacyAccepted: true, copyrightAccepted: true,
+  termsVersion: "2026-11-14", privacyVersion: "2026-11-14", copyrightVersion: "2026-11-14",
+};
 const owner = await client.action(api.users.createAccount.createAccount, {
   email: ownerEmail,
   password,
   username: `owner_${suffix}`,
   name: "Bot platform owner",
+  legalAcceptance,
 });
 const other = await client.action(api.users.createAccount.createAccount, {
   email: otherEmail,
   password,
   username: `other_${suffix}`,
   name: "Bot platform member",
+  legalAcceptance,
 });
 async function signIn(email) {
   const authenticated = new ConvexHttpClient(url);

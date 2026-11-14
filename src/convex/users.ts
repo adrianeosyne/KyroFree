@@ -1004,6 +1004,7 @@ export const exportData = mutation({
         customStatus: user.customStatus,
         createdAt: user.createdAt,
         emailChangedAt: user.emailChangedAt,
+        legalAcceptance: user.legalAcceptance ?? null,
       },
       friends: friendDocs
         .filter((doc): doc is Doc<"users"> => Boolean(doc))

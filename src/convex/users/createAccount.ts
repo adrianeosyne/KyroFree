@@ -9,6 +9,10 @@ import {
 } from "../lib";
 import { generateSixDigitCode } from "../verificationCodes";
 import { prepareEmailVerificationRef } from "../verificationRefs";
+import {
+  legalAcceptanceInput,
+  requireLegalAcceptance,
+} from "../legalAcceptance";
 
 /**
  * Registration for Kyro: email + password, no email verification code.
@@ -51,8 +55,13 @@ export const createAccount = action({
     password: v.string(),
     username: v.string(),
     name: v.optional(v.string()),
+    legalAcceptance: legalAcceptanceInput,
   },
-  handler: async (ctx, { email, password, username, name }) => {
+  handler: async (
+    ctx,
+    { email, password, username, name, legalAcceptance },
+  ) => {
+    const acceptance = requireLegalAcceptance(legalAcceptance);
     const verificationRequired =
       process.env.KYRO_EMAIL_VERIFICATION_ENABLED === "true";
     // Generate before creating anything so an unavailable CSPRNG cannot leave
@@ -109,6 +118,7 @@ export const createAccount = action({
         status: "online",
         lastSeen: Date.now(),
         createdAt: Date.now(),
+        legalAcceptance: acceptance,
         dmPolicy: "everyone",
         allowFriendRequests: true,
         showPresence: true,

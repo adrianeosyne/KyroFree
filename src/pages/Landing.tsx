@@ -552,7 +552,9 @@ export default function Landing() {
               <KyroWordmark className="text-white [&_span]:font-black" />
             </Link>
             <nav className="mx-auto hidden items-center gap-7 text-sm font-bold text-white/85 lg:flex">
-              <Link className="transition hover:text-white" to="/download">Download</Link>
+              <Link className="transition hover:text-white" to="/download">
+                Download
+              </Link>
               <a className="transition hover:text-white" href="#features">
                 Features
               </a>
@@ -863,7 +865,9 @@ export default function Landing() {
                 Product
               </p>
               <div className="mt-4 space-y-3 text-sm text-white/60">
-                <Link className="block hover:text-white" to="/download">Download for Windows</Link>
+                <Link className="block hover:text-white" to="/download">
+                  Download for Windows
+                </Link>
                 <a className="block hover:text-white" href="#features">
                   Features
                 </a>
@@ -905,6 +909,9 @@ export default function Landing() {
                 <Link className="block hover:text-white" to="/privacy">
                   Privacy
                 </Link>
+                <Link className="block hover:text-white" to="/copyright">
+                  Copyright
+                </Link>
                 <Link className="block hover:text-white" to="/auth">
                   Sign in
                 </Link>
@@ -912,7 +919,9 @@ export default function Landing() {
             </div>
           </div>
           <div className="flex flex-col gap-3 pt-8 text-xs text-white/60 sm:flex-row sm:items-center sm:justify-between">
-            <p>© {new Date().getFullYear()} Kyro. Built for belonging.</p>
+            <p>
+              © {new Date().getFullYear()} Adrian Eosyne. All rights reserved.
+            </p>
             <p>No premium tier. No paywalled features. No fine print.</p>
           </div>
         </div>

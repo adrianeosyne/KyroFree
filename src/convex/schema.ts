@@ -123,6 +123,15 @@ const schema = defineSchema(
       allowFriendRequests: v.optional(v.boolean()),
       showPresence: v.optional(v.boolean()),
       createdAt: v.optional(v.number()),
+      /** Server-recorded acceptance at signup; absent for accounts created earlier. */
+      legalAcceptance: v.optional(
+        v.object({
+          acceptedAt: v.number(),
+          termsVersion: v.string(),
+          privacyVersion: v.string(),
+          copyrightVersion: v.string(),
+        }),
+      ),
       /** Username changes are limited to once every hour. */
       usernameChangedAt: v.optional(v.number()),
       /** Email changes are limited to once every seven days. */
