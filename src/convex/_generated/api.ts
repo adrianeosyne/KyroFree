@@ -46,6 +46,7 @@ import type * as functions from "../functions.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as ioMaintenance from "../ioMaintenance.js";
+import type * as legalAcceptance from "../legalAcceptance.js";
 import type * as lib from "../lib.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
@@ -124,6 +125,7 @@ const fullApi: ApiFromModules<{
   "gifs": typeof gifs,
   "http": typeof http,
   "ioMaintenance": typeof ioMaintenance,
+  "legalAcceptance": typeof legalAcceptance,
   "lib": typeof lib,
   "maintenance": typeof maintenance,
   "messages": typeof messages,

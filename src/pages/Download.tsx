@@ -250,6 +250,10 @@ export default function DownloadPage() {
           Terms
         </Link>
         <span className="mx-4">·</span>
+        <Link to="/copyright" className="hover:text-white">
+          Copyright
+        </Link>
+        <span className="mx-4">·</span>
         <Link to="/" className="hover:text-white">
           Kyro home
         </Link>
