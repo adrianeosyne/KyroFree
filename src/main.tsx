@@ -16,6 +16,7 @@ startDesktopWebUpdates();
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const DownloadPage = lazy(() => import("./pages/Download.tsx"));
+const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -156,6 +157,7 @@ createRoot(document.getElementById("root")!).render(
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/download" element={<DownloadPage />} />
+              <Route path="/docs/:slug?" element={<DeveloperDocs />} />
               <Route
                 path="/auth"
                 element={<AuthPage redirectAfterAuth="/dashboard" />}

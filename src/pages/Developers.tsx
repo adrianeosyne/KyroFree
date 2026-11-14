@@ -79,9 +79,14 @@ export default function Developers() {
               </h1>
             </div>
           </Link>
-          <Link className="text-sm text-indigo-300" to="/dashboard/bots">
-            Explore bots <ExternalLink className="ml-1 inline size-3" />
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link className="text-sm text-indigo-300" to="/docs">
+              Developer documentation
+            </Link>
+            <Link className="text-sm text-indigo-300" to="/dashboard/bots">
+              Explore bots <ExternalLink className="ml-1 inline size-3" />
+            </Link>
+          </div>
         </div>
         {applicationId ? (
           <Application applicationId={applicationId as Id<"botApplications">} />
