@@ -468,8 +468,8 @@ export const DOC_PAGES: DocPage[] = [
         text: "Convex object storage is already integrated; no new bucket credentials or database migration are needed. Deploy additive schema/functions to the exact Convex deployment used by the site before deploying the frontend. Confirm the intended deployment in CLI output before applying changes. Add download signing through Convex's secure environment controls. Existing files and user data are retained.",
       },
       {
-        title: "Vercel and docs hostname",
-        text: "Build with npm run build. Keep /api/v1 and legacy bot rewrites and the Mermaid HTML renderer asset. /docs works immediately under the main site. To use docs.kyro-chat.cyou, add that hostname to the existing Vercel project, point DNS to Vercel's requested target and configure a hostname rewrite from / to /docs. Do not claim DNS or deployment is live until configured and verified.",
+        title: "Vercel and documentation URL",
+        text: "Build with npm run build. Keep /api/v1 and legacy bot rewrites and the Mermaid HTML renderer asset. Developer documentation uses https://kyro-chat.cyou/docs on the existing site. No separate documentation domain or DNS configuration is required.",
       },
     ],
   },

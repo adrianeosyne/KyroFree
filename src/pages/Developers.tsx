@@ -97,9 +97,12 @@ export default function Developers() {
           <Link className="text-sm text-indigo-300" to="/dashboard/bots">
             Explore bots <ExternalLink className="ml-1 inline size-3" />
           </Link>
-          <Link className="text-sm text-indigo-300" to="/docs">
+          <a
+            className="text-sm text-indigo-300"
+            href="https://kyro-chat.cyou/docs"
+          >
             Developer documentation
-          </Link>
+          </a>
         </div>
         {applicationId ? (
           <Application applicationId={applicationId as Id<"botApplications">} />

@@ -9,8 +9,8 @@ creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
 
-The developer ecosystem upgrade adds `/docs`, Mermaid chat diagrams and verified
-file uploads. See the [delivery and deployment report](docs/developer-ecosystem-delivery.md)
+The developer ecosystem upgrade adds [developer documentation](https://kyro-chat.cyou/docs),
+Mermaid chat diagrams and verified file uploads. See the [delivery and deployment report](docs/developer-ecosystem-delivery.md)
 for implemented features, tests, limits, schema changes and required configuration.
 
 Application source is maintained in `adrianeosyne/KyroFree`. Keep credentials,

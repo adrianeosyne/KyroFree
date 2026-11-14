@@ -89,14 +89,15 @@ host's persistent disk and posts to an existing staff-restricted channel.
 
 ## Documentation
 
-Public route: `/docs` with 17 pages and a reference for all 53 REST routes.
+Documentation URL: [https://kyro-chat.cyou/docs](https://kyro-chat.cyou/docs),
+with 17 pages and a reference for all 53 REST routes.
 Sections cover introduction, getting started, authentication/installation,
 API, gateway, events, webhooks, commands/components, messaging, files,
 permissions, SDK, examples, Mermaid, troubleshooting, deployment and changelog.
 
 The site includes search, sidebar/mobile navigation, breadcrumbs, highlighted
-copyable code, API/SDK versions and previous/next links. The planned docs hostname
-is supported by the app, but DNS/Vercel domain configuration has not been performed.
+copyable code, API/SDK versions and previous/next links. Documentation uses the
+existing site; no separate docs hostname or DNS configuration is required.
 
 ## Mermaid
 
@@ -175,8 +176,8 @@ Rollout:
 4. Run the checks below and deploy the feature through the normal Vercel process.
    Vercel alone does not deploy Convex. Existing REST rewrites, LiveKit and email
    routes are preserved, and `mermaid.html` must remain a separately served asset.
-5. For `docs.kyro-chat.cyou`, add the hostname to the Vercel project and create
-   the DNS record Vercel requests. The existing `/docs` route needs no new domain.
+5. Verify documentation at `https://kyro-chat.cyou/docs`. The existing `/docs`
+   route needs no new domain or DNS configuration.
 6. Verify production login, chat, file links, SDK callbacks and voice/screen sharing
    after rollout. Do not run disposable test-account scripts against production.
 
@@ -205,7 +206,8 @@ Rollout:
 
 ## Partial or external work
 
-Production deployment, docs DNS, and npm publication were not performed.
+Production deployment and npm publication were not performed. Docs DNS changes
+are not required for `https://kyro-chat.cyou/docs`.
 The code is verified locally; production email delivery, LiveKit calls and screen
 sharing were not exercised against live external services in this run. Existing
 regression suites passed, but they do not constitute a production smoke test.

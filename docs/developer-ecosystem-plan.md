@@ -63,7 +63,7 @@ checks. Disposable integration tests must never target the live deployment.
 
 Vercel does not deploy Convex. Deploy backend to the exact frontend deployment
 before shipping UI. Configure download signing and webhook signing in Convex.
-The docs hostname can point to the existing Vercel project; `/docs` works without
-DNS changes. SDK publication requires a separate npm publishing action and is
+Documentation uses `https://kyro-chat.cyou/docs` on the existing Vercel project;
+no DNS changes are required. SDK publication requires a separate npm publishing action and is
 not claimed here. Malware scanning is an external service: signature validation
 and quarantine do not constitute a malware scan.
