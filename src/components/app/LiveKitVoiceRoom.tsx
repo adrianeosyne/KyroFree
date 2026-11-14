@@ -39,6 +39,7 @@ import {
 import { readableError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
 import { useNow } from "@/hooks/use-now";
+import { audioCapturePreferences } from "@/lib/audioPreferences";
 
 type ContainerType = "channel" | "conversation";
 
@@ -342,11 +343,10 @@ export function LiveKitVoiceRoom({
         const canUseMic = credentials.canPublishSources.includes("microphone");
         if (canUseMic) {
           try {
-            await nextRoom.localParticipant.setMicrophoneEnabled(true, {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            });
+            await nextRoom.localParticipant.setMicrophoneEnabled(
+              true,
+              audioCapturePreferences(),
+            );
           } catch (error) {
             const name = error instanceof DOMException ? error.name : "";
             toast.error(
@@ -420,10 +420,8 @@ export function LiveKitVoiceRoom({
     try {
       const enabled = !room.localParticipant.isMicrophoneEnabled;
       await room.localParticipant.setMicrophoneEnabled(enabled, {
+        ...audioCapturePreferences(),
         deviceId: selectedAudioInput || undefined,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
       });
       setMuted(!enabled);
       updateSeat({ muted: !enabled });

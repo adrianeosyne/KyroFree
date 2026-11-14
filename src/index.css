@@ -3,6 +3,35 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 
+.chat-text {
+  font-size: var(--chat-font-size, 14px);
+  line-height: 1.6;
+}
+
+html[data-underline-links="true"] a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.settings-content {
+  scrollbar-gutter: stable;
+}
+
+.settings-dialog nav,
+.settings-content {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 /* DO NOT CHANGE */
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);

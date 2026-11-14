@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/popover";
 import { dayKey, dayLabel, formatTime, type PresenceState } from "@/lib/format";
 import { isEmojiOnly, renderMessage } from "@/lib/markdown";
+import { useUiStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { CustomEmoji } from "@/lib/emoji";
@@ -522,6 +523,7 @@ function MessageRow({
   onOpenThread: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const mediaPreviews = useUiStore((state) => state.mediaPreviews);
   const [draft, setDraft] = useState(message.content);
   const [, setParams] = useSearchParams();
   const convex = useConvex();
@@ -1027,12 +1029,14 @@ function MessageRow({
                   </p>
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap break-words text-sm leading-[1.375rem] text-foreground/95">
+                <div className="chat-text whitespace-pre-wrap break-words text-sm leading-[1.375rem] text-foreground/95">
                   {renderMessage(message.content, {
                     customEmojis: message.customEmojis,
                     roleMentions: message.roleMentions,
                     onMention: openMention,
-                    onMedia: (url) => onOpenMedia(url, "Shared image"),
+                    onMedia: mediaPreviews
+                      ? (url) => onOpenMedia(url, "Shared image")
+                      : undefined,
                     jumboEmoji: jumbo,
                   })}
                   {message.editedAt && (
@@ -1089,7 +1093,7 @@ function MessageRow({
                 </div>
               )}
 
-              {embeddedMedia.length > 0 && !editing && (
+              {mediaPreviews && embeddedMedia.length > 0 && !editing && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {embeddedMedia.map((url) => (
                     <button

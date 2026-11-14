@@ -18,6 +18,16 @@ export const me = person(
   "online",
   "Making something good",
 );
+Object.assign(me, {
+  email: "alex@example.com",
+  pronouns: "they/them",
+  bio: "A little conversation, a lot of good ideas.",
+  links: [],
+  dmPolicy: "everyone",
+  allowFriendRequests: true,
+  showPresence: true,
+  suggestible: true,
+});
 const friends = [
   person("maya", "Maya Chen", "online", "Sketching new ideas"),
   person("leo", "Leo Parker", "online", "Anyone up for a game?"),
@@ -141,6 +151,12 @@ export function useConvexConnectionState() {
 }
 const empty = [];
 const data = {
+  "warnings:mine": { count: 0, warnings: [] },
+  "security:status": {
+    enabled: false,
+    pending: false,
+    recoveryCodesRemaining: 0,
+  },
   "users:me": me,
   "users:currentUser": me,
   "social:list": { friends, incoming: [], outgoing: [], blocked: [] },
@@ -158,15 +174,13 @@ const data = {
   "servers:joinState": { exists: true, isMember: true },
   "channels:list": channels,
   "servers:members": {
-    online: friends
-      .slice(0, 4)
-      .map((user) => ({
-        user,
-        nickname: null,
-        isOwner: false,
-        topRoleColor: null,
-        topRoleName: "Member",
-      })),
+    online: friends.slice(0, 4).map((user) => ({
+      user,
+      nickname: null,
+      isOwner: false,
+      topRoleColor: null,
+      topRoleName: "Member",
+    })),
     offline: [],
     myPermissions: [],
   },
@@ -184,6 +198,22 @@ const data = {
 export function useQuery(reference, args) {
   if (args === "skip") return undefined;
   const name = getFunctionName(reference);
+  if (
+    name === "messages:list" &&
+    localStorage.getItem("kyro.fixture.media") === "1"
+  )
+    return {
+      messages: [
+        ...messages,
+        {
+          ...messages[0],
+          id: "fixture-media",
+          content: "https://example.com/settings-preview.png",
+        },
+      ],
+      hasMore: false,
+      nextCursor: null,
+    };
   if (name === "servers:get")
     return (
       discovery.find((server) => server.id === args.serverId) ?? discovery[0]
@@ -202,11 +232,17 @@ export function useQuery(reference, args) {
     );
   return Object.hasOwn(data, name) ? data[name] : empty;
 }
+export function usePaginatedQuery() {
+  return { results: empty, status: "Exhausted", loadMore: () => {} };
+}
 const mutations = new Map();
 export function useMutation(reference) {
   const name = getFunctionName(reference);
   if (!mutations.has(name))
     mutations.set(name, async (args) => {
+      window.fixtureMutations ??= [];
+      window.fixtureMutations.push({ name, args });
+      if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;
     });
