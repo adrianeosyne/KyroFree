@@ -1,6 +1,6 @@
 {
   "name": "kyro-desktop",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "private": true,
   "description": "Kyro for Windows — communities, messaging and voice on your desktop.",
   "author": "Kyro",
@@ -19,6 +19,12 @@
     "typescript": "~5.9.3"
   },
   "build": {
+    "publish": {
+      "provider": "github",
+      "owner": "CrimsonCrown967",
+      "repo": "Kyro",
+      "releaseType": "release"
+    },
     "appId": "org.kyro.chat",
     "productName": "Kyro",
     "copyright": "Copyright © 2026 Kyro",
@@ -48,5 +54,8 @@
       "uninstallDisplayName": "Kyro",
       "deleteAppDataOnUninstall": false
     }
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
   }
 }

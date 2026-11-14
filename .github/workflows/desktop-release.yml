@@ -1,0 +1,38 @@
+name: Windows desktop release
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm --prefix desktop ci
+      - run: npm --prefix desktop test
+      - name: Check release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "desktop-v$version") {
+            throw 'The release tag must match desktop/package.json.'
+          }
+      - run: npm --prefix desktop run dist:win
+      - name: Prepare draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = (Get-Content desktop/package.json | ConvertFrom-Json).version
+          $tag = "desktop-v$version"
+          $installer = "desktop/release/Kyro-Setup-$version-x64.exe"
+          $hash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          "$hash  Kyro-Setup-$version-x64.exe" | Set-Content desktop/release/SHA256SUMS.txt -Encoding ascii
+          gh release create $tag $installer "$installer.blockmap" desktop/release/latest.yml desktop/release/SHA256SUMS.txt --draft --title "Kyro for Windows $version" --notes-file desktop/RELEASE_NOTES.md --target $env:GITHUB_SHA
