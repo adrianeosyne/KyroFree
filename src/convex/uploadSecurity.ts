@@ -9,6 +9,8 @@ export { MAX_UPLOAD_BYTES };
 
 export type UploadClaim =
   | "workspace_background"
+  | "workspace_background_poster"
+  | "workspace_cursor"
   | "decoration"
   | "notification_sound"
   | "message"

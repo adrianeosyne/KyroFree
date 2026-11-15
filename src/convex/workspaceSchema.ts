@@ -10,6 +10,7 @@ export const workspaceValidator = v.object({
   backgroundOpacity: v.number(),
   backgroundBlur: v.number(),
   font: v.string(),
+  cursor: v.optional(v.string()),
   spacing: v.number(),
   borderWidth: v.number(),
   shadow: v.number(),

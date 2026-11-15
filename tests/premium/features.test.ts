@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { cursorPngSize } from "../../src/lib/cursorPng";
+import { FONT_THEMES, CURSOR_THEMES } from "../../src/lib/workspaceStyles";
 import { joinKyroHq } from "../../src/convex/servers";
 import { notify } from "../../src/convex/lib";
 import { serverBenefits } from "../../src/convex/premiumBenefits";
@@ -741,5 +744,243 @@ describe("Premium, original artwork and community access", () => {
     expect(
       (await f.owner.query(api.emojis.forServer, { serverId })).emojis,
     ).toHaveLength(101);
+  });
+});
+
+describe("Premium workspace artwork and typography", () => {
+  const png = new Uint8Array(
+    readFileSync(new URL("../../public/logo-32.png", import.meta.url)),
+  );
+  async function cursorAsset(
+    f: Awaited<ReturnType<typeof fixture>>,
+    bytes = png,
+  ) {
+    const storageId = await f.t.run((ctx) =>
+      ctx.storage.store(
+        new Blob([new Uint8Array(bytes)], { type: "image/png" }),
+      ),
+    );
+    await f.owner.mutation(api.files.registerUpload, {
+      storageId,
+      name: "my-cursor.png",
+    });
+    return storageId;
+  }
+  it("accepts animated owned backgrounds and still frames, replaces both, and removes them after expiry", async () => {
+    const f = await fixture();
+    const original = await asset(f, "image/gif");
+    const poster = await asset(f, "image/jpeg");
+    await expect(
+      f.owner.mutation(api.workspace.background, {
+        storageId: original,
+        posterStorageId: poster,
+      }),
+    ).rejects.toThrow("active Premium");
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await expect(
+      f.other.mutation(api.workspace.background, { storageId: original }),
+    ).rejects.toThrow("active Premium");
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.other });
+    await expect(
+      f.other.mutation(api.workspace.background, { storageId: original }),
+    ).rejects.toThrow("does not belong");
+    await f.owner.mutation(api.workspace.background, {
+      storageId: original,
+      posterStorageId: poster,
+    });
+    const saved = await f.owner.query(api.workspace.get);
+    expect(saved.backgroundUrl).toBeTruthy();
+    expect(saved.backgroundPosterUrl).toBeTruthy();
+    expect(saved.backgroundMayAnimate).toBe(true);
+    const next = await asset(f, "image/apng");
+    const nextPoster = await asset(f, "image/jpeg");
+    await f.owner.mutation(api.workspace.background, {
+      storageId: next,
+      posterStorageId: nextPoster,
+    });
+    await f.t.run(async (ctx) => {
+      expect(await ctx.storage.get(original)).toBeNull();
+      expect(await ctx.storage.get(poster)).toBeNull();
+      await ctx.db.patch(f.ids.owner, { premiumUntil: Date.now() - 1 });
+    });
+    const expired = await f.owner.query(api.workspace.get);
+    expect(expired.backgroundUrl).toBeNull();
+    expect(expired.backgroundPosterUrl).toBeNull();
+    await f.owner.mutation(api.workspace.background, { storageId: null });
+    await f.t.run(async (ctx) => {
+      expect(await ctx.storage.get(next)).toBeNull();
+      expect(await ctx.storage.get(nextPoster)).toBeNull();
+    });
+  });
+  it("rejects unsafe formats, oversized backgrounds and invalid or stolen posters without changing the existing background", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    const original = await asset(f, "image/jpeg");
+    await f.owner.mutation(api.workspace.background, { storageId: original });
+    const before = await f.owner.query(api.workspace.get);
+    const svg = await asset(f, "image/svg+xml");
+    const large = await asset(f, "image/png", 5 * 1024 * 1024 + 1);
+    await expect(
+      f.owner.mutation(api.workspace.background, { storageId: svg }),
+    ).rejects.toThrow("5 MB");
+    await expect(
+      f.owner.mutation(api.workspace.background, { storageId: large }),
+    ).rejects.toThrow("5 MB");
+    const gif = await asset(f, "image/gif");
+    await expect(
+      f.owner.mutation(api.workspace.background, {
+        storageId: gif,
+        posterStorageId: svg,
+      }),
+    ).rejects.toThrow("JPEG");
+    const stolen = await asset(f, "image/jpeg");
+    await f.t.run(async (ctx) => {
+      const upload = await ctx.db
+        .query("uploads")
+        .withIndex("by_storage", (q) => q.eq("storageId", stolen))
+        .unique();
+      await ctx.db.patch(upload!._id, { ownerId: f.ids.other });
+    });
+    await expect(
+      f.owner.mutation(api.workspace.background, {
+        storageId: gif,
+        posterStorageId: stolen,
+      }),
+    ).rejects.toThrow("does not belong");
+    expect((await f.owner.query(api.workspace.get)).backgroundUrl).toBe(
+      before.backgroundUrl,
+    );
+  });
+  it("saves all bundled font and cursor choices and supplies defaults for old themes", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    for (const font of FONT_THEMES)
+      await f.owner.mutation(api.workspace.save, {
+        theme: { ...WORKSPACE_DEFAULTS, font: font.id },
+      });
+    for (const cursor of CURSOR_THEMES)
+      await f.owner.mutation(api.workspace.save, {
+        theme: { ...WORKSPACE_DEFAULTS, cursor: cursor.id },
+      });
+    await expect(
+      f.owner.mutation(api.workspace.save, {
+        theme: { ...WORKSPACE_DEFAULTS, font: "unknown" },
+      }),
+    ).rejects.toThrow("supported");
+    await expect(
+      f.owner.mutation(api.workspace.save, {
+        theme: { ...WORKSPACE_DEFAULTS, cursor: "unknown" },
+      }),
+    ).rejects.toThrow("supported");
+    await expect(
+      f.owner.mutation(api.workspace.save, {
+        theme: { ...WORKSPACE_DEFAULTS, cursor: "uploaded" },
+      }),
+    ).rejects.toThrow("Upload a cursor");
+    const legacyTheme = Object.fromEntries(
+      Object.entries(WORKSPACE_DEFAULTS).filter(([key]) => key !== "cursor"),
+    ) as Omit<typeof WORKSPACE_DEFAULTS, "cursor">;
+    await f.owner.mutation(api.workspace.save, { theme: legacyTheme });
+    expect((await f.owner.query(api.workspace.get)).theme.cursor).toBe("kyro");
+  });
+  it("checks cursor ownership, active Premium and real PNG dimensions, then stores and removes the cursor", async () => {
+    const f = await fixture();
+    const storageId = await cursorAsset(f);
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId }),
+    ).rejects.toThrow("active Premium");
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.other });
+    await expect(
+      f.other.action(api.workspaceCursors.set, { storageId }),
+    ).rejects.toThrow("does not belong");
+    await expect(
+      f.owner.action(api.workspaceCursors.set, {
+        storageId,
+        hotspotX: 32,
+        hotspotY: 0,
+      }),
+    ).rejects.toThrow("click point");
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId, hotspotX: 1.5 }),
+    ).rejects.toThrow("click point");
+    await f.owner.action(api.workspaceCursors.set, {
+      storageId,
+      hotspotX: 2,
+      hotspotY: 1,
+    });
+    let saved = await f.owner.query(api.workspace.get);
+    expect(saved.cursorUrl).toBeTruthy();
+    expect(saved.cursorHotspotX).toBe(2);
+    expect(saved.cursorHotspotY).toBe(1);
+    expect(saved.theme.cursor).toBe("uploaded");
+    const replacement = await cursorAsset(f);
+    await f.owner.action(api.workspaceCursors.set, { storageId: replacement });
+    await f.t.run(async (ctx) => {
+      expect(await ctx.storage.get(storageId)).toBeNull();
+      await ctx.db.patch(f.ids.owner, { premiumUntil: Date.now() - 1 });
+    });
+    saved = await f.owner.query(api.workspace.get);
+    expect(saved.cursorUrl).toBeNull();
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId: replacement }),
+    ).rejects.toThrow("active Premium");
+    await f.owner.action(api.workspaceCursors.set, { storageId: null });
+    expect((await f.owner.query(api.workspace.get)).theme.cursor).toBe("kyro");
+    await f.t.run(async (ctx) => {
+      expect(await ctx.storage.get(replacement)).toBeNull();
+    });
+  });
+  it("rejects malformed PNGs, unsafe cursor formats and cursor files over 128 KB", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    const invalid = await asset(f);
+    const gif = await asset(f, "image/gif");
+    const large = await asset(f, "image/png", 128 * 1024 + 1);
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId: invalid }),
+    ).rejects.toThrow("valid static PNG");
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId: gif }),
+    ).rejects.toThrow("static PNG");
+    await expect(
+      f.owner.action(api.workspaceCursors.set, { storageId: large }),
+    ).rejects.toThrow("128 KB");
+    expect((await f.owner.query(api.workspace.get)).cursorUrl).toBeNull();
+  });
+  it("rejects PNG animation chunks, altered geometry, trailing bytes and truncated files", () => {
+    expect(cursorPngSize(png)).toEqual({ width: 32, height: 32 });
+    // Build valid CRCs for modified header / animation chunks to test their actual constraints.
+    const crc = (bytes: Uint8Array) => {
+      let value = 0xffffffff;
+      for (const byte of bytes) {
+        value ^= byte;
+        for (let i = 0; i < 8; i++)
+          value = (value >>> 1) ^ (value & 1 ? 0xedb88320 : 0);
+      }
+      return (value ^ 0xffffffff) >>> 0;
+    };
+    const wide = new Uint8Array(png);
+    const view = new DataView(wide.buffer);
+    view.setUint32(16, 65);
+    view.setUint32(29, crc(wide.subarray(12, 29)));
+    expect(() => cursorPngSize(wide)).toThrow("64 × 64");
+    const animation = new Uint8Array(20);
+    const animationView = new DataView(animation.buffer);
+    animationView.setUint32(0, 8);
+    animation.set([97, 99, 84, 76], 4);
+    animationView.setUint32(8, 2);
+    animationView.setUint32(16, crc(animation.subarray(4, 16)));
+    const apng = new Uint8Array(png.length + animation.length);
+    apng.set(png.subarray(0, 33));
+    apng.set(animation, 33);
+    apng.set(png.subarray(33), 53);
+    expect(() => cursorPngSize(apng)).toThrow("must be static");
+    expect(() => cursorPngSize(png.subarray(0, png.length - 5))).toThrow(
+      "valid static PNG",
+    );
+    const trailing = new Uint8Array(png.length + 1);
+    trailing.set(png);
+    expect(() => cursorPngSize(trailing)).toThrow("valid static PNG");
   });
 });

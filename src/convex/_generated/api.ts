@@ -94,6 +94,7 @@ import type * as voiceMaintenance from "../voiceMaintenance.js";
 import type * as voiceTickets from "../voiceTickets.js";
 import type * as warnings from "../warnings.js";
 import type * as workspace from "../workspace.js";
+import type * as workspaceCursors from "../workspaceCursors.js";
 import type * as workspaceSchema from "../workspaceSchema.js";
 
 const fullApi: ApiFromModules<{
@@ -181,6 +182,7 @@ const fullApi: ApiFromModules<{
   "voiceTickets": typeof voiceTickets,
   "warnings": typeof warnings,
   "workspace": typeof workspace,
+  "workspaceCursors": typeof workspaceCursors,
   "workspaceSchema": typeof workspaceSchema,
 }> = anyApi as any;
 

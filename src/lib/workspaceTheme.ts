@@ -9,6 +9,7 @@ export const WORKSPACE_DEFAULTS = {
   backgroundOpacity: 18,
   backgroundBlur: 0,
   font: "system",
+  cursor: "kyro",
   spacing: 100,
   borderWidth: 1,
   shadow: 20,

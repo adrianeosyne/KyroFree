@@ -1,3 +1,9 @@
+import {
+  FONT_THEMES,
+  CURSOR_THEMES,
+  WORKSPACE_IMAGE_TYPES,
+  WORKSPACE_BACKGROUND_BYTES,
+} from "../lib/workspaceStyles";
 import { v } from "convex/values";
 import { query, mutation } from "./functions";
 import { requireActiveUser } from "./lib";
@@ -19,7 +25,22 @@ export const get = query({
       .unique();
     return {
       premiumUntil: user.premiumUntil ?? null,
-      theme: row?.theme ?? WORKSPACE_DEFAULTS,
+      theme: { ...WORKSPACE_DEFAULTS, ...row?.theme },
+      backgroundPosterUrl:
+        hasPremium(user) && row?.backgroundPosterStorageId
+          ? await ctx.storage.getUrl(row.backgroundPosterStorageId)
+          : null,
+      backgroundMayAnimate:
+        row?.backgroundMayAnimate ??
+        (!!row?.backgroundStorageId &&
+          (await ctx.db.system.get("_storage", row.backgroundStorageId))
+            ?.contentType !== "image/jpeg"),
+      cursorUrl:
+        hasPremium(user) && row?.cursorStorageId
+          ? await ctx.storage.getUrl(row.cursorStorageId)
+          : null,
+      cursorHotspotX: row?.cursorHotspotX ?? 4,
+      cursorHotspotY: row?.cursorHotspotY ?? 3,
       backgroundUrl:
         hasPremium(user) && row?.backgroundStorageId
           ? await ctx.storage.getUrl(row.backgroundStorageId)
@@ -58,22 +79,31 @@ export const save = mutation({
         throw new Error("That workspace value is outside its allowed range.");
     }
     if (
-      !["system", "mono", "rounded"].includes(theme.font) ||
+      !FONT_THEMES.some((font) => font.id === theme.font) ||
       !["center", "top", "bottom"].includes(theme.backgroundPosition) ||
-      !["cover", "contain"].includes(theme.backgroundFit)
+      !["cover", "contain"].includes(theme.backgroundFit) ||
+      (theme.cursor !== undefined &&
+        theme.cursor !== "uploaded" &&
+        !CURSOR_THEMES.some((cursor) => cursor.id === theme.cursor))
     )
       throw new Error("Choose a supported workspace style.");
     const row = await ctx.db
       .query("workspaces")
       .withIndex("by_user", (q) => q.eq("userId", id))
       .unique();
-    if (row) await ctx.db.patch(row._id, { theme });
-    else await ctx.db.insert("workspaces", { userId: id, theme });
+    if (theme.cursor === "uploaded" && !row?.cursorStorageId)
+      throw new Error("Upload a cursor before selecting it.");
+    const normalized = { ...WORKSPACE_DEFAULTS, ...theme };
+    if (row) await ctx.db.patch(row._id, { theme: normalized });
+    else await ctx.db.insert("workspaces", { userId: id, theme: normalized });
   },
 });
 export const background = mutation({
-  args: { storageId: v.union(v.id("_storage"), v.null()) },
-  handler: async (ctx, { storageId }) => {
+  args: {
+    storageId: v.union(v.id("_storage"), v.null()),
+    posterStorageId: v.optional(v.id("_storage")),
+  },
+  handler: async (ctx, { storageId, posterStorageId }) => {
     const { id, user } = await requireActiveUser(ctx);
     if (!hasPremium(user) && storageId)
       throw new Error("Background uploads require active Premium.");
@@ -91,13 +121,35 @@ export const background = mutation({
     if (storageId) {
       const asset = await requireOwnedUpload(ctx, id, storageId);
       if (
-        !["image/png", "image/jpeg", "image/webp", "image/avif"].includes(
+        !(WORKSPACE_IMAGE_TYPES as readonly string[]).includes(
           asset.mimeType,
         ) ||
-        asset.size > 5 * 1024 * 1024
+        asset.size > WORKSPACE_BACKGROUND_BYTES
       )
-        throw new Error("Choose a static background image under 5 MB.");
+        throw new Error(
+          "Choose a static or animated PNG, APNG, JPEG, WebP, AVIF or GIF image up to 5 MB.",
+        );
       await claimUpload(ctx, id, storageId, "workspace_background", rowId);
+      if (posterStorageId) {
+        const poster = await requireOwnedUpload(ctx, id, posterStorageId);
+        if (
+          poster.mimeType !== "image/jpeg" ||
+          poster.size > WORKSPACE_BACKGROUND_BYTES
+        )
+          throw new Error(
+            "The background still preview must be a JPEG up to 5 MB.",
+          );
+        await claimUpload(
+          ctx,
+          id,
+          posterStorageId,
+          "workspace_background_poster",
+          rowId,
+        );
+      }
+      await ctx.db.patch(rowId, {
+        backgroundMayAnimate: asset.mimeType !== "image/jpeg",
+      });
     }
     if (row?.backgroundStorageId !== storageId)
       await deleteClaimedUpload(
@@ -106,6 +158,18 @@ export const background = mutation({
         "workspace_background",
         rowId,
       );
-    await ctx.db.patch(rowId, { backgroundStorageId: storageId ?? undefined });
+    const nextPoster = storageId ? posterStorageId : undefined;
+    if (row?.backgroundPosterStorageId !== nextPoster)
+      await deleteClaimedUpload(
+        ctx,
+        row?.backgroundPosterStorageId,
+        "workspace_background_poster",
+        rowId,
+      );
+    await ctx.db.patch(rowId, {
+      backgroundStorageId: storageId ?? undefined,
+      backgroundPosterStorageId: nextPoster,
+      ...(!storageId ? { backgroundMayAnimate: false } : {}),
+    });
   },
 });

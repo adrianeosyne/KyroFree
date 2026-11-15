@@ -52,13 +52,13 @@ This release exposes at least 60 distinct controls and workflows in each setting
 35. Corner radius
 36. Sidebar width
 37. Panel transparency
-38. Background image upload
+38. Static or animated background upload with preview and a reduced-motion still frame (5 MB)
 39. Background visibility
 40. Background blur
 
 ### Comfort and chat
 
-41. Workspace typography (Premium)
+41. Workspace typography: 15 themes including 12 self-hosted gaming and creator fonts (Premium)
 42. Workspace message spacing (Premium)
 43. Workspace border weight (Premium)
 44. Workspace shadows (Premium)
@@ -77,7 +77,7 @@ This release exposes at least 60 distinct controls and workflows in each setting
 54. Unread DM bubbles
 55. Reduced motion
 56. Underlined links
-57. Custom cursor toggle
+57. Custom cursor toggle, 10 additional Premium cursor styles and owned PNG cursor uploads (64 × 64, 128 KB) with adjustable click point
 58. Microphone check and processing
 59. Manual monthly Premium request
 60. Gift Premium to another member

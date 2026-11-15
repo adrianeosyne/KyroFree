@@ -1,3 +1,4 @@
+import { checkWorkspaceAssets } from "./workspace-checks.mjs";
 import { expect } from "@playwright/test";
 import assert from "node:assert/strict";
 const pixel = Buffer.from(
@@ -110,6 +111,7 @@ export async function checkFeatures(page) {
     window.fixtureMutations.findLast((x) => x.name === "workspace:save"),
   );
   assert.equal(saved.args.theme.radius, 22);
+  await checkWorkspaceAssets(page, settings, nav);
   await page.evaluate(() =>
     window.setFixtureData("workspace:get", {
       premiumUntil: null,

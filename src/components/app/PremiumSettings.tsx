@@ -53,7 +53,7 @@ const perks = [
   [
     "Your whole Kyro",
     "Studio customization",
-    "Personalize colors, backgrounds, panels and the shape of your workspace.",
+    "Personalize colors, static or animated backgrounds, 15 font themes, 10 new gaming cursors and your own cursor artwork, panels and layout.",
   ],
   [
     "Premium",

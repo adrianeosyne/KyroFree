@@ -1,21 +1,26 @@
 /* DO NOT CHANGE */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./workspaceFonts.css";
 @custom-variant dark (&:is(.dark *));
 
 @media (hover: hover) and (pointer: fine) {
   html[data-custom-cursor="true"] body {
-    cursor:
+    cursor: var(
+      --kyro-cursor-default,
       url("/cursors/kyro-default.svg") 4 3,
-      auto;
+      auto
+    );
   }
   html[data-custom-cursor="true"]
     :is(a, button, [role="button"], summary, select, .cursor-pointer):not(
       :disabled
     ):not([aria-disabled="true"]) {
-    cursor:
+    cursor: var(
+      --kyro-cursor-pointer,
       url("/cursors/kyro-pointer.svg") 4 3,
-      pointer;
+      pointer
+    );
   }
   html[data-custom-cursor="true"]
     :is(
@@ -929,6 +934,9 @@ html[data-workspace="true"] {
     transparent
   );
   --sidebar: var(--workspace-panel);
+}
+html[data-workspace="true"] body {
+  font-family: var(--workspace-font);
 }
 html[data-workspace="true"] .kyro-app-shell {
   font-family: var(--workspace-font);

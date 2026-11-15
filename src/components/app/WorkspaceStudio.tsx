@@ -4,13 +4,25 @@ import { api } from "@/convex/_generated/api";
 import { hasPremium } from "@/lib/entitlements";
 import { WORKSPACE_DEFAULTS, type WorkspaceTheme } from "@/lib/workspaceTheme";
 import { Button } from "@/components/ui/button";
-import { useUploadFile } from "@/lib/upload";
+import {
+  FONT_THEMES,
+  cursorAssets,
+  workspaceFont,
+} from "@/lib/workspaceStyles";
+import {
+  WorkspaceBackgroundEditor,
+  WorkspaceCursorEditor,
+} from "./WorkspaceAssets";
+import { useSystemReducedMotion } from "@/hooks/use-system-reduced-motion";
+import { useUiStore } from "@/lib/store";
 import { toast } from "sonner";
 import { useNow } from "@/hooks/use-now";
 
 export function WorkspaceAppearance() {
   const data = useQuery(api.workspace.get);
   const now = useNow(30_000);
+  const reducedMotion = useUiStore((state) => state.reducedMotion);
+  const systemReducedMotion = useSystemReducedMotion();
   useEffect(() => {
     const root = document.documentElement;
     const t = data?.theme;
@@ -24,24 +36,36 @@ export function WorkspaceAppearance() {
         `--workspace-${key}`,
         typeof value === "number" ? String(value) : value,
       );
+    const still = reducedMotion || systemReducedMotion;
+    const backgroundUrl =
+      still && data.backgroundMayAnimate
+        ? data.backgroundPosterUrl
+        : data.backgroundUrl;
     root.style.setProperty(
       "--workspace-image",
-      data.backgroundUrl
-        ? `url(${JSON.stringify(data.backgroundUrl)})`
-        : "none",
+      backgroundUrl ? `url(${JSON.stringify(backgroundUrl)})` : "none",
+    );
+    root.style.setProperty("--workspace-font", workspaceFont(t.font));
+    const assets = cursorAssets(t.cursor ?? "kyro");
+    const uploaded = t.cursor === "uploaded" && data.cursorUrl;
+    root.style.setProperty(
+      "--kyro-cursor-default",
+      uploaded
+        ? `url(${JSON.stringify(data.cursorUrl)}) ${data.cursorHotspotX} ${data.cursorHotspotY}, auto`
+        : `url(${JSON.stringify(assets.normal)}) 4 3, auto`,
     );
     root.style.setProperty(
-      "--workspace-font",
-      t.font === "mono"
-        ? "ui-monospace, monospace"
-        : t.font === "rounded"
-          ? "'Trebuchet MS', sans-serif"
-          : "Inter, system-ui, sans-serif",
+      "--kyro-cursor-pointer",
+      uploaded
+        ? `url(${JSON.stringify(data.cursorUrl)}) ${data.cursorHotspotX} ${data.cursorHotspotY}, pointer`
+        : `url(${JSON.stringify(assets.pointer)}) 4 3, pointer`,
     );
     return () => {
       root.removeAttribute("data-workspace");
+      root.style.removeProperty("--kyro-cursor-default");
+      root.style.removeProperty("--kyro-cursor-pointer");
     };
-  }, [data, now]);
+  }, [data, now, reducedMotion, systemReducedMotion]);
   return null;
 }
 const ranges = [
@@ -58,11 +82,10 @@ const ranges = [
 export function WorkspaceStudio() {
   const data = useQuery(api.workspace.get);
   const save = useMutation(api.workspace.save);
-  const background = useMutation(api.workspace.background);
-  const upload = useUploadFile({ requireRegistration: true });
+
   const [draft, setDraft] = useState<WorkspaceTheme | null>(null);
   const [busy, setBusy] = useState(false);
-  const t = draft ?? data?.theme ?? WORKSPACE_DEFAULTS;
+  const t = { ...WORKSPACE_DEFAULTS, ...(draft ?? data?.theme) };
   const perform = async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try {
@@ -84,7 +107,8 @@ export function WorkspaceStudio() {
         <h2 className="mt-3 text-2xl font-bold">Build your own Kyro.</h2>
         <p className="mt-3 text-sm text-muted-foreground">
           Unlock workspace colors, backgrounds, typography, panels and layout
-          for $1.99 per month. Open Premium in settings to request activation.
+          including animated images, font themes and your own cursor, for $1.99
+          per month. Open Premium in settings to request activation.
         </p>
       </section>
     );
@@ -98,6 +122,7 @@ export function WorkspaceStudio() {
           color: t.text,
           border: `${t.borderWidth}px solid ${t.accent}`,
           borderRadius: t.radius,
+          fontFamily: workspaceFont(t.font),
         }}
       >
         <p
@@ -150,7 +175,6 @@ export function WorkspaceStudio() {
         ))}
         {(
           [
-            ["font", ["system", "mono", "rounded"]],
             ["backgroundPosition", ["center", "top", "bottom"]],
             ["backgroundFit", ["cover", "contain"]],
           ] as const
@@ -173,6 +197,50 @@ export function WorkspaceStudio() {
           </label>
         ))}
       </div>
+      <section className="space-y-3 rounded-2xl border border-border bg-surface p-5">
+        <h3 className="font-semibold">Font themes</h3>
+        <p className="text-xs text-muted-foreground">
+          Choose from 15 styles, including 12 new gaming and creator fonts.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {FONT_THEMES.map((font) => (
+            <button
+              key={font.id}
+              type="button"
+              aria-label={`${font.name} font theme`}
+              aria-pressed={t.font === font.id}
+              disabled={busy}
+              onClick={() => setDraft({ ...t, font: font.id })}
+              className="rounded-xl border border-border bg-panel p-4 text-left aria-pressed:border-primary aria-pressed:bg-primary/10"
+            >
+              <span
+                className="block text-lg"
+                style={{ fontFamily: font.family }}
+              >
+                Aa · Kyro
+              </span>
+              <span className="mt-2 block text-sm font-semibold">
+                {font.name}
+              </span>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                {font.description}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <WorkspaceCursorEditor
+        data={data}
+        selectedCursor={t.cursor}
+        disabled={busy}
+        onCursorChange={(cursor) =>
+          setDraft((current) => ({
+            ...WORKSPACE_DEFAULTS,
+            ...(current ?? data.theme),
+            cursor,
+          }))
+        }
+      />
       <div className="flex gap-3">
         <Button
           disabled={busy}
@@ -191,47 +259,7 @@ export function WorkspaceStudio() {
           Reset studio
         </Button>
       </div>
-      <section className="rounded-xl border border-border bg-surface p-4">
-        <label className="block text-sm">
-          Workspace background
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/avif"
-            disabled={busy}
-            className="mt-3 block w-full text-xs"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file)
-                void perform(async () => {
-                  const asset = await upload(file);
-                  await background({ storageId: asset.storageId });
-                });
-            }}
-          />
-        </label>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Static PNG, JPEG, WebP or AVIF · under 5 MB
-        </p>
-        {data.backgroundUrl && (
-          <>
-            <img
-              src={data.backgroundUrl}
-              alt="Workspace background"
-              className="mt-3 max-h-40 rounded-lg"
-            />
-            <Button
-              variant="outline"
-              className="mt-3"
-              disabled={busy}
-              onClick={() =>
-                void perform(() => background({ storageId: null }))
-              }
-            >
-              Remove background
-            </Button>
-          </>
-        )}
-      </section>
+      <WorkspaceBackgroundEditor data={data} disabled={busy} />
     </div>
   );
 }

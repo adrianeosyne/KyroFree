@@ -131,7 +131,8 @@ const TABS: {
     icon: Palette,
     group: "App settings",
     description: "Design your entire Kyro workspace with Premium.",
-    keywords: "premium background panels fonts layout full customize",
+    keywords:
+      "premium background animated gif panels fonts typography gaming cursors upload layout full customize",
   },
   {
     id: "premium",

@@ -1301,6 +1301,18 @@ export const deleteAccount = mutation({
         "workspace_background",
         row._id,
       );
+      await deleteClaimedUpload(
+        ctx,
+        row.backgroundPosterStorageId,
+        "workspace_background_poster",
+        row._id,
+      );
+      await deleteClaimedUpload(
+        ctx,
+        row.cursorStorageId,
+        "workspace_cursor",
+        row._id,
+      );
       await ctx.db.delete(row._id);
     }
     const decorations = await ctx.db

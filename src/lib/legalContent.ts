@@ -371,8 +371,8 @@ export const PRIVACY: LegalSection[] = [
   {
     heading: "Custom artwork, workspace and sound uploads",
     body: [
-      "Kyro stores uploaded avatars, profile artwork, workspace backgrounds and notification audio, together with associated file metadata and customization settings. Community decoration submissions also include descriptions, ownership confirmations, animation status and staff review records. Creator and bot-review requests include submitted evidence, priority, status and feedback.",
-      "Approved community artwork appears in the shared decoration collection and can be equipped by other members. Submission history and review details are available to the submitting member and authorized reviewers. Workspace backgrounds and notification sounds are used for your selected appearance and playback features; their infrastructure providers handle the stored files as described in this policy.",
+      "Kyro stores uploaded avatars, profile artwork, static or animated workspace backgrounds, cursor images and notification audio, together with associated file metadata, cursor click points and customization settings. Community decoration submissions also include descriptions, ownership confirmations, animation status and staff review records. Creator and bot-review requests include submitted evidence, priority, status and feedback.",
+      "Approved community artwork appears in the shared decoration collection and can be equipped by other members. Submission history and review details are available to the submitting member and authorized reviewers. Workspace backgrounds, cursor images and notification sounds are used for your selected appearance and playback features; their infrastructure providers handle the stored files as described in this policy.",
     ],
   },
   {
