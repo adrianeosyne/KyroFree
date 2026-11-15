@@ -1,3 +1,4 @@
+import { queueBotReview } from "./trustReviews";
 import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -79,6 +80,8 @@ export const get = query({
     }
     return {
       ...(await publicBot(ctx, app)),
+      directoryStatus: app.directoryStatus ?? null,
+      directoryReviewNote: app.directoryReviewNote ?? null,
       tokenConfigured: Boolean(app.tokenHash),
       tokenUpdatedAt: app.tokenUpdatedAt,
       events: app.events,
@@ -231,15 +234,40 @@ export const update = mutation({
       .first();
     if (existing && existing._id !== app.botUserId)
       botError(409, "USERNAME_TAKEN", "That username is already taken.");
+    const sameListing =
+      app.directoryStatus === "approved" &&
+      app.name === args.name.trim() &&
+      app.description === args.description &&
+      app.category === args.category &&
+      JSON.stringify(app.permissions) ===
+        JSON.stringify(validPermissions(args.permissions));
     await ctx.db.patch(app._id, {
       name: args.name.trim(),
       description: args.description,
       enabled: args.enabled,
-      discoverable: args.discoverable,
+      discoverable: args.discoverable && sameListing,
+      directoryStatus:
+        args.discoverable && !sameListing
+          ? "pending"
+          : !args.discoverable && app.directoryStatus === "pending"
+            ? undefined
+            : app.directoryStatus,
       category: args.category,
       permissions: validPermissions(args.permissions),
       updatedAt: Date.now(),
     });
+    if (args.discoverable && !sameListing)
+      await queueBotReview(ctx, app._id, app.ownerId);
+    if (!args.discoverable) {
+      const pending = await ctx.db
+        .query("trustRequests")
+        .withIndex("by_application", (q) =>
+          q.eq("applicationId", app._id).eq("status", "pending"),
+        )
+        .collect();
+      for (const row of pending)
+        await ctx.db.patch(row._id, { status: "withdrawn" });
+    }
     await ctx.db.patch(app.botUserId, {
       name: args.name.trim(),
       username,

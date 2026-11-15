@@ -668,8 +668,9 @@ export default function Landing() {
             Hang out without hitting a paywall
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#606378] sm:text-lg sm:leading-8">
-            Every member gets the same chat, voice, moderation and customization
-            tools. No premium rooms. No feature gates. No awkward upgrade pitch.
+            Chat, voice, moderation and everyday customization stay free.
+            Optional Premium adds bigger uploads, sharper screen sharing and a
+            studio to make Kyro yours for $1.99 per month.
           </p>
         </Reveal>
       </section>
@@ -922,7 +923,7 @@ export default function Landing() {
             <p>
               © {new Date().getFullYear()} Adrian Eosyne. All rights reserved.
             </p>
-            <p>No premium tier. No paywalled features. No fine print.</p>
+            <p>Free core features. Optional Premium: $1.99/month.</p>
           </div>
         </div>
       </footer>

@@ -9,6 +9,7 @@ import {
 } from "./upload";
 import { readableError } from "./errors";
 import { toast } from "sonner";
+import type { Id } from "@/convex/_generated/dataModel";
 
 export type PendingFile = {
   id: string;
@@ -37,10 +38,17 @@ class AttachmentSession {
 
 /** Reserve slots before uploading, and keep local previews alive until send/removal. */
 export function usePendingAttachments(scope: string) {
-  const upload = useUploadFile({ requireRegistration: true });
+  const channelId = scope.startsWith("channel:")
+    ? (scope.slice(8) as Id<"channels">)
+    : undefined;
+  const upload = useUploadFile({ requireRegistration: true, channelId });
   const discard = useMutation(api.files.discard);
   const me = useQuery(api.users.me);
-  const limit = uploadLimit(me);
+  const benefits = useQuery(
+    api.premium.communityBenefits,
+    channelId ? { channelId } : "skip",
+  );
+  const limit = Math.max(uploadLimit(me), benefits?.uploadBytes ?? 0);
   const session = useMemo(() => new AttachmentSession(scope), [scope]);
   const [snapshot, setSnapshot] = useState({
     session,

@@ -345,7 +345,7 @@ export function isPlatformFounder(user: PlatformUser): boolean {
 export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   const isFounder = isFounderUser(user);
   const badges: GlobalBadge[] = [];
-  if (hasPremium(user)) badges.push("premium");
+  if (hasPremium(user) && !user.hidePremiumBadge) badges.push("premium");
   // Founder badge: the founder always holds it (unless they stripped it from
   // their own profile), plus anyone the founder explicitly granted it to.
   if (
@@ -699,6 +699,19 @@ export async function notify(
   if (args.actorId && args.userId === args.actorId) return;
   const target = await ctx.db.get(args.userId);
   if (!target) return;
+  if (args.containerKey) {
+    const channelId = ctx.db.normalizeId("channels", args.containerKey);
+    const channel = channelId ? await ctx.db.get(channelId) : null;
+    if (channel?.premiumOnly) {
+      const server = await ctx.db.get(channel.serverId);
+      if (
+        server?.isPlatformHome &&
+        !hasPremium(target) &&
+        !isPlatformStaff(target)
+      )
+        return;
+    }
+  }
   await ctx.db.insert("notifications", {
     userId: args.userId,
     type: args.type,

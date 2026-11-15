@@ -153,6 +153,7 @@ const schema = defineSchema(
       pronouns: v.optional(v.string()),
       /** Which badge shows next to the name in chat; `"none"` hides them. */
       primaryBadge: v.optional(v.string()),
+      hidePremiumBadge: v.optional(v.boolean()),
       /** Profile theme preset id from the profile editor. */
       profileTheme: v.optional(v.string()),
       /** Decorative animated/static overlay rendered across the profile card. */
@@ -273,6 +274,26 @@ const schema = defineSchema(
         searchField: "name",
         filterFields: ["status", "kind"],
       }),
+    trustRequests: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("creator"), v.literal("bot")),
+      applicationId: v.optional(v.id("botApplications")),
+      evidence: v.string(),
+      priority: v.boolean(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("withdrawn"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_application", ["applicationId", "status"])
+      .index("by_queue", ["status", "priority", "createdAt"]),
     userPresence: defineTable({
       userId: v.id("users"),
       lastHeartbeatAt: v.number(),
@@ -416,6 +437,7 @@ const schema = defineSchema(
       .index("by_server_user", ["serverId", "userId"]),
 
     serverRoles: defineTable({
+      premiumRole: v.optional(v.boolean()),
       botApplicationId: v.optional(v.id("botApplications")),
       serverId: v.id("servers"),
       name: v.string(),
@@ -443,6 +465,7 @@ const schema = defineSchema(
       .index("by_server_position", ["serverId", "position"]),
 
     channels: defineTable({
+      premiumOnly: v.optional(v.boolean()),
       serverId: v.id("servers"),
       categoryId: v.optional(v.id("categories")),
       name: v.string(),

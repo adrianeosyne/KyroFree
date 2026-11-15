@@ -1,3 +1,4 @@
+import { requireReadAccess } from "./messages";
 import { AVATAR_FRAMES } from "../lib/frames";
 import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
@@ -773,7 +774,14 @@ export const searchMessages = query({
         .query("channels")
         .withIndex("by_server", (q) => q.eq("serverId", membership.serverId))
         .collect();
-      for (const channel of channels) channelIds.add(channel._id);
+      for (const channel of channels) {
+        try {
+          await requireReadAccess(ctx, viewerId, "channel", channel._id);
+          channelIds.add(channel._id);
+        } catch {
+          /* A membership does not grant every channel. */
+        }
+      }
     }
     const conversationIds = new Set(conversations.map((c) => c.conversationId));
     conversationIds.forEach((id) => channelIds.add(id));
@@ -1010,6 +1018,11 @@ export const exportData = mutation({
     );
 
     const payload = {
+      creatorAndBotReviews: await ctx.db
+        .query("trustRequests")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      hidePremiumBadge: user.hidePremiumBadge === true,
       premiumUntil: user.premiumUntil ?? null,
       workspace: await ctx.db
         .query("workspaces")
@@ -1313,6 +1326,11 @@ export const deleteAccount = mutation({
       .withIndex("by_user", (q) => q.eq("userId", id))
       .collect();
     for (const row of charges) await ctx.db.delete(row._id);
+    const reviews = await ctx.db
+      .query("trustRequests")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .collect();
+    for (const row of reviews) await ctx.db.delete(row._id);
     const payments = await ctx.db
       .query("premiumRequests")
       .withIndex("by_requester", (q) => q.eq("requesterId", id))

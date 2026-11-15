@@ -83,6 +83,12 @@ export function Composer({
 }) {
   const me = useQuery(api.users.me);
   const maxCharacters = messageLimit(me);
+  const benefits = useQuery(
+    api.premium.communityBenefits,
+    containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
   const draftKey = `${containerType}:${containerId}`;
   const draft = useUiStore((state) => state.drafts[draftKey] ?? "");
   const setDraft = useUiStore((state) => state.setDraft);
@@ -367,7 +373,15 @@ export function Composer({
     }
   };
 
-  const addFiles = uploads.addFiles;
+  const addFiles = (files: FileList | File[] | null) => {
+    if (benefits?.canPostMedia === false) {
+      toast.error(
+        "Share files in #media in Kyro HQ, or use Premium to share across HQ.",
+      );
+      return Promise.resolve();
+    }
+    return uploads.addFiles(files);
+  };
 
   const clearRecordingTimers = () => {
     if (recordingIntervalRef.current !== null) {
@@ -566,7 +580,7 @@ export function Composer({
             type="file"
             multiple
             accept={ACCEPTED_UPLOAD}
-            disabled={busy || recording}
+            disabled={busy || recording || benefits?.canPostMedia === false}
             aria-label="Attach files"
             className="sr-only"
             onChange={(event) => {
@@ -872,7 +886,12 @@ export function Composer({
         <button
           type="button"
           aria-label="Create poll"
-          title="Create poll"
+          title={
+            benefits?.canPoll === false
+              ? "HQ polls require creator verification or Premium"
+              : "Create poll"
+          }
+          disabled={benefits?.canPoll === false}
           onClick={() => setPollOpen(true)}
           className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground"
         >

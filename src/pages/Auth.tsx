@@ -468,13 +468,14 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             Communities, channels, friends, roles and moderation — the whole
-            platform, free for everyone, with nothing to upgrade to.
+            core platform, free for everyone. Optional Premium gives you more
+            room to create.
           </p>
           <ul className="mt-6 space-y-2.5">
             {[
-              "Unlimited communities, messages and uploads",
+              "Communities, messages and everyday uploads",
               "Every moderation tool, included for all",
-              "No subscriptions and no premium tier",
+              "Optional Premium for $1.99 per month",
             ].map((line) => (
               <li key={line} className="flex items-start gap-2.5 text-sm">
                 <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-success/15 text-[10px] font-bold text-success">
@@ -487,7 +488,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         </div>
 
         <p className="relative text-xs text-muted-foreground">
-          Free forever · no paywalled features · your data stays yours
+          Free core features · optional Premium · your data stays yours
         </p>
       </aside>
 

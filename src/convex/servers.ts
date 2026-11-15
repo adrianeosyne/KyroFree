@@ -1,3 +1,5 @@
+import { canUsePremiumLounge } from "./premiumBenefits";
+import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -60,13 +62,18 @@ async function hasUnreadChannels(
   ctx: Ctx,
   server: Doc<"servers">,
   readMap: Map<string, number>,
+  viewerId: Id<"users">,
 ): Promise<boolean> {
   const channels = await ctx.db
     .query("channels")
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
+  const loungeAllowed =
+    !server.isPlatformHome || (await canUsePremiumLounge(ctx, viewerId));
   return channels.some(
-    (channel) => (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
+    (channel) =>
+      (!channel.premiumOnly || loungeAllowed) &&
+      (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
   );
 }
 
@@ -141,7 +148,7 @@ export const listMine = query({
             ? ctx.storage.getUrl(server.iconStorageId)
             : Promise.resolve(null),
           metricValue(ctx, `members:${server._id}`),
-          hasUnreadChannels(ctx, server, readMap),
+          hasUnreadChannels(ctx, server, readMap, id),
           permissionsFor(ctx, server, membership),
         ]);
         return {
@@ -468,7 +475,10 @@ export const members = query({
         if (!user) return null;
         const memberRoles = row.roleIds
           .map((roleId) => roleMap.get(roleId))
-          .filter((role): role is NonNullable<typeof role> => Boolean(role))
+          .filter(
+            (role): role is NonNullable<typeof role> =>
+              Boolean(role) && (!role?.premiumRole || hasPremium(user)),
+          )
           .sort((a, b) => a.position - b.position);
         const top =
           memberRoles.length > 0 ? memberRoles[memberRoles.length - 1] : null;
@@ -614,6 +624,70 @@ export const invitePreview = query({
 /** Kyro HQ — the platform's home community, owned by the founder. */
 const HQ_NAME = "Kyro HQ";
 
+async function ensurePremiumHq(
+  ctx: MutationCtx,
+  serverId: Id<"servers">,
+  founderId: Id<"users">,
+  userId: Id<"users">,
+) {
+  const roles = await ctx.db
+    .query("serverRoles")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  const roleId =
+    roles.find((r) => r.premiumRole)?._id ??
+    (await ctx.db.insert("serverRoles", {
+      serverId,
+      name: "Premium",
+      color: "#e879f9",
+      position: 1,
+      permissions: [],
+      isDefault: false,
+      hoist: true,
+      premiumRole: true,
+    }));
+  const channels = await ctx.db
+    .query("channels")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  if (!channels.some((c) => c.premiumOnly))
+    await ctx.db.insert("channels", {
+      serverId,
+      name: "premium-chat",
+      topic:
+        "The Kyro Premium lounge: creators, gameplay and community conversation.",
+      position: channels.length,
+      premiumOnly: true,
+      createdAt: Date.now(),
+      createdById: founderId,
+    });
+  if (!channels.some((c) => c.name === "media"))
+    await ctx.db.insert("channels", {
+      serverId,
+      name: "media",
+      topic: "Share your pictures, clips and artwork here.",
+      position: channels.length + 1,
+      createdAt: Date.now(),
+      createdById: founderId,
+    });
+  const member = await ctx.db
+    .query("serverMembers")
+    .withIndex("by_server_user", (q) =>
+      q.eq("serverId", serverId).eq("userId", userId),
+    )
+    .unique();
+  const user = await ctx.db.get(userId);
+  if (member && user) {
+    const ids = member.roleIds.filter((id) => id !== roleId);
+    if ((user.premiumUntil ?? 0) > Date.now()) ids.push(roleId);
+    if (
+      ids.length !== member.roleIds.length ||
+      ids.some((id, i) => id !== member.roleIds[i])
+    )
+      await ctx.db.patch(member._id, { roleIds: ids });
+  }
+}
+
 async function ensureMembership(
   ctx: MutationCtx,
   serverId: Id<"servers">,
@@ -713,6 +787,7 @@ export async function joinKyroHq(
   const serverId = home?._id ?? (await createHq(ctx, founder._id));
   await ensureMembership(ctx, serverId, userId);
   await ensureMembership(ctx, serverId, founder._id);
+  await ensurePremiumHq(ctx, serverId, founder._id, userId);
 }
 
 /** Internal hook so sign-up (an action) can auto-join Kyro HQ. */

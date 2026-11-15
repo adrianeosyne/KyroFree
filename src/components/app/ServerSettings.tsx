@@ -2265,6 +2265,7 @@ function AuditTab({ serverId }: { serverId: string }) {
 /* ------------------------------------------------------------------ */
 
 type ServerEmojiData = {
+  emojiLimit?: number;
   canManage: boolean;
   emojis: {
     id: string;
@@ -2361,7 +2362,9 @@ function EmojisTab({
         <h2 className="text-base font-semibold">Custom emojis</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Upload PNG, WebP, APNG, or animated GIF emoji up to 1 MB. Members can
-          use them in any Kyro conversation.
+          use them in any Kyro conversation. This server has{" "}
+          {data?.emojiLimit ?? 100} slots; an active supercharge raises the
+          limit to 200.
         </p>
       </div>
 

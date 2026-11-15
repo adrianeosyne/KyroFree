@@ -299,7 +299,9 @@ function ApplicationEditor({ app }: { app: App }) {
   const [username, setUsername] = useState(app.username);
   const [botDescription, setBotDescription] = useState(app.botDescription);
   const [enabled, setEnabled] = useState(app.enabled);
-  const [discoverable, setDiscoverable] = useState(app.discoverable);
+  const [discoverable, setDiscoverable] = useState(
+    app.discoverable || app.directoryStatus === "pending",
+  );
   const [category, setCategory] = useState(app.category);
   const [permissions, setPermissions] = useState(app.permissions);
   const [secret, setSecret] = useState("");
@@ -525,7 +527,7 @@ function ApplicationEditor({ app }: { app: App }) {
               </div>
               <div className="flex items-center justify-between gap-4">
                 <Label htmlFor="bot-public">
-                  List in the public bot directory
+                  Request a public directory listing
                 </Label>
                 <Switch
                   id="bot-public"
@@ -533,6 +535,19 @@ function ApplicationEditor({ app }: { app: App }) {
                   onCheckedChange={setDiscoverable}
                 />
               </div>
+              <p className="text-xs text-white/50">
+                Directory listings need staff approval. Premium creator
+                submissions are reviewed first. Updating a listing sends it for
+                review again.
+              </p>
+              {app.directoryStatus && (
+                <p className="text-xs text-indigo-300">
+                  Directory review: {app.directoryStatus}
+                  {app.directoryReviewNote
+                    ? ` · ${app.directoryReviewNote}`
+                    : ""}
+                </p>
+              )}
               <Field label="Directory category">
                 <select
                   className="w-full rounded-md border border-white/10 bg-[#111318] p-2"

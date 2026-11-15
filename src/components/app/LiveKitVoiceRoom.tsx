@@ -52,6 +52,7 @@ const SCREEN_SHARE_RESOLUTION = {
 } as const;
 
 type TokenResponse = {
+  audioBitrate?: number;
   screenShare: { width: number; height: number; frameRate: number };
   ok: true;
   serverUrl: string;
@@ -131,6 +132,12 @@ export function LiveKitVoiceRoom({
   onConnectionChange?: (state: string) => void;
 }) {
   const me = useQuery(api.users.me);
+  const communityBenefits = useQuery(
+    api.premium.communityBenefits,
+    active && containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
   const roster = useQuery(
     api.voice.roster,
     active ? { containerType, containerId } : "skip",
@@ -157,6 +164,9 @@ export function LiveKitVoiceRoom({
     TokenResponse["canPublishSources"]
   >([]);
   const [muted, setMuted] = useState(false);
+  const [tokenAudioBitrate, setAudioBitrate] = useState(64000);
+  const audioBitrate = communityBenefits?.audioBitrate ?? tokenAudioBitrate;
+  const appliedAudioBitrate = useRef(64000);
   const [deafened, setDeafened] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -361,6 +371,8 @@ export function LiveKitVoiceRoom({
         if (disposed) return;
         setCanManage(credentials.canManage);
         setAllowedSources(credentials.canPublishSources);
+        setAudioBitrate(credentials.audioBitrate ?? 64000);
+        appliedAudioBitrate.current = credentials.audioBitrate ?? 64000;
         setShareGrant(credentials.screenShare ?? SCREEN_SHARE_RESOLUTION);
         await nextRoom.connect(credentials.serverUrl, credentials.token, {
           autoSubscribe: true,
@@ -376,6 +388,9 @@ export function LiveKitVoiceRoom({
             await nextRoom.localParticipant.setMicrophoneEnabled(
               true,
               audioCapturePreferences(),
+              {
+                audioPreset: { maxBitrate: credentials.audioBitrate ?? 64000 },
+              },
             );
           } catch (error) {
             const name = error instanceof DOMException ? error.name : "";
@@ -445,14 +460,46 @@ export function LiveKitVoiceRoom({
     void join({ containerType, containerId, ...patch }).catch(() => undefined);
   };
 
+  useEffect(() => {
+    const next = communityBenefits?.audioBitrate;
+    if (
+      !next ||
+      next === appliedAudioBitrate.current ||
+      connection !== ConnectionState.Connected
+    )
+      return;
+    appliedAudioBitrate.current = next;
+    if (room.localParticipant.isMicrophoneEnabled) {
+      void (async () => {
+        await room.localParticipant.setMicrophoneEnabled(false);
+        if (stateRef.current.muted || room.state !== ConnectionState.Connected)
+          return;
+        await room.localParticipant.setMicrophoneEnabled(
+          true,
+          {
+            ...audioCapturePreferences(),
+            deviceId: selectedAudioInput || undefined,
+          },
+          { audioPreset: { maxBitrate: next } },
+        );
+      })().catch((error) =>
+        toast.error(readableError(error, "Could not update voice quality.")),
+      );
+    }
+  }, [communityBenefits?.audioBitrate, connection, room, selectedAudioInput]);
+
   const toggleMicrophone = async () => {
     if (!room || !allowedSources.includes("microphone")) return;
     try {
       const enabled = !room.localParticipant.isMicrophoneEnabled;
-      await room.localParticipant.setMicrophoneEnabled(enabled, {
-        ...audioCapturePreferences(),
-        deviceId: selectedAudioInput || undefined,
-      });
+      await room.localParticipant.setMicrophoneEnabled(
+        enabled,
+        {
+          ...audioCapturePreferences(),
+          deviceId: selectedAudioInput || undefined,
+        },
+        { audioPreset: { maxBitrate: audioBitrate } },
+      );
       setMuted(!enabled);
       updateSeat({ muted: !enabled });
       refresh();

@@ -2,6 +2,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { makeFunctionReference } from "convex/server";
 
 export interface ConsumedLiveKitTicket {
+  audioBitrate?: number;
   screenShare?: { width: number; height: number; frameRate: number };
   roomName: string;
   identity: string;

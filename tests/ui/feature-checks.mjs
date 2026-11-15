@@ -18,6 +18,56 @@ export async function checkFeatures(page) {
     path: "test-results/kyro-premium-desktop.png",
     animations: "disabled",
   });
+  await expect(
+    settings
+      .getByRole("heading", {
+        name: "Creator verification",
+        exact: true,
+      })
+      .last(),
+  ).toBeVisible();
+  await settings
+    .getByLabel("Creator ownership evidence")
+    .fill("My original gaming artwork and public ownership page.");
+  await settings
+    .getByRole("button", { name: "Request verification", exact: true })
+    .click();
+  assert(
+    await page.evaluate(() =>
+      window.fixtureMutations.some(
+        (call) => call.name === "trustReviews:requestCreator",
+      ),
+    ),
+    "Creator verification submits ownership evidence",
+  );
+  await page.evaluate(() =>
+    window.setFixtureData("premium:status", {
+      premiumUntil: Date.now() + 86400000,
+      hidePremiumBadge: false,
+      instructions: "Contact adrianeosyne for manual payment.",
+      requests: [],
+    }),
+  );
+  await expect(
+    settings.getByRole("button", {
+      name: "Enter the Premium lounge",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await settings.getByLabel("Show Premium badge on my profile").uncheck();
+  assert(
+    await page.evaluate(() =>
+      window.fixtureMutations.some(
+        (call) =>
+          call.name === "premium:badgeVisibility" && call.args.hidden === true,
+      ),
+    ),
+    "Premium badge visibility saves",
+  );
+  await page.screenshot({
+    path: "test-results/kyro-premium-active.png",
+    animations: "disabled",
+  });
   await nav
     .getByRole("button", { name: "Workspace Studio", exact: true })
     .click();

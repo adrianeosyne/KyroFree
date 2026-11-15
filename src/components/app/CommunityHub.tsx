@@ -107,7 +107,7 @@ export function CommunityEvents({
             onClick={() =>
               void perform(async () => {
                 await charge(args);
-                toast.success("You're featured as a supporter of this server.");
+                toast.success("Community supercharge activated.");
               })
             }
           >
@@ -115,7 +115,9 @@ export function CommunityEvents({
           </Button>
         )}
         <p className="mt-2 text-[10px] text-muted-foreground">
-          Premium members can feature one community on the supporter board.
+          One included supercharge gives a community 200 emoji slots, 50 MB
+          uploads and 128 kbps voice audio for all members. Moving it transfers
+          those benefits; they last while Premium is active.
         </p>
       </section>
       {manage && (

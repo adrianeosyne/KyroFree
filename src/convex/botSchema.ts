@@ -11,6 +11,14 @@ export const botTables = {
     bannerStorageId: v.optional(v.id("_storage")),
     enabled: v.boolean(),
     discoverable: v.boolean(),
+    directoryStatus: v.optional(
+      v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+    ),
+    directoryReviewNote: v.optional(v.string()),
     category: v.string(),
     verified: v.boolean(),
     featured: v.boolean(),

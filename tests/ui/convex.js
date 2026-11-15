@@ -165,6 +165,7 @@ const data = {
   "users:me": me,
   "automod:getSettings": {enabled:true,blockedWords:[],blockInvites:true,blockLinks:false,maxMentions:10,blockCaps:true,blockSpam:true,exemptRoleIds:[],exemptChannelIds:[]},
   "workspace:get": {premiumUntil:null,theme:WORKSPACE_DEFAULTS,backgroundUrl:null},
+  "trustReviews:mine": {verified:false,requests:[]},
   "premium:status": {premiumUntil:null,instructions:"Contact adrianeosyne for manual payment instructions.",requests:[]},
   "communityDecorations:catalog": [],
   "communityDecorations:mine": [],
@@ -258,6 +259,7 @@ export function useMutation(reference) {
       window.fixtureMutations.push({ name, args });
       if (name === "files:generateUploadUrl") return "http://127.0.0.1:5187/fixture-upload";
       if (name === "files:registerUpload") return {storageId:args.storageId,name:args.name,size:100,mimeType:"image/png"};
+      if (name === "premium:badgeVisibility") window.setFixtureData("premium:status", {...data["premium:status"],hidePremiumBadge:args.hidden});
       if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;

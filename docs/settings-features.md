@@ -175,3 +175,13 @@ Community decoration search and the staff review queue use pagination so every p
 ## Validation
 
 `npm run typecheck`, `npm run build`, `npm run test:features`, `npm run test:ui`, `npm run test:voice` and the existing Vitest suites cover build compatibility, Premium permissions and expiry, upload ownership and quotas, moderation state, private ticket access, event capacity, image galleries, retry/removal, object URL cleanup, settings persistence and responsive layouts. Browser checks use isolated fixtures and do not send messages or payments to live accounts.
+
+## Premium HQ and supercharge perks
+
+One active Premium contribution can support one server: 200 custom emoji slots, 50 MB member message uploads and a 128 kbps microphone audio target (normally 100 slots, 10 MB and 64 kbps). Transferring support moves the benefits. Existing emojis remain when support expires, but creating more obeys the lower cap. Larger server uploads cannot be claimed as personal profile assets or sent outside a supported server unless the sender has their own Premium entitlement.
+
+Premium members receive a pink role and a private `#premium-chat` lounge in the official Kyro HQ. Lounge reads, search, polls, voice access and notification previews require current Premium or platform staff access. Free members upload files in HQ's `#media`; Premium and staff can upload across HQ. HQ polls require creator verification, Premium or staff access. These HQ policies do not restrict ordinary communities.
+
+Premium badges may be hidden independently of paid benefits. Creator verification and bot directory submissions appear in an indexed, paginated staff queue, with Premium submissions first. Priority is set when submitting. Administrators still review ownership, identity or bot behavior, must provide feedback, and cannot review their own submission. Revised bot listing details require a new review. New directory listings remain private until approved.
+
+Scheduled expiry invalidates live queries when a month ends. Renewals extend the current period and stale expiry jobs cannot revoke a renewal. Actual voice bitrate and capture quality depend on the browser, device, network and LiveKit service.

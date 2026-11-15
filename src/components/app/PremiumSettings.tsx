@@ -1,3 +1,5 @@
+import { CreatorVerification } from "./TrustReviews";
+import { useNavigate } from "react-router";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -9,14 +11,34 @@ import { toast } from "sonner";
 
 const perks = [
   [
+    "Kyro HQ",
+    "Premium lounge",
+    "Get a pink Premium role and access to #premium-chat.",
+  ],
+  [
+    "Across HQ",
+    "Media sharing",
+    "Share pictures and clips throughout HQ. Free members use #media.",
+  ],
+  [
+    "Your voice",
+    "HQ polls",
+    "Create polls in HQ without creator verification.",
+  ],
+  [
+    "Priority queue",
+    "Creator verification",
+    "Your original work is reviewed first, with the same ownership checks.",
+  ],
+  [
     "10 bot applications",
     "More room to build",
-    "Create up to ten bot identities for your communities.",
+    "Create up to ten bot identities. Your directory submissions receive priority staff review.",
   ],
   [
     "One community",
     "Supercharge",
-    "Feature your support on a community supporter board.",
+    "Give one community 200 emoji slots, 50 MB member uploads and 128 kbps voice audio while your Premium is active.",
   ],
   [
     "1440p · 60 fps",
@@ -36,12 +58,12 @@ const perks = [
   [
     "Premium",
     "Profile badge",
-    "A luminous badge on your member profile and badge shelf.",
+    "A luminous badge on your profile. Hide or restore it any time.",
   ],
   [
     "4,000 characters",
     "Longer messages",
-    "Give your ideas and community updates room to breathe.",
+    "Write and edit messages up to 4,000 characters.",
   ],
   [
     "5 MB",
@@ -51,6 +73,9 @@ const perks = [
 ];
 export function PremiumSettings() {
   const data = useQuery(api.premium.status);
+  const visibility = useMutation(api.premium.badgeVisibility);
+  const lounge = useMutation(api.premium.enterLounge);
+  const navigate = useNavigate();
   const request = useMutation(api.premium.request);
   const [reference, setReference] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -85,6 +110,55 @@ export function PremiumSettings() {
           </p>
         )}
       </div>
+      {hasPremium(data) && (
+        <section className="space-y-3 rounded-2xl border border-fuchsia-400/25 bg-panel p-5">
+          <label className="flex items-center gap-3 text-sm">
+            <input
+              type="checkbox"
+              checked={!data.hidePremiumBadge}
+              disabled={busy}
+              onChange={async (e) => {
+                setBusy(true);
+                try {
+                  await visibility({ hidden: !e.target.checked });
+                } catch (error) {
+                  toast.error(
+                    error instanceof Error
+                      ? error.message
+                      : "Could not update badge.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />{" "}
+            Show Premium badge on my profile
+          </label>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const target = await lounge({});
+                navigate(
+                  `/dashboard/s/${target.serverId}/c/${target.channelId}`,
+                );
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Lounge unavailable.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Enter the Premium lounge
+          </Button>
+        </section>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         {perks.map(([value, title, description]) => (
           <div
@@ -122,7 +196,16 @@ export function PremiumSettings() {
               ["Full workspace studio", "—", "Included"],
               ["Community artwork", "Included", "Included"],
               ["Bot applications", "2", "10"],
-              ["Supercharge supporter board", "—", "One community"],
+              [
+                "Server supercharge",
+                "—",
+                "One community: 200 emojis, 50 MB, 128 kbps",
+              ],
+              ["Premium badge", "—", "Show or hide any time"],
+              ["HQ lounge", "—", "Pink role + #premium-chat"],
+              ["Media in HQ", "#media", "Across HQ"],
+              ["Polls in HQ", "Verified creators", "Included"],
+              ["Creator & bot review", "Standard queue", "Priority queue"],
             ].map((row) => (
               <tr key={row[0]} className="border-t border-border/60">
                 {row.map((x) => (
@@ -190,6 +273,7 @@ export function PremiumSettings() {
           {busy ? "Submitting…" : "Request founder approval"}
         </Button>
       </section>
+      <CreatorVerification />
       {data.requests.length > 0 && (
         <section>
           <h3 className="mb-3 font-semibold">Your requests</h3>

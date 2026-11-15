@@ -1,7 +1,87 @@
+import { makeFunctionReference } from "convex/server";
+import type { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
-import { mutation, query } from "./functions";
-import { isFounderUser, requireActiveUser } from "./lib";
+import { mutation, query, internalMutation } from "./functions";
+import { configuredFounderId, isFounderUser, requireActiveUser, requireServerAccess, isPlatformStaff } from "./lib";
 import { PREMIUM_MONTH_MS } from "../lib/entitlements";
+import { joinKyroHq } from "./servers";
+import { serverBenefits, requirePremiumChannel } from "./premiumBenefits";
+
+async function syncContribution(
+  ctx: Parameters<typeof joinKyroHq>[0],
+  userId: Parameters<typeof joinKyroHq>[1],
+) {
+  await joinKyroHq(ctx, userId);
+  const user = await ctx.db.get(userId);
+  const contribution = await ctx.db
+    .query("serverSupercharges")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+  if (contribution)
+    await ctx.db.patch(contribution._id, { until: user?.premiumUntil ?? 0 });
+  if (user?.premiumUntil && user.premiumUntil > Date.now())
+    await ctx.scheduler.runAt(
+      user.premiumUntil,
+      makeFunctionReference<
+        "mutation",
+        { userId: Id<"users">; expectedUntil: number }
+      >("premium:expire"),
+      { userId, expectedUntil: user.premiumUntil },
+    );
+}
+
+export const communityBenefits = query({
+  args: { channelId: v.id("channels") },
+  handler: async (ctx, { channelId }) => {
+    const { id, user } = await requireActiveUser(ctx);
+    const channel = await ctx.db.get(channelId);
+    if (!channel) throw new Error("Channel unavailable.");
+    const access = await requireServerAccess(ctx, channel.serverId, id);
+    return {
+      ...(await serverBenefits(ctx, channel.serverId)),
+      isHq: access.server.isPlatformHome === true,
+      canPostMedia:
+        !access.server.isPlatformHome ||
+        channel.name === "media" ||
+        (user.premiumUntil ?? 0) > Date.now() ||
+        isPlatformStaff(user),
+      canPoll:
+        !access.server.isPlatformHome ||
+        (user.premiumUntil ?? 0) > Date.now() ||
+        user.verified === true ||
+        isPlatformStaff(user),
+    };
+  },
+});
+
+export const enterLounge = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireActiveUser(ctx);
+    await joinKyroHq(ctx, id);
+    const home = await ctx.db
+      .query("servers")
+      .withIndex("by_platform_home", (q) => q.eq("isPlatformHome", true))
+      .unique();
+    if (!home) throw new Error("Kyro HQ is not configured yet.");
+    const channel = await ctx.db
+      .query("channels")
+      .withIndex("by_server", (q) => q.eq("serverId", home._id))
+      .filter((q) => q.eq(q.field("premiumOnly"), true))
+      .first();
+    if (!channel) throw new Error("The lounge is not available yet.");
+    await requirePremiumChannel(ctx, channel, id);
+    return { serverId: home._id, channelId: channel._id };
+  },
+});
+
+export const badgeVisibility = mutation({
+  args: { hidden: v.boolean() },
+  handler: async (ctx, { hidden }) => {
+    const { id } = await requireActiveUser(ctx);
+    await ctx.db.patch(id, { hidePremiumBadge: hidden });
+  },
+});
 
 export const status = query({
   args: {},
@@ -9,6 +89,7 @@ export const status = query({
     const { id, user } = await requireActiveUser(ctx);
     return {
       premiumUntil: user.premiumUntil ?? null,
+      hidePremiumBadge: user.hidePremiumBadge === true,
       instructions:
         process.env.KYRO_PREMIUM_PAYMENT_INSTRUCTIONS ??
         "Contact adrianeosyne in Kyro for manual payment instructions before paying.",
@@ -91,6 +172,7 @@ export const review = mutation({
         premiumUntil:
           Math.max(Date.now(), recipient.premiumUntil ?? 0) + PREMIUM_MONTH_MS,
       });
+    if (args.approve && recipient) await syncContribution(ctx, recipient._id);
     await ctx.db.patch(request._id, {
       status: args.approve ? "approved" : "rejected",
       reviewedAt: Date.now(),
@@ -124,6 +206,7 @@ export const grant = mutation({
         ? undefined
         : Math.max(Date.now(), target.premiumUntil ?? 0) + PREMIUM_MONTH_MS,
     });
+    await syncContribution(ctx, target._id);
     await ctx.db.insert("adminActions", {
       createdAt: Date.now(),
       actorId: id,
@@ -132,5 +215,31 @@ export const grant = mutation({
       targetId: target._id,
       details: args.revoke ? "Premium revoked." : "30 days of Premium granted.",
     });
+  },
+});
+
+/** Scheduled invalidation makes active queries update when a month ends. */
+export const expire = internalMutation({
+  args: { userId: v.id("users"), expectedUntil: v.number() },
+  handler: async (ctx, { userId, expectedUntil }) => {
+    const user = await ctx.db.get(userId);
+    if (
+      !user ||
+      user.premiumUntil !== expectedUntil ||
+      expectedUntil > Date.now()
+    )
+      return;
+    await ctx.db.patch(userId, { premiumUntil: undefined });
+    await syncContribution(ctx, userId);
+  },
+});
+
+/** Idempotent deployment setup for the official HQ channels. */
+export const initializeHq = internalMutation({
+  args: {}, handler: async ctx => {
+    const founderId = configuredFounderId();
+    if (!founderId) throw new Error("Configure the founder account before initializing Kyro HQ.");
+    await joinKyroHq(ctx, founderId as Id<"users">);
+    return { initialized: true };
   },
 });

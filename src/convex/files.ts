@@ -1,4 +1,4 @@
-import { uploadLimit } from "../lib/entitlements";
+import { contextualUploadLimit } from "./premiumBenefits";
 import { v } from "convex/values";
 import { mutation } from "./functions";
 import { requireProfile } from "./lib";
@@ -30,10 +30,11 @@ export const registerUpload = mutation({
   args: {
     storageId: v.id("_storage"),
     name: v.string(),
+    channelId: v.optional(v.id("channels")),
   },
-  handler: async (ctx, { storageId, name }) => {
+  handler: async (ctx, { storageId, name, channelId }) => {
     const { id, user } = await requireProfile(ctx);
-    const limit = uploadLimit(user);
+    const limit = await contextualUploadLimit(ctx, user, channelId);
     const existing = await uploadByStorageId(ctx, storageId);
     if (existing) {
       if (existing.ownerId !== id) {

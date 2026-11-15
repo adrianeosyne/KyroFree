@@ -32,6 +32,9 @@ import {
 import { deleteMessageData } from "./cleanup";
 import { claimUpload, requireOwnedUpload } from "./uploadSecurity";
 import { evaluateAutomod, recordAutomodEvent } from "./automod";
+import { requirePremiumChannel } from "./premiumBenefits";
+import { hasPremium } from "../lib/entitlements";
+import { isPlatformStaff } from "./lib";
 
 export type ContainerType = "channel" | "conversation";
 
@@ -49,7 +52,7 @@ type ReadAccess =
   | { kind: "conversation"; conversation: Doc<"conversations"> };
 
 /** Read access to a channel or conversation, or a thrown error. */
-async function requireReadAccess(
+export async function requireReadAccess(
   ctx: Ctx,
   userId: Id<"users">,
   containerType: ContainerType,
@@ -58,6 +61,7 @@ async function requireReadAccess(
   if (containerType === "channel") {
     const channel = await ctx.db.get(containerId as Id<"channels">);
     if (!channel) throw new Error("That channel no longer exists.");
+    await requirePremiumChannel(ctx, channel, userId);
     const access = await requireServerAccess(ctx, channel.serverId, userId);
     const defaultRole = await ctx.db
       .query("serverRoles")
@@ -515,7 +519,9 @@ export const send = mutation({
 
     const ownedUploads = await Promise.all(
       attachmentInputs.map((attachment) =>
-        requireOwnedUpload(ctx, userId, attachment.storageId),
+        requireOwnedUpload(ctx, userId, attachment.storageId, {
+          channelId: access.kind === "channel" ? access.channel._id : undefined,
+        }),
       ),
     );
     const attachments = ownedUploads.map((upload) => ({
@@ -535,6 +541,16 @@ export const send = mutation({
       serverId = access.server._id;
       mutedServer = access.member.muted === true;
       const channel = access.channel;
+      if (
+        attachments.length &&
+        access.server.isPlatformHome &&
+        channel.name !== "media" &&
+        !hasPremium(user) &&
+        !isPlatformStaff(user)
+      )
+        throw new Error(
+          "Free members can share files in #media in Kyro HQ. Premium members can share across HQ.",
+        );
 
       for (const rawRoleId of requestedRoleMentions) {
         const roleId = ctx.db.normalizeId("serverRoles", rawRoleId);
@@ -732,6 +748,9 @@ export const send = mutation({
         attachment.storageId,
         "message",
         messageId,
+        {
+          channelId: access.kind === "channel" ? access.channel._id : undefined,
+        },
       );
     }
 
@@ -795,6 +814,13 @@ export const send = mutation({
           }
           const target = await ctx.db.get(membership.userId);
           if (!target || target.deletedAt !== undefined) continue;
+          if (access.kind === "channel") {
+            try {
+              await requirePremiumChannel(ctx, access.channel, target._id);
+            } catch {
+              continue;
+            }
+          }
           if (mentionHere && visiblePresence(target, false) === "offline") {
             continue;
           }
@@ -879,6 +905,13 @@ export const send = mutation({
             }
             const target = await ctx.db.get(membership.userId);
             if (!target || target.deletedAt !== undefined) continue;
+            if (access.kind === "channel") {
+              try {
+                await requirePremiumChannel(ctx, access.channel, target._id);
+              } catch {
+                continue;
+              }
+            }
             notified.add(target._id);
             await notify(ctx, {
               userId: target._id,
@@ -912,6 +945,13 @@ export const send = mutation({
           )
           .unique();
         if (!membership || membership.muted) continue;
+        if (access.kind === "channel") {
+          try {
+            await requirePremiumChannel(ctx, access.channel, membership.userId);
+          } catch {
+            continue;
+          }
+        }
         notified.add(setting.userId);
         await notify(ctx, {
           userId: setting.userId,

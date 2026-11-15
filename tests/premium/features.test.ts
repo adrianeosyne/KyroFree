@@ -1,8 +1,12 @@
+import { joinKyroHq } from "../../src/convex/servers";
+import { notify } from "../../src/convex/lib";
+import { serverBenefits } from "../../src/convex/premiumBenefits";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Id } from "../../src/convex/_generated/dataModel";
 import schema from "../../src/convex/schema";
-import { api } from "../../src/convex/_generated/api";
+import { api, internal } from "../../src/convex/_generated/api";
 import { WORKSPACE_DEFAULTS } from "../../src/lib/workspaceTheme";
 import {
   hasPremium,
@@ -17,8 +21,12 @@ import { PROFILE_THEMES } from "../../src/lib/profileThemes";
 import { AVATAR_FRAMES } from "../../src/lib/frames";
 import { requireOwnedUpload } from "../../src/convex/uploadSecurity";
 const modules = import.meta.glob("../../src/convex/**/*.{ts,tsx}");
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
 async function fixture() {
+  vi.useFakeTimers();
   const t = convexTest(schema, modules);
   const ids = await t.run(async (ctx) => {
     const founder = await ctx.db.insert("users", {
@@ -400,5 +408,338 @@ describe("Premium, original artwork and community access", () => {
     await expect(
       f.founder.mutation(api.communityHub.rsvp, { id: e._id, attending: true }),
     ).rejects.toThrow("full");
+  });
+
+  it("protects the HQ lounge after expiry, including poll votes and notifications", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.t.run((ctx) => joinKyroHq(ctx, f.ids.other));
+    const target = await f.owner.mutation(api.premium.enterLounge, {});
+    const premiumChannels = await f.owner.query(api.channels.list, {
+      serverId: target.serverId,
+    });
+    expect(
+      premiumChannels.channels.some((c) => c.name === "premium-chat"),
+    ).toBe(true);
+    const freeChannels = await f.other.query(api.channels.list, {
+      serverId: target.serverId,
+    });
+    expect(freeChannels.channels.some((c) => c.name === "premium-chat")).toBe(
+      false,
+    );
+    const message = await f.owner.mutation(api.messages.send, {
+      containerType: "channel",
+      containerId: target.channelId,
+      content: "Our first lounge poll",
+    });
+    expect(
+      await f.other.query(api.users.searchMessages, { term: "lounge" }),
+    ).toHaveLength(0);
+    const pollId = await f.owner.mutation(api.polls.attach, {
+      messageId: message.messageId!,
+      question: "What game next?",
+      options: ["Racing", "Adventure"],
+      multiple: false,
+    });
+    await expect(
+      f.other.mutation(api.polls.vote, { pollId, optionIds: ["option-1"] }),
+    ).rejects.toThrow("Premium lounge");
+    await f.t.run((ctx) =>
+      notify(ctx, {
+        userId: f.ids.other,
+        type: "mention",
+        title: "Private lounge update",
+        body: "Secret",
+        containerKey: target.channelId,
+      }),
+    );
+    expect(
+      await f.t.run((ctx) => ctx.db.query("notifications").collect()),
+    ).toHaveLength(0);
+    await f.t.run((ctx) =>
+      ctx.db.patch(f.ids.owner, { premiumUntil: Date.now() - 1 }),
+    );
+    await expect(f.owner.mutation(api.premium.enterLounge, {})).rejects.toThrow(
+      "Premium lounge",
+    );
+    await expect(
+      f.owner.query(api.messages.list, {
+        containerType: "channel",
+        containerId: target.channelId,
+      }),
+    ).rejects.toThrow("Premium lounge");
+  });
+  it("enforces HQ media and poll policy while ordinary communities retain their permissions", async () => {
+    const f = await fixture();
+    await f.t.run((ctx) => joinKyroHq(ctx, f.ids.owner));
+    const home = await f.t.run((ctx) =>
+      ctx.db
+        .query("servers")
+        .withIndex("by_platform_home", (q) => q.eq("isPlatformHome", true))
+        .unique(),
+    );
+    const channels = (
+      await f.owner.query(api.channels.list, { serverId: home!._id })
+    ).channels;
+    const general = channels.find((c) => c.name === "general")!;
+    const media = channels.find((c) => c.name === "media")!;
+    const file = await asset(f);
+    const attachments = [
+      { storageId: file, name: "art.png", mimeType: "image/png", size: 100 },
+    ];
+    await expect(
+      f.owner.mutation(api.messages.send, {
+        containerType: "channel",
+        containerId: general.id,
+        content: "",
+        attachments,
+      }),
+    ).rejects.toThrow("#media");
+    await f.owner.mutation(api.messages.send, {
+      containerType: "channel",
+      containerId: media.id,
+      content: "",
+      attachments,
+    });
+    const plain = await f.owner.mutation(api.messages.send, {
+      containerType: "channel",
+      containerId: general.id,
+      content: "A question for HQ",
+    });
+    await expect(
+      f.owner.mutation(api.polls.attach, {
+        messageId: plain.messageId!,
+        question: "Which game?",
+        options: ["A", "B"],
+        multiple: false,
+      }),
+    ).rejects.toThrow("verification");
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.owner.mutation(api.polls.attach, {
+      messageId: plain.messageId!,
+      question: "Which game?",
+      options: ["A", "B"],
+      multiple: false,
+    });
+  });
+  it("transfers supercharge benefits and keeps larger files confined to the boosted server", async () => {
+    const f = await fixture();
+    const first = await f.owner.mutation(api.servers.create, {
+      name: "First squad",
+      isPublic: true,
+    });
+    const second = await f.owner.mutation(api.servers.create, {
+      name: "Second squad",
+      isPublic: true,
+    });
+    await f.other.mutation(api.servers.join, { serverId: first });
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.owner.mutation(api.communityHub.supercharge, { serverId: first });
+    expect(await f.t.run((ctx) => serverBenefits(ctx, first))).toMatchObject({
+      active: true,
+      emojiSlots: 200,
+      audioBitrate: 128000,
+    });
+    const channel = (
+      await f.other.query(api.channels.list, { serverId: first })
+    ).channels.find((c) => c.kind === "text")!;
+    const file = await f.t.run((ctx) =>
+      ctx.storage.store(
+        new Blob([new Uint8Array(11 * 1024 * 1024)], { type: "video/webm" }),
+      ),
+    );
+    const attachment = await f.other.mutation(api.files.registerUpload, {
+      storageId: file,
+      name: "clip.webm",
+      channelId: channel.id as Id<"channels">,
+    });
+    await expect(
+      f.t.run((ctx) => requireOwnedUpload(ctx, f.ids.other, file)),
+    ).rejects.toThrow("upload limit");
+    await f.other.mutation(api.messages.send, {
+      containerType: "channel",
+      containerId: channel.id,
+      content: "",
+      attachments: [attachment],
+    });
+    await f.owner.mutation(api.communityHub.supercharge, { serverId: second });
+    expect((await f.t.run((ctx) => serverBenefits(ctx, first))).active).toBe(
+      false,
+    );
+    expect((await f.t.run((ctx) => serverBenefits(ctx, second))).active).toBe(
+      true,
+    );
+    await f.founder.mutation(api.premium.grant, {
+      userId: f.ids.owner,
+      revoke: true,
+    });
+    expect((await f.t.run((ctx) => serverBenefits(ctx, second))).active).toBe(
+      false,
+    );
+  });
+  it("orders paid review requests first without bypassing admin checks or granting automatic verification", async () => {
+    const f = await fixture();
+    await f.other.mutation(api.trustReviews.requestCreator, {
+      evidence: "My original artwork is published on my personal creator page.",
+    });
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.owner.mutation(api.trustReviews.requestCreator, {
+      evidence:
+        "My original gaming tutorials and public ownership proof are here.",
+    });
+    const queue = await f.staff.query(api.trustReviews.queue, {
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    expect(queue.page[0].userId).toBe(f.ids.owner);
+    expect((await f.owner.query(api.trustReviews.mine)).verified).toBe(false);
+    const args = {
+      requestId: queue.page[0]._id,
+      approve: true,
+      note: "Ownership and identity confirmed.",
+    };
+    await expect(
+      f.staff.mutation(api.trustReviews.review, args),
+    ).rejects.toThrow("admin");
+    await f.founder.mutation(api.trustReviews.review, args);
+    expect((await f.owner.query(api.trustReviews.mine)).verified).toBe(true);
+    await expect(
+      f.founder.mutation(api.trustReviews.review, args),
+    ).rejects.toThrow("already");
+  });
+  it("hides the Premium badge while retaining paid entitlements", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    expect((await f.owner.query(api.users.me))?.badges).toContain("premium");
+    await f.owner.mutation(api.premium.badgeVisibility, { hidden: true });
+    const me = await f.owner.query(api.users.me);
+    expect(me?.badges).not.toContain("premium");
+    expect(hasPremium(me)).toBe(true);
+    await f.owner.mutation(api.premium.badgeVisibility, { hidden: false });
+    expect((await f.owner.query(api.users.me))?.badges).toContain("premium");
+  });
+
+  it("requires bot directory approval and invalidates approval when listing details change", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    const appId = await f.owner.mutation(api.botApplications.create, {
+      name: "Racing Helper",
+      username: "racing_helper",
+      description: "Our original racing community helper.",
+      tokenHash: "1".repeat(64),
+    });
+    const details = {
+      applicationId: appId,
+      name: "Racing Helper",
+      username: "racing_helper",
+      description: "Our original racing community helper.",
+      botDescription: "Race schedules",
+      enabled: true,
+      discoverable: true,
+      category: "Utilities",
+      permissions: ["view_channel", "send_messages"],
+    };
+    await f.owner.mutation(api.botApplications.update, details);
+    let app = await f.t.run((ctx) => ctx.db.get(appId));
+    expect(app?.discoverable).toBe(false);
+    expect(app?.directoryStatus).toBe("pending");
+    const queue = await f.staff.query(api.trustReviews.queue, {
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    const request = queue.page.find((r) => r.applicationId === appId)!;
+    expect(request.priority).toBe(true);
+    await f.founder.mutation(api.trustReviews.review, {
+      requestId: request._id,
+      approve: true,
+      note: "Behavior, description and permissions checked.",
+    });
+    app = await f.t.run((ctx) => ctx.db.get(appId));
+    expect(app?.discoverable).toBe(true);
+    await f.owner.mutation(api.botApplications.update, {
+      ...details,
+      description: "A substantially updated racing assistant.",
+    });
+    expect((await f.t.run((ctx) => ctx.db.get(appId)))?.discoverable).toBe(
+      false,
+    );
+    await expect(
+      f.founder.mutation(api.trustReviews.review, {
+        requestId: request._id,
+        approve: true,
+        note: "Old listing approved again.",
+      }),
+    ).rejects.toThrow("already");
+  });
+
+  it("keeps renewals active when an older expiry job runs and removes benefits at the new expiry", async () => {
+    const f = await fixture();
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    const original = (await f.owner.query(api.premium.status)).premiumUntil!;
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    const renewal = (await f.owner.query(api.premium.status)).premiumUntil!;
+    vi.setSystemTime(original + 1);
+    await f.t.mutation(internal.premium.expire, {
+      userId: f.ids.owner,
+      expectedUntil: original,
+    });
+    expect((await f.owner.query(api.premium.status)).premiumUntil).toBe(
+      renewal,
+    );
+    vi.setSystemTime(renewal + 1);
+    await f.t.mutation(internal.premium.expire, {
+      userId: f.ids.owner,
+      expectedUntil: renewal,
+    });
+    expect((await f.owner.query(api.premium.status)).premiumUntil).toBeNull();
+  });
+  it("raises the emoji cap only while the community has active support", async () => {
+    const f = await fixture();
+    const serverId = await f.owner.mutation(api.servers.create, {
+      name: "Emoji squad",
+      isPublic: true,
+    });
+    const storageId = await asset(f);
+    await f.t.run(async (ctx) => {
+      for (let i = 0; i < 100; i++)
+        await ctx.db.insert("serverEmojis", {
+          serverId,
+          storageId,
+          name: `emoji_${i}`,
+          animated: false,
+          createdById: f.ids.owner,
+          createdAt: Date.now(),
+        });
+    });
+    await expect(
+      f.owner.mutation(api.emojis.create, {
+        serverId,
+        storageId,
+        name: "extra_emoji",
+      }),
+    ).rejects.toThrow("100");
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
+    await f.owner.mutation(api.communityHub.supercharge, { serverId });
+    await f.owner.mutation(api.emojis.create, {
+      serverId,
+      storageId,
+      name: "extra_emoji",
+    });
+    expect(
+      (await f.owner.query(api.emojis.forServer, { serverId })).emojis,
+    ).toHaveLength(101);
+    await f.founder.mutation(api.premium.grant, {
+      userId: f.ids.owner,
+      revoke: true,
+    });
+    const next = await asset(f);
+    await expect(
+      f.owner.mutation(api.emojis.create, {
+        serverId,
+        storageId: next,
+        name: "another_emoji",
+      }),
+    ).rejects.toThrow("100");
+    expect(
+      (await f.owner.query(api.emojis.forServer, { serverId })).emojis,
+    ).toHaveLength(101);
   });
 });

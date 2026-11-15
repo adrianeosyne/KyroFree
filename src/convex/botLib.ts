@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { ConvexError } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -121,6 +122,7 @@ export async function botChannel(
 ) {
   const channel = await ctx.db.get(channelId);
   if (!channel) botError(404, "NOT_FOUND", "Channel not found.");
+  await requirePremiumChannel(ctx, channel, app.botUserId);
   const access = await botServer(ctx, app, channel.serverId);
   const roles = await ctx.db
     .query("serverRoles")

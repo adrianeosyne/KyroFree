@@ -29,9 +29,15 @@ const uploadRegistrationEnabled =
  * Files go straight to object storage through a short-lived signed URL, so
  * the browser never streams file contents through the database.
  */
-export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
+export function useUploadFile(
+  options: { requireRegistration?: boolean; channelId?: Id<"channels"> } = {},
+) {
   const me = useQuery(api.users.me);
-  const limit = uploadLimit(me);
+  const benefits = useQuery(
+    api.premium.communityBenefits,
+    options.channelId ? { channelId: options.channelId } : "skip",
+  );
+  const limit = Math.max(uploadLimit(me), benefits?.uploadBytes ?? 0);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const registerUpload = useMutation(api.files.registerUpload);
 
@@ -75,6 +81,7 @@ export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
         return await registerUpload({
           storageId: attachment.storageId,
           name: file.name,
+          channelId: options.channelId,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -90,6 +97,12 @@ export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
         return attachment;
       }
     },
-    [generateUploadUrl, options.requireRegistration, registerUpload, limit],
+    [
+      generateUploadUrl,
+      options.requireRegistration,
+      options.channelId,
+      registerUpload,
+      limit,
+    ],
   );
 }

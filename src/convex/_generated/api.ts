@@ -61,6 +61,7 @@ import type * as passwordResetInternal from "../passwordResetInternal.js";
 import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
 import type * as premium from "../premium.js";
+import type * as premiumBenefits from "../premiumBenefits.js";
 import type * as presence from "../presence.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -75,6 +76,7 @@ import type * as templates from "../templates.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as threads from "../threads.js";
 import type * as totp from "../totp.js";
+import type * as trustReviews from "../trustReviews.js";
 import type * as uploadSecurity from "../uploadSecurity.js";
 import type * as users from "../users.js";
 import type * as users_changeEmail from "../users/changeEmail.js";
@@ -146,6 +148,7 @@ const fullApi: ApiFromModules<{
   "platformStats": typeof platformStats,
   "polls": typeof polls,
   "premium": typeof premium,
+  "premiumBenefits": typeof premiumBenefits,
   "presence": typeof presence,
   "reports": typeof reports,
   "roles": typeof roles,
@@ -160,6 +163,7 @@ const fullApi: ApiFromModules<{
   "tempResetPassword": typeof tempResetPassword,
   "threads": typeof threads,
   "totp": typeof totp,
+  "trustReviews": typeof trustReviews,
   "uploadSecurity": typeof uploadSecurity,
   "users": typeof users,
   "users/changeEmail": typeof users_changeEmail,

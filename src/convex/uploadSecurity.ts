@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { Ctx } from "./lib";
 import type { MutationCtx } from "./functions";
 import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
+import { contextualUploadLimit } from "./premiumBenefits";
 
 export { MAX_UPLOAD_BYTES };
 
@@ -58,7 +59,11 @@ export async function requireOwnedUpload(
   ctx: Ctx,
   ownerId: Id<"users">,
   storageId: Id<"_storage">,
-  options: { imageOnly?: boolean } = {},
+  options: {
+    imageOnly?: boolean;
+    channelId?: Id<"channels">;
+    ignoreLimit?: boolean;
+  } = {},
 ): Promise<Doc<"uploads">> {
   const upload = await uploadByStorageId(ctx, storageId);
   if (!upload || upload.ownerId !== ownerId) {
@@ -73,7 +78,11 @@ export async function requireOwnedUpload(
       "That upload is no longer available. Please upload the file again.",
     );
   }
-  if (metadata.size > uploadLimit(await ctx.db.get(ownerId))) {
+  const owner = await ctx.db.get(ownerId);
+  const limit = owner
+    ? await contextualUploadLimit(ctx, owner, options.channelId)
+    : uploadLimit(null);
+  if (!options.ignoreLimit && metadata.size > limit) {
     throw new Error("That file exceeds your current upload limit.");
   }
   return upload;
@@ -100,7 +109,7 @@ export async function claimUpload(
   storageId: Id<"_storage">,
   claimType: UploadClaim,
   claimId: string,
-  options: { imageOnly?: boolean } = {},
+  options: { imageOnly?: boolean; channelId?: Id<"channels"> } = {},
 ): Promise<Doc<"uploads">> {
   const upload = await requireOwnedUpload(ctx, ownerId, storageId, options);
   if (upload.claimType !== undefined || upload.claimId !== undefined) {
@@ -138,7 +147,9 @@ export async function deleteUnclaimedUpload(
   ownerId: Id<"users">,
   storageId: Id<"_storage">,
 ): Promise<void> {
-  const upload = await requireOwnedUpload(ctx, ownerId, storageId);
+  const upload = await requireOwnedUpload(ctx, ownerId, storageId, {
+    ignoreLimit: true,
+  });
   if (upload.claimType !== undefined) return;
   await deleteStorageObjectIfPresent(ctx, storageId);
   await ctx.db.delete(upload._id);

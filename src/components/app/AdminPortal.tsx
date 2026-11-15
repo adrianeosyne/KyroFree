@@ -1,3 +1,4 @@
+import { TrustReviewQueue } from "./TrustReviews";
 import { PremiumAdmin } from "./PremiumSettings";
 import { DecorationReview } from "./DecorationStudio";
 import { useMutation, useQuery } from "convex/react";
@@ -44,6 +45,7 @@ import { BUG_CATEGORY_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type AdminTab =
+  | "creatorReviews"
   | "premium"
   | "decorations"
   | "overview"
@@ -57,6 +59,7 @@ type AdminTab =
   | "ips";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
+  { id: "creatorReviews", label: "Creator & bot reviews", icon: Check },
   { id: "premium", label: "Premium payments", icon: ShieldCheck },
   { id: "decorations", label: "Decorations", icon: Check },
   { id: "overview", label: "Overview", icon: ShieldCheck },
@@ -256,6 +259,7 @@ export function AdminPortal() {
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
         {tab === "premium" && me?.isFounder && <PremiumAdmin />}
         {tab === "decorations" && me?.isPlatformStaff && <DecorationReview />}
+        {tab === "creatorReviews" && <TrustReviewQueue />}
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
         {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (
