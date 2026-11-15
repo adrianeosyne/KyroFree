@@ -193,7 +193,10 @@ export function ProfileCard() {
           "[&>button[data-slot=dialog-close]]:right-4 [&>button[data-slot=dialog-close]]:top-4 [&>button[data-slot=dialog-close]]:rounded-full [&>button[data-slot=dialog-close]]:bg-black/45 [&>button[data-slot=dialog-close]]:p-1.5 [&>button[data-slot=dialog-close]]:text-white [&>button[data-slot=dialog-close]]:opacity-90 [&>button[data-slot=dialog-close]]:shadow-sm [&>button[data-slot=dialog-close]]:hover:bg-black/65 [&>button[data-slot=dialog-close]]:hover:opacity-100",
         )}
       >
-        <ProfileDecorationLayer decorationId={user?.profileDecoration} />
+        <ProfileDecorationLayer
+          decorationId={user?.profileDecoration}
+          imageUrl={user?.profileDecorationUrl}
+        />
         <div className="relative z-10 min-h-0 flex-1 overflow-hidden">
           {user ? (
             <div className="grid h-full min-h-0 md:grid-cols-[31rem_minmax(0,1fr)]">

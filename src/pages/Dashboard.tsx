@@ -1,7 +1,8 @@
 import { useQuery } from "convex/react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router";
-import { ArrowLeft, Hash, Loader2 } from "@/components/icons";
+import { ArrowLeft, Hash } from "@/components/icons";
+import { AppLoading } from "@/components/AppLoading";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { AdminPortal } from "@/components/app/AdminPortal";
@@ -197,11 +198,7 @@ function ServerIndexContent() {
   if (!serverId) return <Navigate to="/dashboard" replace />;
 
   if (channels === undefined) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <AppLoading fullScreen={false} label="Opening this community" />;
   }
 
   // Prefer a text channel as the landing view; fall back to the first voice

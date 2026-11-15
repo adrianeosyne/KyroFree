@@ -1,3 +1,4 @@
+import { CommunityEvents, CommunityTickets } from "./CommunityHub";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -79,6 +80,10 @@ import { inviteUrl, siteOrigin } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 type TabId =
+  | "safety"
+  | "events"
+  | "tickets"
+  | "backup"
   | "overview"
   | "theme"
   | "channels"
@@ -93,6 +98,10 @@ type TabId =
   | "danger";
 
 const SETTINGS_TABS: readonly TabId[] = [
+  "safety",
+  "events",
+  "tickets",
+  "backup",
   "overview",
   "theme",
   "channels",
@@ -144,6 +153,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     isPublic: true,
     tags: [] as string[],
   });
+  const [settingsSearch, setSettingsSearch] = useState("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState<"icon" | "banner" | null>(null);
   const [cropRequest, setCropRequest] = useState<{
@@ -222,7 +232,38 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     show: boolean;
     icon: typeof Settings;
   }[] = [
-    { id: "overview", label: "Overview", show: canManage, icon: Settings },
+    {
+      id: "overview",
+      label: "Server Profile",
+      show: canManage,
+      icon: Settings,
+    },
+    {
+      id: "safety",
+      label: "Safety & onboarding",
+      show: canManage,
+      icon: Shield,
+    },
+    {
+      id: "events",
+      label: "Events & supercharge",
+      show: canManage,
+      icon: Users,
+    },
+    {
+      id: "tickets",
+      label: "Support tickets",
+      show:
+        canManage ||
+        hasPermission(server.permissions, PERMISSIONS.MANAGE_MESSAGES),
+      icon: MessagesSquare,
+    },
+    {
+      id: "backup",
+      label: "Configuration backup",
+      show: canManage,
+      icon: Copy,
+    },
     { id: "theme", label: "Theme", show: canManage, icon: Palette },
     { id: "channels", label: "Channels", show: canChannels, icon: Hash },
     { id: "roles", label: "Roles", show: canRoles, icon: Shield },
@@ -250,11 +291,24 @@ export function ServerSettings({ serverId }: { serverId: string }) {
       icon: AlertTriangle,
     },
   ];
-  const visibleTabs = TABS.filter((entry) => entry.show);
+  const availableTabs = TABS.filter((entry) => entry.show);
+  const tabGroup = (id: TabId) =>
+    ["overview", "theme", "emojis"].includes(id)
+      ? "Identity & expression"
+      : ["events", "channels", "bots", "invites"].includes(id)
+        ? "Community"
+        : ["safety", "tickets", "reports", "bans"].includes(id)
+          ? "Safety & support"
+          : "People & administration";
+  const visibleTabs = availableTabs.filter((entry) =>
+    `${entry.label} ${tabGroup(entry.id)}`
+      .toLowerCase()
+      .includes(settingsSearch.toLowerCase()),
+  );
   const requestedTab = settingsTabFromPath(location.pathname);
-  const activeTab = visibleTabs.some((entry) => entry.id === requestedTab)
+  const activeTab = availableTabs.some((entry) => entry.id === requestedTab)
     ? requestedTab
-    : (visibleTabs[0]?.id ?? "overview");
+    : (availableTabs[0]?.id ?? "overview");
   const openTab = (nextTab: TabId) => {
     navigate(`/dashboard/s/${serverId}/settings/${nextTab}`);
   };
@@ -493,7 +547,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             className="absolute inset-0 size-full object-cover opacity-30"
           />
         )}
-        <div className="relative mx-auto max-w-5xl px-4 py-4 sm:px-6">
+        <div className="relative mx-auto max-w-6xl px-4 py-4 sm:px-6">
           <button
             type="button"
             onClick={() => navigate(`/dashboard/s/${serverId}`)}
@@ -557,57 +611,57 @@ export function ServerSettings({ serverId }: { serverId: string }) {
         </div>
       </motion.div>
 
-      <div className="mx-auto flex max-w-5xl gap-6 px-4 py-6 sm:px-6">
+      <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 sm:px-6">
         {/* Section rail */}
-        <nav className="hidden w-56 shrink-0 flex-col gap-1.5 md:flex">
-          <p className="mb-1.5 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Community settings
-          </p>
-          <div className="flex flex-col gap-0.5 rounded-2xl border border-border/60 bg-panel p-1.5">
-            {visibleTabs.map((entry) => {
-              const Icon = entry.icon;
-              const active = activeTab === entry.id;
-              return (
-                <button
-                  key={entry.id}
-                  type="button"
-                  onClick={() => openTab(entry.id)}
-                  className={cn(
-                    "relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition-colors",
-                    active
-                      ? "font-medium text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="server-settings-active-tab"
-                      transition={{
-                        type: "spring",
-                        stiffness: 520,
-                        damping: 42,
-                      }}
-                      className="absolute inset-0 rounded-xl bg-surface shadow-sm ring-1 ring-border/70"
-                    />
-                  )}
-                  <Icon
-                    className={cn(
-                      "relative size-4 shrink-0 transition-colors",
-                      active
-                        ? entry.id === "danger"
-                          ? "text-destructive"
-                          : "text-brand"
-                        : "text-muted-foreground",
-                    )}
-                  />
-                  <span className="relative truncate">{entry.label}</span>
-                  {active && (
-                    <ChevronRight className="relative ml-auto size-3.5 text-muted-foreground" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+        <nav
+          aria-label="Server settings"
+          className="sticky top-5 hidden max-h-[calc(100dvh-13rem)] w-60 overflow-y-auto shrink-0 flex-col gap-3 md:flex"
+        >
+          <Input
+            aria-label="Search server settings"
+            placeholder="Search server settings"
+            value={settingsSearch}
+            onChange={(e) => setSettingsSearch(e.target.value)}
+          />
+          {[
+            "Identity & expression",
+            "Community",
+            "Safety & support",
+            "People & administration",
+          ].map((group) => (
+            <section key={group}>
+              <p className="mb-2 mt-2 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                {group}
+              </p>
+              {visibleTabs
+                .filter((entry) => tabGroup(entry.id) === group)
+                .map((entry) => {
+                  const Icon = entry.icon;
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      aria-current={activeTab === entry.id ? "page" : undefined}
+                      onClick={() => openTab(entry.id)}
+                      className={cn(
+                        "mb-1 flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left text-sm transition-colors",
+                        activeTab === entry.id
+                          ? "border-primary/25 bg-primary/10 font-semibold text-foreground"
+                          : "text-muted-foreground hover:bg-surface hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4 shrink-0 text-primary" />
+                      {entry.label}
+                    </button>
+                  );
+                })}
+            </section>
+          ))}
+          {!visibleTabs.length && (
+            <p className="p-3 text-xs text-muted-foreground">
+              No settings match your search.
+            </p>
+          )}
         </nav>
 
         <motion.div
@@ -642,7 +696,9 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             <section className="rounded-xl border border-border/70 bg-panel p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold">Quick actions</h2>
+                  <h2 className="text-xl font-bold">
+                    Make a great first impression.
+                  </h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     The places you visit most, one click away.
                   </p>
@@ -676,7 +732,44 @@ export function ServerSettings({ serverId }: { serverId: string }) {
 
           {activeTab === "overview" && (
             <section className="rounded-xl border border-border/70 bg-panel p-5">
-              <h2 className="text-sm font-semibold">Images</h2>
+              <div className="relative mt-5 overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/20 via-surface to-cyan/10 p-5">
+                {server.bannerUrl && (
+                  <img
+                    src={server.bannerUrl}
+                    alt=""
+                    className="absolute inset-0 size-full object-cover opacity-20"
+                  />
+                )}
+                <div className="relative flex items-center gap-4">
+                  <div className="flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-primary/20 text-xl font-black">
+                    {server.iconUrl ? (
+                      <img
+                        src={server.iconUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      form.name.slice(0, 2).toUpperCase()
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary">
+                      Live community profile
+                    </p>
+                    <h3 className="mt-1 text-xl font-bold">{form.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {form.description ||
+                        "Tell members what makes this community special."}
+                    </p>
+                  </div>
+                </div>
+                <div className="relative mt-4 flex gap-5 text-xs text-muted-foreground">
+                  <span>{server.memberCount} members</span>
+                  <span>{server.onlineCount} online</span>
+                  <span>{form.isPublic ? "Discoverable" : "Private"}</span>
+                </div>
+              </div>
+              <h2 className="mt-6 text-sm font-semibold">Images</h2>
               <div className="mt-4 flex flex-wrap items-center gap-4">
                 <div className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-brand to-cyan text-sm font-bold text-white">
                   {server.iconUrl ? (
@@ -1073,6 +1166,23 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 </div>
               </div>
 
+              <div className="mt-4 flex justify-end">
+                <Button onClick={() => void save()} disabled={saving}>
+                  {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Save changes
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {activeTab === "safety" && canManage && (
+            <section className="rounded-2xl border border-border bg-panel p-6">
+              <h2 className="text-xl font-bold">
+                A safer community starts here.
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Onboarding, account gates and automated moderation in one place.
+              </p>{" "}
               <h2 className="mt-7 text-sm font-semibold">Raid protection</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Locked: nobody new can join and only people who can manage
@@ -1122,7 +1232,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                     : " until you unlock it."}
                 </p>
               )}
-
               <h2 className="mt-7 text-sm font-semibold">Verification level</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 What people need before they can talk here. The owner, staff and
@@ -1159,7 +1268,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                       ? "Accounts need to be at least 1 day old."
                       : "Anyone in the community can talk right away."}
               </p>
-
               <h2 className="mt-7 text-sm font-semibold">New accounts</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Stops raids from freshly made accounts. Only accounts older than
@@ -1192,7 +1300,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 <option value="1d">1 day</option>
                 <option value="7d">7 days</option>
               </select>
-
               <h2 className="mt-7 text-sm font-semibold">Rules channel</h2>
               <p className="mt-1 text-xs text-muted-foreground">
                 Gets a book icon, only people who can manage the server can post
@@ -1219,34 +1326,37 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                   </option>
                 ))}
               </select>
-
               <JoinApplicationSettings
                 serverId={serverId}
                 isPublic={server.isPublic}
                 applyToJoin={server.applyToJoin}
                 applicationQuestions={server.applicationQuestions}
               />
-
               <AutoModSettings
                 serverId={serverId}
                 channels={channels?.channels ?? []}
                 roles={server.roles}
               />
-
+            </section>
+          )}
+          {activeTab === "backup" && canManage && (
+            <section className="rounded-2xl border border-border bg-panel p-6">
+              <h2 className="mb-4 text-xl font-bold">Configuration backup</h2>{" "}
               <ServerConfigurationExport
                 serverId={serverId}
                 serverName={server.name}
               />
-
-              <div className="mt-4 flex justify-end">
-                <Button onClick={() => void save()} disabled={saving}>
-                  {saving && <Loader2 className="mr-2 size-4 animate-spin" />}
-                  Save changes
-                </Button>
-              </div>
             </section>
           )}
-
+          {activeTab === "events" && canManage && (
+            <CommunityEvents serverId={serverId} manage />
+          )}
+          {activeTab === "tickets" &&
+            (canManage ||
+              hasPermission(
+                server.permissions,
+                PERMISSIONS.MANAGE_MESSAGES,
+              )) && <CommunityTickets serverId={serverId} manage />}
           {activeTab === "roles" && (
             <RolesTab
               serverId={serverId}

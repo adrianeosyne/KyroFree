@@ -1,3 +1,5 @@
+import { PremiumAdmin } from "./PremiumSettings";
+import { DecorationReview } from "./DecorationStudio";
 import { useMutation, useQuery } from "convex/react";
 import type {
   DefaultFunctionArgs,
@@ -42,6 +44,8 @@ import { BUG_CATEGORY_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type AdminTab =
+  | "premium"
+  | "decorations"
   | "overview"
   | "badges"
   | "reports"
@@ -53,6 +57,8 @@ type AdminTab =
   | "ips";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
+  { id: "premium", label: "Premium payments", icon: ShieldCheck },
+  { id: "decorations", label: "Decorations", icon: Check },
   { id: "overview", label: "Overview", icon: ShieldCheck },
   { id: "ips", label: "IP detector", icon: Globe },
   { id: "badges", label: "Badges", icon: Shield },
@@ -132,6 +138,7 @@ function timeAgo(timestamp: number): string {
  */
 export function AdminPortal() {
   const data = useQuery(api.admin.overview);
+  const me = useQuery(api.users.me);
   // The badge and the Bugs tab read the same query result, so the indicator
   // can never advertise reports the tab refuses to show.
   const bugs = useQuery(api.bugReports.list);
@@ -172,7 +179,10 @@ export function AdminPortal() {
         ).length;
   // The IP detector is a two-person tool, stricter than staff access.
   const visibleTabs = TABS.filter(
-    (entry) => entry.id !== "ips" || data.canViewIps,
+    (entry) =>
+      (entry.id !== "ips" || data.canViewIps) &&
+      (entry.id !== "premium" || me?.isFounder) &&
+      (entry.id !== "decorations" || me?.isPlatformStaff),
   );
 
   return (
@@ -244,6 +254,8 @@ export function AdminPortal() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {tab === "premium" && me?.isFounder && <PremiumAdmin />}
+        {tab === "decorations" && me?.isPlatformStaff && <DecorationReview />}
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
         {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (

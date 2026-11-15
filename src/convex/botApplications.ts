@@ -1,3 +1,4 @@
+import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { makeFunctionReference } from "convex/server";
@@ -117,7 +118,7 @@ export const create = mutation({
     tokenHash: v.string(),
   },
   handler: async (ctx, args) => {
-    const { id } = await requireActiveUser(ctx);
+    const { id, user } = await requireActiveUser(ctx);
     const name = args.name.trim();
     const username = args.username.trim().toLowerCase();
     if (
@@ -138,11 +139,11 @@ export const create = mutation({
       .query("botApplications")
       .withIndex("by_owner", (q) => q.eq("ownerId", id))
       .collect();
-    if (owned.filter((a) => !a.deletedAt).length >= 20)
+    if (owned.filter((a) => !a.deletedAt).length >= (hasPremium(user) ? 10 : 2))
       botError(
         409,
         "APPLICATION_LIMIT",
-        "An account may own up to 20 applications.",
+        "Free accounts can own 2 bot applications; Premium accounts can own 10.",
       );
     if (
       await ctx.db

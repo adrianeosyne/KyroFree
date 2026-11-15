@@ -6,10 +6,26 @@
 import { useUiStore } from "./store";
 
 let context: AudioContext | null = null;
+let customSoundUrl: string | null = null;
+let customAudio: HTMLAudioElement | null = null;
+export function setNotificationSound(url: string | null) {
+  customSoundUrl = url;
+  customAudio?.pause();
+  customAudio = null;
+}
 
 export function playNotificationPing(): void {
   if (typeof window === "undefined") return;
   try {
+    if (customSoundUrl) {
+      customAudio?.pause();
+      customAudio = new Audio(customSoundUrl);
+      customAudio.volume =
+        Math.max(0, Math.min(100, useUiStore.getState().notificationVolume)) /
+        100;
+      void customAudio.play().catch(() => {});
+      return;
+    }
     const AudioCtor =
       window.AudioContext ??
       (window as unknown as { webkitAudioContext?: typeof AudioContext })

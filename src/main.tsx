@@ -1,6 +1,8 @@
 import "@vly-ai/integrations";
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { AppLoading } from "@/components/AppLoading";
+import { SiteMotion } from "@/components/SiteMotion";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -30,15 +32,6 @@ const CopyrightPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.CopyrightPage })),
 );
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
-
-// Simple loading fallback for route transitions
-function RouteLoading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
 
 /** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
  *  crashing the whole app (e.g. hook errors in the browser runtime). */
@@ -153,30 +146,32 @@ createRoot(document.getElementById("root")!).render(
       <ConvexAuthProvider client={convex}>
         <BrowserRouter>
           <RouteSyncer />
-          <Suspense fallback={<RouteLoading />}>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/download" element={<DownloadPage />} />
-              <Route path="/docs/:slug?" element={<DeveloperDocs />} />
-              <Route
-                path="/auth"
-                element={<AuthPage redirectAfterAuth="/dashboard" />}
-              />
-              <Route
-                path="/dashboard/*"
-                element={
-                  <RequireAuth>
-                    <Dashboard />
-                  </RequireAuth>
-                }
-              />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/copyright" element={<CopyrightPage />} />
-              <Route path="/invite/:code" element={<InviteRoute />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+          <SiteMotion>
+            <Suspense fallback={<AppLoading />}>
+              <Routes>
+                <Route path="/" element={<Landing />} />
+                <Route path="/download" element={<DownloadPage />} />
+                <Route path="/docs/:slug?" element={<DeveloperDocs />} />
+                <Route
+                  path="/auth"
+                  element={<AuthPage redirectAfterAuth="/dashboard" />}
+                />
+                <Route
+                  path="/dashboard/*"
+                  element={
+                    <RequireAuth>
+                      <Dashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/copyright" element={<CopyrightPage />} />
+                <Route path="/invite/:code" element={<InviteRoute />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </SiteMotion>
         </BrowserRouter>
         <Toaster />
       </ConvexAuthProvider>

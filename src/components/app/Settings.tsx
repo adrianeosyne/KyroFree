@@ -1,3 +1,6 @@
+import { WorkspaceStudio } from "./WorkspaceStudio";
+import { PremiumSettings } from "./PremiumSettings";
+import { DecorationStudio } from "./DecorationStudio";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type {
   DefaultFunctionArgs,
@@ -98,6 +101,9 @@ import {
 type ProfileLink = { label: string; url: string };
 
 type TabId =
+  | "premium"
+  | "workshop"
+  | "studio"
   | "account"
   | "profile"
   | "appearance"
@@ -119,6 +125,30 @@ const TABS: {
   description: string;
   keywords: string;
 }[] = [
+  {
+    id: "studio",
+    label: "Workspace Studio",
+    icon: Palette,
+    group: "App settings",
+    description: "Design your entire Kyro workspace with Premium.",
+    keywords: "premium background panels fonts layout full customize",
+  },
+  {
+    id: "premium",
+    label: "Premium",
+    icon: Sparkles,
+    group: "Your account",
+    description: "More room to play and create. $1.99 per month.",
+    keywords: "payment gift subscription badge 1440p 60fps 200mb",
+  },
+  {
+    id: "workshop",
+    label: "Decoration Workshop",
+    icon: Palette,
+    group: "Your account",
+    description: "Share your original artwork with the Kyro community.",
+    keywords: "upload submit artwork animated gif community moderation",
+  },
   {
     id: "account",
     label: "My Account",
@@ -399,6 +429,9 @@ function SettingsContent({ initialTab }: { initialTab: string }) {
               <AccountTab onEditProfile={() => setTab("profile")} />
             )}
             {tab === "profile" && <ProfileTab />}
+            {tab === "premium" && <PremiumSettings />}
+            {tab === "workshop" && <DecorationStudio />}
+            {tab === "studio" && <WorkspaceStudio />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "chat" && <ChatSettings />}
             {tab === "voice" && <VoiceSettings />}
@@ -1698,6 +1731,8 @@ function ProfileTab() {
   );
   const [linksBusy, setLinksBusy] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [themeSearch, setThemeSearch] = useState("");
+  const [frameSearch, setFrameSearch] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [nameStyleOpen, setNameStyleOpen] = useState(false);
@@ -1925,7 +1960,10 @@ function ProfileTab() {
               className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-panel/60 sm:p-5"
             >
               <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/40 via-panel to-background ring-1 ring-border/70">
-                <ProfileDecorationLayer decorationId={me.profileDecoration} />
+                <ProfileDecorationLayer
+                  decorationId={me.profileDecoration}
+                  imageUrl={me.profileDecorationUrl}
+                />
                 <span className="relative z-10 flex size-full items-end p-2 text-[9px] font-bold">
                   Profile
                 </span>
@@ -2191,7 +2229,14 @@ function ProfileTab() {
           <p className="mb-3 text-xs text-muted-foreground">
             Colours your profile card and its banner when you have no picture.
           </p>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <Input
+            aria-label="Search profile themes"
+            placeholder="Search 200 profile themes"
+            value={themeSearch}
+            onChange={(e) => setThemeSearch(e.target.value)}
+            className="mb-3"
+          />
+          <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
             <button
               type="button"
               onClick={() => {
@@ -2221,7 +2266,9 @@ function ProfileTab() {
               </span>
               None
             </button>
-            {PROFILE_THEMES.map((theme) => {
+            {PROFILE_THEMES.filter((theme) =>
+              theme.label.toLowerCase().includes(themeSearch.toLowerCase()),
+            ).map((theme) => {
               const active =
                 (themeSel === undefined ? me.profileTheme : themeSel) ===
                 theme.id;
@@ -2268,6 +2315,13 @@ function ProfileTab() {
             Give your profile a fresh look — a frame around your picture.
             Built-in ones are free.
           </p>
+          <Input
+            aria-label="Search avatar frames"
+            placeholder="Search 200 avatar frames"
+            value={frameSearch}
+            onChange={(e) => setFrameSearch(e.target.value)}
+            className="mb-3"
+          />
           <div className="flex flex-wrap items-start gap-6">
             <div className="flex flex-col items-center gap-2">
               <UserAvatar
@@ -2288,7 +2342,7 @@ function ProfileTab() {
                 })()}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => {
@@ -2319,7 +2373,9 @@ function ProfileTab() {
                 </span>
                 None
               </button>
-              {AVATAR_FRAMES.map((frame) => {
+              {AVATAR_FRAMES.filter((frame) =>
+                frame.label.toLowerCase().includes(frameSearch.toLowerCase()),
+              ).map((frame) => {
                 const active =
                   (frameSel === undefined ? me.avatarFrame : frameSel) ===
                   frame.id;
@@ -2626,7 +2682,10 @@ function ProfilePreviewPane({
             : undefined
         }
       >
-        <ProfileDecorationLayer decorationId={me.profileDecoration} />
+        <ProfileDecorationLayer
+          decorationId={me.profileDecoration}
+          imageUrl={me.profileDecorationUrl}
+        />
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(

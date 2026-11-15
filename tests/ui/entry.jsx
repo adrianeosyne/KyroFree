@@ -1,3 +1,4 @@
+import { SiteMotion } from "@/components/SiteMotion";
 // Local-only fixture: real product components, deterministic data, no accounts.
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -11,10 +12,10 @@ window.setFixtureTheme = (theme) =>
   useUiStore.getState().setPreference("theme", theme);
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <TooltipProvider>
+    <SiteMotion><TooltipProvider>
       <Routes>
         <Route path="/dashboard/*" element={<Dashboard />} />
       </Routes>
-    </TooltipProvider>
+    </TooltipProvider></SiteMotion>
   </BrowserRouter>,
 );

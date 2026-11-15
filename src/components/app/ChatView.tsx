@@ -5,6 +5,7 @@ import { Navigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Composer, type MentionRole } from "@/components/app/Composer";
+import { AppLoading } from "@/components/AppLoading";
 import { MemberList } from "@/components/app/MemberList";
 import {
   MessageList,
@@ -412,7 +413,7 @@ export function DirectChat({ conversationId }: { conversationId: string }) {
   const me = useQuery(api.users.me);
 
   if (conversation === undefined) {
-    return <CenteredNote>Loading conversation…</CenteredNote>;
+    return <AppLoading fullScreen={false} label="Loading your conversation" />;
   }
   if (conversation === null) {
     return (

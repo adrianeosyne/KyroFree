@@ -1,3 +1,4 @@
+import { hasPremium } from "@/lib/entitlements";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
   ConnectionState,
@@ -43,7 +44,7 @@ import { audioCapturePreferences } from "@/lib/audioPreferences";
 
 type ContainerType = "channel" | "conversation";
 
-/** Screen shares are capped at 720p/30fps to protect CPU and bandwidth. */
+/** Free display capture target; Premium targets come from the server grant. */
 const SCREEN_SHARE_RESOLUTION = {
   width: 1280,
   height: 720,
@@ -51,6 +52,7 @@ const SCREEN_SHARE_RESOLUTION = {
 } as const;
 
 type TokenResponse = {
+  screenShare: { width: number; height: number; frameRate: number };
   ok: true;
   serverUrl: string;
   token: string;
@@ -158,6 +160,12 @@ export function LiveKitVoiceRoom({
   const [deafened, setDeafened] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [shareGrant, setShareGrant] = useState<{
+    width: number;
+    height: number;
+    frameRate: number;
+  }>(SCREEN_SHARE_RESOLUTION);
+  const shareResolution = hasPremium(me) ? shareGrant : SCREEN_SHARE_RESOLUTION;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
@@ -179,6 +187,19 @@ export function LiveKitVoiceRoom({
     sharing: false,
   });
   const now = useNow(1_000);
+  useEffect(() => {
+    if (!room.localParticipant.isScreenShareEnabled) return;
+    const track = room.localParticipant.getTrackPublication(
+      Track.Source.ScreenShare,
+    )?.videoTrack?.mediaStreamTrack;
+    void track
+      ?.applyConstraints({
+        width: { max: shareResolution.width },
+        height: { max: shareResolution.height },
+        frameRate: { max: shareResolution.frameRate },
+      })
+      .catch(() => {});
+  }, [room, shareResolution]);
 
   const refresh = () => setRevision((value) => value + 1);
   const signalLeave = () => {
@@ -340,6 +361,7 @@ export function LiveKitVoiceRoom({
         if (disposed) return;
         setCanManage(credentials.canManage);
         setAllowedSources(credentials.canPublishSources);
+        setShareGrant(credentials.screenShare ?? SCREEN_SHARE_RESOLUTION);
         await nextRoom.connect(credentials.serverUrl, credentials.token, {
           autoSubscribe: true,
         });
@@ -484,25 +506,28 @@ export function LiveKitVoiceRoom({
         {
           audio: allowedSources.includes("screen_share_audio"),
           video: true,
-          resolution: SCREEN_SHARE_RESOLUTION,
+          resolution: shareResolution,
           selfBrowserSurface: "include",
           surfaceSwitching: "include",
           systemAudio: "include",
           contentHint: "detail",
         },
         {
-          screenShareEncoding: ScreenSharePresets.h720fps30.encoding,
+          screenShareEncoding:
+            shareResolution.frameRate === 60
+              ? { maxBitrate: 8_000_000, maxFramerate: 60 }
+              : ScreenSharePresets.h720fps30.encoding,
           degradationPreference: "maintain-resolution",
         },
       );
       if (enabled) {
         // Chromium treats display-capture resolution hints as "ideal" rather
         // than a hard ceiling. Apply max constraints to the captured track so
-        // high-resolution monitors cannot publish above 720p/30fps.
+        // high-resolution monitors respect the current entitlement target.
         await publication?.videoTrack?.mediaStreamTrack.applyConstraints({
-          width: { max: SCREEN_SHARE_RESOLUTION.width },
-          height: { max: SCREEN_SHARE_RESOLUTION.height },
-          frameRate: { max: SCREEN_SHARE_RESOLUTION.frameRate },
+          width: { max: shareResolution.width },
+          height: { max: shareResolution.height },
+          frameRate: { max: shareResolution.frameRate },
         });
       }
       setSharing(enabled);

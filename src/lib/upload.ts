@@ -1,8 +1,8 @@
-import { useMutation } from "convex/react";
+import { uploadLimit } from "./entitlements";
+import { useMutation, useQuery } from "convex/react";
 import { useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 
 export { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 export const MAX_ATTACHMENTS = 6;
@@ -30,21 +30,28 @@ const uploadRegistrationEnabled =
  * the browser never streams file contents through the database.
  */
 export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
+  const me = useQuery(api.users.me);
+  const limit = uploadLimit(me);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const registerUpload = useMutation(api.files.registerUpload);
 
   return useCallback(
-    async (file: File): Promise<PendingAttachment> => {
-      if (file.size > MAX_UPLOAD_BYTES) {
+    async (
+      file: File,
+      request?: { signal?: AbortSignal },
+    ): Promise<PendingAttachment> => {
+      if (file.size > limit) {
         throw new Error(
-          `"${file.name}" is larger than the 10 MB upload limit.`,
+          `"${file.name}" is larger than the ${limit / 1024 / 1024} MB upload limit.`,
         );
       }
       const uploadUrl = await generateUploadUrl();
+      request?.signal?.throwIfAborted();
       const response = await fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": file.type || "application/octet-stream" },
         body: file,
+        signal: request?.signal,
       });
       if (!response.ok) {
         throw new Error(`Upload failed (${response.status}). Try again.`);
@@ -74,7 +81,8 @@ export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
         const backendPredatesRegistration =
           message.includes("Could not find public function") &&
           message.toLowerCase().includes("registerupload");
-        if (!backendPredatesRegistration) throw error;
+        if (!backendPredatesRegistration || options.requireRegistration)
+          throw error;
 
         // The object is already in Convex storage. Older deployments predate
         // upload ownership tracking, so they accept the storage id directly —
@@ -82,6 +90,6 @@ export function useUploadFile(options: { requireRegistration?: boolean } = {}) {
         return attachment;
       }
     },
-    [generateUploadUrl, options.requireRegistration, registerUpload],
+    [generateUploadUrl, options.requireRegistration, registerUpload, limit],
   );
 }

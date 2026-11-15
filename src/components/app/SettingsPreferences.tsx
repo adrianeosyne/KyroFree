@@ -1,3 +1,4 @@
+import { NotificationSoundUpload } from "./NotificationSoundUpload";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -164,6 +165,7 @@ export function NotificationSettings() {
   const setPreference = useUiStore((state) => state.setPreference);
   return (
     <>
+      <NotificationSoundUpload />
       <SettingsGroup
         title="Stay in the loop"
         description="Choose what makes a sound. These preferences are saved on this device."
@@ -238,6 +240,11 @@ export function AccessibilitySettings() {
           preference="underlineLinks"
           title="Always underline links"
           description="Make links easier to identify without relying on colour."
+        />
+        <PreferenceToggle
+          preference="customCursor"
+          title="Use the Kyro cursor"
+          description="A custom pointer for mouse and trackpad users. Turn off to use your system cursor."
         />
       </SettingsGroup>
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">

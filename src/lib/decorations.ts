@@ -1,3 +1,4 @@
+import { GAMING_PALETTES } from "./gamingPalettes";
 export type AvatarDecorationKind =
   | "sparkles"
   | "orbit"
@@ -909,6 +910,60 @@ export const PROFILE_DECORATIONS: ProfileDecoration[] = [
     4,
   ),
 ];
+
+// Additional palettes alter geometry through the variant seed as well as colour.
+const avatarMotifs: AvatarDecorationKind[] = [
+  "sparkles",
+  "orbit",
+  "crown",
+  "wings",
+  "flame",
+  "flora",
+  "crystal",
+  "hearts",
+  "runes",
+  "halo",
+];
+const profileMotifs: ProfileDecorationKind[] = [
+  "stars",
+  "aurora",
+  "grid",
+  "petals",
+  "embers",
+  "snow",
+  "ribbons",
+  "constellation",
+];
+for (let i = AVATAR_DECORATIONS.length; i < 200; i++) {
+  const palette = GAMING_PALETTES[i % 20];
+  const kind = avatarMotifs[Math.floor(i / 20) % 10];
+  AVATAR_DECORATIONS.push(
+    avatar(
+      `gaming-avatar-${i}`,
+      `${palette.label} ${kind[0].toUpperCase() + kind.slice(1)}`,
+      `${palette.label} gaming artwork with ${kind} and a unique layout.`,
+      kind,
+      palette.colours,
+      i % 3 !== 0,
+      i + 7,
+    ),
+  );
+}
+for (let i = PROFILE_DECORATIONS.length; i < 200; i++) {
+  const palette = GAMING_PALETTES[i % 20];
+  const kind = profileMotifs[Math.floor(i / 20) % 8];
+  PROFILE_DECORATIONS.push(
+    profile(
+      `gaming-profile-${i}`,
+      `${palette.label} ${kind[0].toUpperCase() + kind.slice(1)}`,
+      `${palette.label} ${kind} sweep across your player card.`,
+      kind,
+      palette.colours,
+      i % 3 !== 0,
+      i + 11,
+    ),
+  );
+}
 
 export const AVATAR_DECORATION_IDS = AVATAR_DECORATIONS.map((item) => item.id);
 export const PROFILE_DECORATION_IDS = PROFILE_DECORATIONS.map(

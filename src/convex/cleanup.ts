@@ -262,6 +262,28 @@ export async function deleteServerData(
     "server_banner",
     serverId,
   );
+  const events = await ctx.db
+    .query("communityEvents")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const event of events) {
+    const attendees = await ctx.db
+      .query("eventAttendees")
+      .withIndex("by_event", (q) => q.eq("eventId", event._id))
+      .collect();
+    for (const row of attendees) await ctx.db.delete(row._id);
+    await ctx.db.delete(event._id);
+  }
+  const tickets = await ctx.db
+    .query("supportTickets")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const row of tickets) await ctx.db.delete(row._id);
+  const charges = await ctx.db
+    .query("serverSupercharges")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const row of charges) await ctx.db.delete(row._id);
   await ctx.db.delete(serverId);
 }
 

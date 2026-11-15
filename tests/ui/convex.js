@@ -1,3 +1,4 @@
+import { WORKSPACE_DEFAULTS } from "../../src/lib/workspaceTheme";
 import { getFunctionName } from "convex/server";
 import { useSyncExternalStore } from "react";
 
@@ -69,6 +70,8 @@ const discovery = servers.map((server, index) => ({
   memberCount: [126, 82, 54][index],
   onlineCount: [18, 9, 4][index],
   createdAt: 1700000000000 + index * 100000,
+  permissions: ["manage_server","manage_channels","manage_roles","create_invites","manage_messages","kick_members","ban_members","view_audit_log","manage_emojis"],
+  isOwner:true,roles:[],links:[],verificationLevel:"none",applicationQuestions:[],tag:null,themeAccent:null,themeTint:null,
   isJoined: true,
   applyToJoin: false,
 }));
@@ -136,6 +139,8 @@ const messages = [
   replyTo: null,
 }));
 let connected = true;
+let fixtureRevision=0;
+window.setFixtureData=(name,value)=>{data[name]=value;fixtureRevision++;listeners.forEach(l=>l());};
 const listeners = new Set();
 window.setFixtureConnection = (value) => {
   connected = value;
@@ -158,6 +163,14 @@ const data = {
     recoveryCodesRemaining: 0,
   },
   "users:me": me,
+  "automod:getSettings": {enabled:true,blockedWords:[],blockInvites:true,blockLinks:false,maxMentions:10,blockCaps:true,blockSpam:true,exemptRoleIds:[],exemptChannelIds:[]},
+  "workspace:get": {premiumUntil:null,theme:WORKSPACE_DEFAULTS,backgroundUrl:null},
+  "premium:status": {premiumUntil:null,instructions:"Contact adrianeosyne for manual payment instructions.",requests:[]},
+  "communityDecorations:catalog": [],
+  "communityDecorations:mine": [],
+  "communityHub:events": [],
+  "communityHub:tickets": [],
+  "communityHub:supporters": [],
   "users:currentUser": me,
   "social:list": { friends, incoming: [], outgoing: [], blocked: [] },
   "servers:listMine": servers,
@@ -196,6 +209,7 @@ const data = {
   ],
 };
 export function useQuery(reference, args) {
+  useSyncExternalStore(subscribe, () => fixtureRevision);
   if (args === "skip") return undefined;
   const name = getFunctionName(reference);
   if (
@@ -226,7 +240,7 @@ export function useQuery(reference, args) {
     );
   if (name === "conversations:get")
     return conversations.find((c) => c.id === args.conversationId) ?? null;
-  if (name === "users:search")
+  if (name === "users:search" || name === "users:searchUsers")
     return friends.filter((p) =>
       p.name.toLowerCase().includes((args.term ?? "").toLowerCase()),
     );
@@ -242,6 +256,8 @@ export function useMutation(reference) {
     mutations.set(name, async (args) => {
       window.fixtureMutations ??= [];
       window.fixtureMutations.push({ name, args });
+      if (name === "files:generateUploadUrl") return "http://127.0.0.1:5187/fixture-upload";
+      if (name === "files:registerUpload") return {storageId:args.storageId,name:args.name,size:100,mimeType:"image/png"};
       if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;

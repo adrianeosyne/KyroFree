@@ -31,6 +31,8 @@ import type * as botWebhooks from "../botWebhooks.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
+import type * as communityDecorations from "../communityDecorations.js";
+import type * as communityHub from "../communityHub.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
 import type * as emailDelivery from "../emailDelivery.js";
@@ -53,10 +55,12 @@ import type * as messages from "../messages.js";
 import type * as metricsLib from "../metricsLib.js";
 import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
+import type * as notificationSounds from "../notificationSounds.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as passwordResetInternal from "../passwordResetInternal.js";
 import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
+import type * as premium from "../premium.js";
 import type * as presence from "../presence.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -87,6 +91,8 @@ import type * as voiceAuthRefs from "../voiceAuthRefs.js";
 import type * as voiceMaintenance from "../voiceMaintenance.js";
 import type * as voiceTickets from "../voiceTickets.js";
 import type * as warnings from "../warnings.js";
+import type * as workspace from "../workspace.js";
+import type * as workspaceSchema from "../workspaceSchema.js";
 
 const fullApi: ApiFromModules<{
   "admin": typeof admin,
@@ -110,6 +116,8 @@ const fullApi: ApiFromModules<{
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,
+  "communityDecorations": typeof communityDecorations,
+  "communityHub": typeof communityHub,
   "conversations": typeof conversations,
   "crons": typeof crons,
   "emailDelivery": typeof emailDelivery,
@@ -132,10 +140,12 @@ const fullApi: ApiFromModules<{
   "metricsLib": typeof metricsLib,
   "moderation": typeof moderation,
   "notifications": typeof notifications,
+  "notificationSounds": typeof notificationSounds,
   "passwordReset": typeof passwordReset,
   "passwordResetInternal": typeof passwordResetInternal,
   "platformStats": typeof platformStats,
   "polls": typeof polls,
+  "premium": typeof premium,
   "presence": typeof presence,
   "reports": typeof reports,
   "roles": typeof roles,
@@ -166,6 +176,8 @@ const fullApi: ApiFromModules<{
   "voiceMaintenance": typeof voiceMaintenance,
   "voiceTickets": typeof voiceTickets,
   "warnings": typeof warnings,
+  "workspace": typeof workspace,
+  "workspaceSchema": typeof workspaceSchema,
 }> = anyApi as any;
 
 /**

@@ -108,6 +108,7 @@ export function OfficialBadge({ compact = false }: { compact?: boolean }) {
  * uses one cyan → indigo → violet palette so it reads as a single collection.
  */
 export type GlobalBadgeKey =
+  | "premium"
   | "founder"
   | "cofounder"
   | "manager"
@@ -127,6 +128,11 @@ export const GLOBAL_BADGE_META: Record<
   GlobalBadgeKey,
   { label: string; blurb: string; chip: string }
 > = {
+  premium: {
+    label: "Premium",
+    blurb: "Kyro Premium member · enhanced sharing and customization.",
+    chip: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-200",
+  },
   founder: {
     label: "Kyro Founder",
     blurb: "Built Kyro from the ground up.",
@@ -224,6 +230,7 @@ export type GrantableBadge = (typeof GRANTABLE_BADGES)[number];
  */
 export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "founder",
+  "premium",
   "cofounder",
   "manager",
   "admin",
@@ -340,8 +347,19 @@ export function BadgeTray({
         const meta = GLOBAL_BADGE_META[badge];
         return (
           <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
-            <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
-              <GlobalBadgeIcon badge={badge} className="size-5" />
+            <span
+              className={cn(
+                "flex items-center justify-center rounded-lg transition-colors",
+                badge === "premium"
+                  ? "gap-1 border border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-600/30 to-violet-600/30 px-2 py-1 text-[10px] font-bold text-fuchsia-100"
+                  : "size-7 hover:bg-indigo-300/10",
+              )}
+            >
+              <GlobalBadgeIcon
+                badge={badge}
+                className={badge === "premium" ? "size-4" : "size-5"}
+              />
+              {badge === "premium" && "Premium"}
             </span>
           </BadgeTip>
         );
@@ -393,6 +411,7 @@ const BADGE_ART: Record<
   Exclude<GlobalBadgeKey, "founder">,
   { stops: [string, string, string]; edge: string; vertical?: boolean }
 > = {
+  premium: { stops: ["#f0abfc", "#c026d3", "#7c3aed"], edge: "#86198f" },
   cofounder: {
     stops: ["#c4b5fd", "#8b5cf6", "#4f46e5"],
     edge: "#4338ca",
@@ -459,6 +478,13 @@ export function GlobalBadgeIcon({
 }) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 
+  if (badge === "premium")
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className={cn("size-5", className)}>
+        <path d="M12 2 22 9 18 21H6L2 9Z" fill="#c026d3" stroke="#f0abfc" />
+        <path d="m12 5 2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="white" />
+      </svg>
+    );
   if (badge === "founder") {
     return (
       <CrownBadge

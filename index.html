@@ -13,11 +13,88 @@
             (stored.theme !== "system" ||
               matchMedia("(prefers-color-scheme: dark)").matches);
           document.documentElement.classList.toggle("dark", dark);
+          document.documentElement.dataset.customCursor = String(
+            stored.customCursor !== false,
+          );
+          document.documentElement.dataset.reducedMotion = String(
+            stored.reducedMotion === true,
+          );
         } catch {
           document.documentElement.classList.add("dark");
         }
       })();
     </script>
+    <style>
+      .kyro-boot {
+        --boot-primary: #4c57d6;
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: radial-gradient(circle at 50% 40%, #ece8ff, #f5f6f9 60%);
+        color: #14161c;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+      }
+      .dark .kyro-boot {
+        --boot-primary: #9580ff;
+        background: radial-gradient(circle at 50% 40%, #242038, #17171f 60%);
+        color: #f2f3f5;
+      }
+      .kyro-boot-logo {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 96px;
+        height: 96px;
+        border-radius: 28px;
+        border: 1px solid #9580ff40;
+        background: #9580ff12;
+      }
+      .kyro-boot-logo::before {
+        content: "";
+        position: absolute;
+        inset: -20px;
+        border: 1px solid #9580ff25;
+        border-top: 2px solid var(--boot-primary);
+        border-radius: 50%;
+        animation: kyro-boot-spin 2.4s linear infinite;
+      }
+      .kyro-boot-brand {
+        margin: 32px 0 18px;
+        font-size: 32px;
+        font-weight: 750;
+        letter-spacing: -1.5px;
+      }
+      .kyro-boot-brand span {
+        color: var(--boot-primary);
+      }
+      .kyro-boot-label {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .kyro-boot-caption {
+        margin-top: 12px;
+        font-size: 12px;
+        opacity: 0.6;
+      }
+      @keyframes kyro-boot-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      html[data-reduced-motion="true"] .kyro-boot-logo::before {
+        animation: none;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .kyro-boot-logo::before {
+          animation: none;
+        }
+      }
+    </style>
     <link
       rel="icon"
       type="image/png"
@@ -70,7 +147,16 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="kyro-boot" role="status" aria-label="Loading Kyro">
+        <div class="kyro-boot-logo">
+          <img src="/logo-192.png" alt="" width="64" height="64" />
+        </div>
+        <p class="kyro-boot-brand">kyro<span>.</span></p>
+        <p class="kyro-boot-label">Getting your space ready</p>
+        <p class="kyro-boot-caption">Your people. Your place.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

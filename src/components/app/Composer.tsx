@@ -1,3 +1,4 @@
+import { messageLimit } from "@/lib/entitlements";
 import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   BarChart3,
@@ -24,15 +25,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { ReplyTarget } from "@/components/app/MessageList";
-import { formatBytes } from "@/lib/format";
 import { useUiStore } from "@/lib/store";
-import {
-  ACCEPTED_UPLOAD,
-  MAX_ATTACHMENTS,
-  useUploadFile,
-  type PendingAttachment,
-} from "@/lib/upload";
+import { ACCEPTED_UPLOAD, MAX_ATTACHMENTS } from "@/lib/upload";
 import { audioCapturePreferences } from "@/lib/audioPreferences";
+import { usePendingAttachments } from "@/lib/usePendingAttachments";
+import { PendingAttachments } from "./PendingAttachments";
 import { cn } from "@/lib/utils";
 import { readableError } from "@/lib/errors";
 import { toast } from "sonner";
@@ -84,6 +81,8 @@ export function Composer({
   mentionRoles?: MentionRole[];
   allowMassMentions?: boolean;
 }) {
+  const me = useQuery(api.users.me);
+  const maxCharacters = messageLimit(me);
   const draftKey = `${containerType}:${containerId}`;
   const draft = useUiStore((state) => state.drafts[draftKey] ?? "");
   const setDraft = useUiStore((state) => state.setDraft);
@@ -110,11 +109,13 @@ export function Composer({
       ? { channelId: containerId as Id<"channels"> }
       : "skip",
   );
-  const upload = useUploadFile();
+  const uploads = usePendingAttachments(draftKey);
+  const attachments = uploads.attachments;
+  const uploading = uploads.files.filter(
+    (item) => item.status === "uploading",
+  ).length;
   const convex = useConvex();
   const registerGifShare = useAction(api.gifs.registerShare);
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-  const [uploading, setUploading] = useState(0);
   const [busy, setBusy] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
@@ -290,7 +291,11 @@ export function Composer({
   const send = async () => {
     const content = draft.trim();
     if (!content && attachments.length === 0) return;
-    if (busy) return;
+    if (busy || recording || uploads.pending) return;
+    if (content.length > maxCharacters) {
+      toast.error(`Messages are limited to ${maxCharacters} characters.`);
+      return;
+    }
     setBusy(true);
     const clientId = crypto.randomUUID();
     try {
@@ -351,7 +356,7 @@ export function Composer({
       }
       setDraft(draftKey, "");
       setMentionQuery(null);
-      setAttachments([]);
+      uploads.clear();
       onCancelReply();
       onSent?.();
       textareaRef.current?.focus();
@@ -362,26 +367,7 @@ export function Composer({
     }
   };
 
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files || files.length === 0) return;
-    const room = MAX_ATTACHMENTS - attachments.length;
-    if (room <= 0) {
-      toast.error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
-      return;
-    }
-    const chosen = Array.from(files).slice(0, room);
-    setUploading((count) => count + chosen.length);
-    for (const file of chosen) {
-      try {
-        const stored = await upload(file);
-        setAttachments((state) => [...state, stored]);
-      } catch (error) {
-        toast.error(readableError(error, "Upload failed."));
-      } finally {
-        setUploading((count) => count - 1);
-      }
-    }
-  };
+  const addFiles = uploads.addFiles;
 
   const clearRecordingTimers = () => {
     if (recordingIntervalRef.current !== null) {
@@ -495,8 +481,17 @@ export function Composer({
     <div
       className="bg-transparent px-3 pb-4 pt-2 sm:px-5"
       data-kyro-update-blocked={Boolean(
-        draft || reply || attachments.length || uploading || busy || recording,
+        draft || reply || uploads.files.length || busy || recording,
       )}
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        if (event.dataTransfer.files.length) {
+          event.preventDefault();
+          if (!busy && !recording) addFiles(event.dataTransfer.files);
+        }
+      }}
     >
       {containerType === "channel" && (
         <BotInteractionResponses channelId={containerId as Id<"channels">} />
@@ -533,40 +528,12 @@ export function Composer({
         </div>
       )}
 
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 rounded-t-lg border border-b-0 border-border/70 bg-surface p-2">
-          {attachments.map((attachment) => (
-            <span
-              key={attachment.storageId}
-              className="flex items-center gap-2 rounded-md border border-border/70 bg-panel px-2 py-1 text-xs"
-            >
-              <span className="max-w-40 truncate">{attachment.name}</span>
-              <span className="text-muted-foreground">
-                {formatBytes(attachment.size)}
-              </span>
-              <button
-                type="button"
-                aria-label={`Remove ${attachment.name}`}
-                onClick={() =>
-                  setAttachments((state) =>
-                    state.filter(
-                      (item) => item.storageId !== attachment.storageId,
-                    ),
-                  )
-                }
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <X className="size-3.5" />
-              </button>
-            </span>
-          ))}
-          {uploading > 0 && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              Uploading {uploading}…
-            </span>
-          )}
-        </div>
-      )}
+      <PendingAttachments
+        files={uploads.files}
+        busy={busy}
+        onRemove={uploads.remove}
+        onRetry={uploads.retry}
+      />
 
       {recording && (
         <div className="mb-1 flex items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs">
@@ -587,7 +554,7 @@ export function Composer({
       <div
         className={cn(
           "relative flex flex-wrap items-end gap-1 rounded-2xl border border-border bg-panel px-2.5 py-2 shadow-[0_4px_20px_rgba(0,0,0,.08)] transition-shadow focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/10 sm:flex-nowrap",
-          (attachments.length > 0 || reply) && "rounded-t-none",
+          reply && "rounded-t-none",
         )}
       >
         <label
@@ -599,6 +566,7 @@ export function Composer({
             type="file"
             multiple
             accept={ACCEPTED_UPLOAD}
+            disabled={busy || recording}
             aria-label="Attach files"
             className="sr-only"
             onChange={(event) => {
@@ -918,7 +886,7 @@ export function Composer({
           disabled={
             busy ||
             recording ||
-            uploading > 0 ||
+            uploads.pending ||
             (!draft.trim() && attachments.length === 0)
           }
           aria-label="Send message"

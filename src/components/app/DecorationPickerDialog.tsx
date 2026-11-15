@@ -1,4 +1,5 @@
-import { useMutation } from "convex/react";
+import type { Id } from "@/convex/_generated/dataModel";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useDeferredValue, useState } from "react";
 import { Check, Loader2, Search, Sparkles, X } from "@/components/icons";
 import { ProfileDecorationLayer } from "@/components/app/DecorationArt";
@@ -36,11 +37,22 @@ export function DecorationPickerDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const update = useMutation(api.users.updateProfile);
+
+  const equip = useMutation(api.communityDecorations.equip);
   const [selected, setSelected] = useState<string | null>(current ?? null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
+  const {
+    results: community,
+    status: communityStatus,
+    loadMore,
+  } = usePaginatedQuery(
+    api.communityDecorations.gallery,
+    { kind, term: deferredQuery || undefined },
+    { initialNumItems: 40 },
+  );
   const source = kind === "avatar" ? AVATAR_DECORATIONS : PROFILE_DECORATIONS;
   const items = source.filter((item) => {
     if (filter === "animated" && !item.animated) return false;
@@ -56,10 +68,21 @@ export function DecorationPickerDialog({
       ? findAvatarDecoration(selected)
       : findProfileDecoration(selected);
 
+  const equippedCommunity = useQuery(
+    api.communityDecorations.get,
+    selected?.startsWith("community:")
+      ? { id: selected.slice(10) as Id<"communityDecorations"> }
+      : "skip",
+  );
+  const selectedCommunity =
+    community?.find((item) => `community:${item._id}` === selected) ??
+    equippedCommunity;
   const apply = async () => {
     setBusy(true);
     try {
-      if (kind === "avatar") {
+      if (selected?.startsWith("community:")) {
+        await equip({ id: selected.slice(10) as Id<"communityDecorations"> });
+      } else if (kind === "avatar") {
         await update({ avatarDecoration: selected });
       } else {
         await update({ profileDecoration: selected });
@@ -123,6 +146,71 @@ export function DecorationPickerDialog({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <h3 className="mb-3 text-sm font-semibold">
+                Community decorations
+              </h3>
+              <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {community
+                  ?.filter(
+                    (item) =>
+                      item.kind === kind &&
+                      (filter === "all" ||
+                        item.animated === (filter === "animated")) &&
+                      `${item.name} ${item.description}`
+                        .toLowerCase()
+                        .includes(deferredQuery),
+                  )
+                  .map((item) => (
+                    <button
+                      key={item._id}
+                      type="button"
+                      onClick={() => setSelected(`community:${item._id}`)}
+                      className={cn(
+                        "rounded-xl border bg-surface p-3 text-left",
+                        selected === `community:${item._id}`
+                          ? "border-primary ring-1 ring-primary"
+                          : "border-border",
+                      )}
+                    >
+                      {item.url && (
+                        <img
+                          src={item.url}
+                          alt=""
+                          loading="lazy"
+                          className="h-20 w-full object-contain"
+                        />
+                      )}
+                      <span className="mt-2 block text-sm font-semibold">
+                        {item.name}
+                      </span>
+                      <span className="mt-1 block text-[10px] text-primary">
+                        Community · {item.animated ? "Animated" : "Static"}
+                      </span>
+                    </button>
+                  ))}
+              </div>
+              {community?.filter((item) => item.kind === kind).length === 0 && (
+                <p className="mb-4 text-xs text-muted-foreground">
+                  Approved community artwork will appear here. Submit your own
+                  in the Decoration Workshop.
+                </p>
+              )}
+              {(communityStatus === "CanLoadMore" ||
+                communityStatus === "LoadingMore") && (
+                <Button
+                  className="mb-4"
+                  variant="outline"
+                  disabled={communityStatus === "LoadingMore"}
+                  onClick={() => loadMore(40)}
+                >
+                  {communityStatus === "LoadingMore"
+                    ? "Loading…"
+                    : "Load more community decorations"}
+                </Button>
+              )}
+              <h3 className="mb-3 text-sm font-semibold">
+                Kyro originals · 200 styles
+              </h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                 <button
                   type="button"
@@ -206,13 +294,20 @@ export function DecorationPickerDialog({
             {kind === "avatar" ? (
               <div className="flex flex-1 items-center justify-center py-10">
                 <UserAvatar
-                  user={{ ...user, avatarDecoration: selected }}
+                  user={{
+                    ...user,
+                    avatarDecoration: selected,
+                    avatarDecorationUrl: selectedCommunity?.url,
+                  }}
                   size="2xl"
                 />
               </div>
             ) : (
               <div className="relative my-6 min-h-72 overflow-hidden rounded-2xl border border-border/70 bg-gradient-to-br from-primary/35 via-panel to-background p-5 shadow-lg">
-                <ProfileDecorationLayer decorationId={selected} />
+                <ProfileDecorationLayer
+                  decorationId={selected}
+                  imageUrl={selectedCommunity?.url}
+                />
                 <div className="relative z-10">
                   <UserAvatar user={user} size="lg" />
                   <p className="mt-4 text-lg font-bold">{user.name}</p>
@@ -228,10 +323,13 @@ export function DecorationPickerDialog({
             )}
             <div className="rounded-xl border border-border/70 bg-surface p-3">
               <p className="text-sm font-semibold">
-                {selectedItem?.label ?? "No decoration"}
+                {selectedCommunity?.name ??
+                  selectedItem?.label ??
+                  "No decoration"}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                {selectedItem?.description ??
+                {selectedCommunity?.description ??
+                  selectedItem?.description ??
                   "Keep the original Kyro profile appearance."}
               </p>
               {selectedItem && (

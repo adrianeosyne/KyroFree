@@ -1,11 +1,12 @@
+import { uploadLimit } from "../lib/entitlements";
 import { v } from "convex/values";
 import { mutation } from "./functions";
 import { requireProfile } from "./lib";
 import {
-  MAX_UPLOAD_BYTES,
   deleteStorageObjectIfPresent,
   isAllowedUploadType,
   uploadByStorageId,
+  deleteUnclaimedUpload,
 } from "./uploadSecurity";
 
 /**
@@ -31,7 +32,8 @@ export const registerUpload = mutation({
     name: v.string(),
   },
   handler: async (ctx, { storageId, name }) => {
-    const { id } = await requireProfile(ctx);
+    const { id, user } = await requireProfile(ctx);
+    const limit = uploadLimit(user);
     const existing = await uploadByStorageId(ctx, storageId);
     if (existing) {
       if (existing.ownerId !== id) {
@@ -48,11 +50,11 @@ export const registerUpload = mutation({
     const metadata = await ctx.db.system.get("_storage", storageId);
     if (!metadata) throw new Error("That upload no longer exists.");
     const mimeType = metadata.contentType ?? "application/octet-stream";
-    if (metadata.size > MAX_UPLOAD_BYTES || !isAllowedUploadType(mimeType)) {
+    if (metadata.size > limit || !isAllowedUploadType(mimeType)) {
       await deleteStorageObjectIfPresent(ctx, storageId);
       throw new Error(
-        metadata.size > MAX_UPLOAD_BYTES
-          ? "That file is larger than the 10 MB upload limit."
+        metadata.size > limit
+          ? "That file exceeds your current upload limit."
           : "That file type is not allowed.",
       );
     }
@@ -66,5 +68,13 @@ export const registerUpload = mutation({
       createdAt: Date.now(),
     });
     return { storageId, name: cleanName, size: metadata.size, mimeType };
+  },
+});
+
+export const discard = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => {
+    const { id } = await requireProfile(ctx);
+    await deleteUnclaimedUpload(ctx, id, storageId);
   },
 });

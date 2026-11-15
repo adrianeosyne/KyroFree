@@ -1,0 +1,19 @@
+export const WORKSPACE_DEFAULTS = {
+  background: "#0c0d14",
+  panel: "#151724",
+  accent: "#9580ff",
+  text: "#eef0ff",
+  radius: 14,
+  sidebarWidth: 240,
+  panelOpacity: 95,
+  backgroundOpacity: 18,
+  backgroundBlur: 0,
+  font: "system",
+  spacing: 100,
+  borderWidth: 1,
+  shadow: 20,
+  backgroundPosition: "center",
+  backgroundFit: "cover",
+  contrast: 100,
+};
+export type WorkspaceTheme = typeof WORKSPACE_DEFAULTS;

@@ -1,3 +1,4 @@
+import { checkFeatures } from "../tests/ui/feature-checks.mjs";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -69,6 +70,7 @@ try {
   ).toBeVisible({ timeout: 120000 });
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
   await checkSettings(page, context);
+  await checkFeatures(page);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();

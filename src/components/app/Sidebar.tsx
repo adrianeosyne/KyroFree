@@ -1,3 +1,4 @@
+import { CommunityHubDialog } from "./CommunityHub";
 import { useMutation, useQuery } from "convex/react";
 import {
   Bell,
@@ -24,6 +25,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  MessageCircle,
 } from "@/components/icons";
 import { useMemo, useState } from "react";
 import {
@@ -78,7 +80,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
+    <div className="kyro-sidebar flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -119,6 +121,9 @@ function ServerSection({ serverId }: { serverId: string }) {
   const navigate = useNavigate();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [hubSection, setHubSection] = useState<"events" | "tickets" | null>(
+    null,
+  );
   const [nicknameOpen, setNicknameOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const activeTextChannel = useMatch("/dashboard/s/:serverId/c/:channelId");
@@ -278,6 +283,14 @@ function ServerSection({ serverId }: { serverId: string }) {
               >
                 <Copy className="size-4" /> Copy server ID
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setHubSection("events")}>
+                <Users className="size-4" />
+                Events & supercharge
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setHubSection("tickets")}>
+                <MessageCircle className="size-4" />
+                Support tickets
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setNicknameOpen(true)}>
                 <Pencil className="size-4" /> Change nickname
               </DropdownMenuItem>
@@ -426,6 +439,13 @@ function ServerSection({ serverId }: { serverId: string }) {
         onOpenChange={setCreateOpen}
         categories={listing.categories}
       />
+      {hubSection && (
+        <CommunityHubDialog
+          serverId={serverId}
+          section={hubSection}
+          onClose={() => setHubSection(null)}
+        />
+      )}
       <NicknameDialog
         serverId={serverId}
         currentNickname={server.nickname ?? ""}

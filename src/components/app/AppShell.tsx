@@ -1,5 +1,7 @@
+import { WorkspaceAppearance } from "./WorkspaceStudio";
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Home, Loader2, Menu, Search, User } from "@/components/icons";
+import { Bell, Home, Menu, Search, User } from "@/components/icons";
+import { AppLoading } from "@/components/AppLoading";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   useLocation,
@@ -23,7 +25,7 @@ import { KyroMark } from "@/components/KyroMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUiStore } from "@/lib/store";
-import { playNotificationPing } from "@/lib/sound";
+import { playNotificationPing, setNotificationSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,6 +65,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     isAuthenticated ? {} : "skip",
   );
   const mentionCount = mentionSummary?.count;
+  useEffect(() => {
+    setNotificationSound(me?.notificationSoundUrl ?? null);
+    return () => setNotificationSound(null);
+  }, [me?.notificationSoundUrl]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -176,11 +182,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [location.pathname, location.search, setMobileNav]);
 
   if (isLoading || !user) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <AppLoading label="Opening your space" />;
   }
 
   // Onboarding gate: Kyro needs a unique handle before you can talk.
@@ -253,6 +255,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </button>
       </div>
+      <WorkspaceAppearance />
       <ConnectionBanner />
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
@@ -299,7 +302,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           </header>
 
-          <main className="min-h-0 flex-1 bg-background">{children}</main>
+          <main className="min-h-0 flex-1 bg-background">
+            <div
+              key={location.pathname}
+              className="kyro-view-enter h-full min-h-0"
+            >
+              {children}
+            </div>
+          </main>
 
           {/* Phone-first dock: large touch targets, safe-area padding and one
             thumb-reachable route to every core surface. Account/status tools
@@ -373,6 +383,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
       <Inbox open={inboxOpen} onOpenChange={setInboxOpen} />
       <SettingsDialog
+        initialTab={
+          searchParams.get("settings") === "1"
+            ? "account"
+            : (searchParams.get("settings") ?? "account")
+        }
         open={settingsOpen}
         onOpenChange={(open: boolean) => {
           if (!open) {

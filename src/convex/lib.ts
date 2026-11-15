@@ -1,3 +1,4 @@
+import { hasPremium } from "../lib/entitlements";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   ALL_PERMISSIONS,
@@ -152,6 +153,10 @@ export function visiblePresence(
 }
 
 export interface PublicUser {
+  premiumUntil: number | null;
+  notificationSoundUrl: string | null;
+  avatarDecorationUrl: string | null;
+  profileDecorationUrl: string | null;
   botApplicationId?: string | null;
   id: string;
   username: string | null;
@@ -242,6 +247,7 @@ export function canViewIpDirectory(
 
 /** A platform-wide badge; never scoped to a single community. */
 export type GlobalBadge =
+  | "premium"
   | "founder"
   | "cofounder"
   | "manager"
@@ -339,6 +345,7 @@ export function isPlatformFounder(user: PlatformUser): boolean {
 export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   const isFounder = isFounderUser(user);
   const badges: GlobalBadge[] = [];
+  if (hasPremium(user)) badges.push("premium");
   // Founder badge: the founder always holds it (unless they stripped it from
   // their own profile), plus anyone the founder explicitly granted it to.
   if (
@@ -406,6 +413,21 @@ export async function hydrateUser(
       user.status !== "offline");
   const badges = globalBadgesFor(user);
   return {
+    premiumUntil: user.premiumUntil ?? null,
+    notificationSoundUrl:
+      user._id === viewerId && user.notificationSoundStorageId
+        ? await ctx.storage.getUrl(user.notificationSoundStorageId)
+        : null,
+    avatarDecorationUrl: await decorationUrl(
+      ctx,
+      user.avatarDecoration,
+      "avatar",
+    ),
+    profileDecorationUrl: await decorationUrl(
+      ctx,
+      user.profileDecoration,
+      "profile",
+    ),
     id: user._id,
     botApplicationId: user.botApplicationId ?? null,
     username: user.username ?? null,
@@ -756,4 +778,17 @@ export async function canSendDirectMessage(
     }
   }
   return { ok: true };
+}
+
+async function decorationUrl(
+  ctx: Ctx,
+  value: string | undefined,
+  kind: "avatar" | "profile",
+) {
+  if (!value?.startsWith("community:")) return null;
+  const id = ctx.db.normalizeId("communityDecorations", value.slice(10));
+  const item = id ? await ctx.db.get(id) : null;
+  return item?.status === "approved" && item.kind === kind
+    ? await ctx.storage.getUrl(item.storageId)
+    : null;
 }

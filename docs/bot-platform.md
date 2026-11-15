@@ -200,7 +200,7 @@ Private responses are stored on the interaction and queried only for the invokin
 
 API authentication is limited to **120 requests per minute per application**, including reads, polling and failed authorized operations. The authorization counter commits separately from resource mutations. Bots may send **five messages per five seconds**, and channel slow mode applies. JSON bodies are ≤64 KiB. Users may invoke ten commands/minute and submit five bot reports/hour. Limits use the backend clock; do not rely on the UI to enforce them.
 
-Current product caps: 20 applications/owner, 100 installations/application, 100 commands/application. Directory search considers the newest 500 discoverable applications and returns at most 100. Analytics count distinct member IDs from at most 5000 memberships per installed server, so users reached is bounded for very large servers. Mass mentions inspect at most 1000 memberships. These bounds are capacity controls, not claims of unlimited scale.
+Current product caps: 2 applications/free owner or 10 with active Premium, 100 installations/application, 100 commands/application. Directory search considers the newest 500 discoverable applications and returns at most 100. Analytics count distinct member IDs from at most 5000 memberships per installed server, so users reached is bounded for very large servers. Mass mentions inspect at most 1000 memberships. These bounds are capacity controls, not claims of unlimited scale.
 
 ## Events and signed webhooks
 

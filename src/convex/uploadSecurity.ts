@@ -1,3 +1,4 @@
+import { uploadLimit } from "../lib/entitlements";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { Ctx } from "./lib";
 import type { MutationCtx } from "./functions";
@@ -6,6 +7,9 @@ import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 export { MAX_UPLOAD_BYTES };
 
 export type UploadClaim =
+  | "workspace_background"
+  | "decoration"
+  | "notification_sound"
   | "message"
   | "user_avatar"
   | "user_banner"
@@ -69,8 +73,8 @@ export async function requireOwnedUpload(
       "That upload is no longer available. Please upload the file again.",
     );
   }
-  if (metadata.size > MAX_UPLOAD_BYTES) {
-    throw new Error("That file is larger than the 10 MB upload limit.");
+  if (metadata.size > uploadLimit(await ctx.db.get(ownerId))) {
+    throw new Error("That file exceeds your current upload limit.");
   }
   return upload;
 }

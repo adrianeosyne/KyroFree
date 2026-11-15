@@ -51,6 +51,7 @@ export interface Preferences {
   underlineLinks: boolean;
   noiseSuppression: boolean;
   autoGainControl: boolean;
+  customCursor: boolean;
 }
 
 const DEFAULT_PREFS: Preferences = {
@@ -75,6 +76,7 @@ const DEFAULT_PREFS: Preferences = {
   underlineLinks: false,
   noiseSuppression: true,
   autoGainControl: true,
+  customCursor: true,
 };
 
 function loadPrefs(): Preferences {
@@ -168,6 +170,7 @@ export function applyPreferences(prefs: Preferences) {
   root.dataset.accent = prefs.accent === "default" ? "" : prefs.accent;
   root.dataset.density = prefs.density;
   root.dataset.reducedMotion = String(prefs.reducedMotion);
+  root.dataset.customCursor = String(prefs.customCursor);
   root.dataset.underlineLinks = String(prefs.underlineLinks);
   root.style.setProperty("--chat-font-size", `${prefs.chatFontSize}px`);
   applyTint(prefs);
@@ -214,6 +217,7 @@ function pickPrefs(state: AppState): Preferences {
     underlineLinks: state.underlineLinks,
     noiseSuppression: state.noiseSuppression,
     autoGainControl: state.autoGainControl,
+    customCursor: state.customCursor,
   };
 }
 

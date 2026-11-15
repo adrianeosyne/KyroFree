@@ -13,6 +13,7 @@
     "test:voice": "tsx --test tests/voice/*.test.ts",
     "test:desktop": "npm --prefix desktop test",
     "test:ui": "node scripts/ui-smoke.mjs",
+    "test:features": "vitest run tests/premium",
     "test:io": "vitest run tests/io",
     "build:desktop": "npm --prefix desktop run dist:win",
     "test:bots": "npm run build:sdk && vitest run",

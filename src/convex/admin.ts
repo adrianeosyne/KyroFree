@@ -96,6 +96,7 @@ async function logAction(
 }
 
 type BadgeFlag =
+  | "premium"
   | "founder"
   | "cofounder"
   | "manager"

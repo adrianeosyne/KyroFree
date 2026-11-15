@@ -47,6 +47,11 @@ export default async function handler(
       serverUrl: credentials.url,
       token: credentials.token,
       roomName: grant.roomName,
+      screenShare: grant.screenShare ?? {
+        width: 1280,
+        height: 720,
+        frameRate: 30,
+      },
       canManage: grant.canManage,
       canPublishSources: grant.canPublishSources,
     });

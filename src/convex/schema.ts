@@ -1,3 +1,4 @@
+import { workspaceValidator } from "./workspaceSchema";
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
@@ -41,6 +42,8 @@ const schema = defineSchema(
       emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
       isAnonymous: v.optional(v.boolean()), // is the user is anonymous. do not remove
 
+      premiumUntil: v.optional(v.number()),
+      notificationSoundStorageId: v.optional(v.id("_storage")),
       role: v.optional(roleValidator), // role of the user. do not remove
 
       // --- Platform-wide (global) badges, granted by staff ---
@@ -169,6 +172,107 @@ const schema = defineSchema(
         filterFields: ["deletedAt"],
       }),
 
+    communityEvents: defineTable({
+      serverId: v.id("servers"),
+      title: v.string(),
+      description: v.string(),
+      startsAt: v.number(),
+      endsAt: v.number(),
+      location: v.string(),
+      capacity: v.number(),
+      createdBy: v.id("users"),
+      createdAt: v.number(),
+      cancelled: v.boolean(),
+    }).index("by_server", ["serverId"]),
+    eventAttendees: defineTable({
+      eventId: v.id("communityEvents"),
+      userId: v.id("users"),
+    })
+      .index("by_event", ["eventId"])
+      .index("by_user", ["userId"]),
+    supportTickets: defineTable({
+      serverId: v.id("servers"),
+      ownerId: v.id("users"),
+      title: v.string(),
+      details: v.string(),
+      category: v.union(
+        v.literal("help"),
+        v.literal("report"),
+        v.literal("idea"),
+      ),
+      status: v.union(
+        v.literal("open"),
+        v.literal("in_progress"),
+        v.literal("closed"),
+      ),
+      assignedTo: v.optional(v.id("users")),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      responses: v.array(
+        v.object({
+          userId: v.id("users"),
+          name: v.string(),
+          text: v.string(),
+          at: v.number(),
+        }),
+      ),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_owner", ["ownerId"])
+      .index("by_server_owner", ["serverId", "ownerId"]),
+    serverSupercharges: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      until: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_server", ["serverId"]),
+    workspaces: defineTable({
+      userId: v.id("users"),
+      theme: workspaceValidator,
+      backgroundStorageId: v.optional(v.id("_storage")),
+    }).index("by_user", ["userId"]),
+    premiumRequests: defineTable({
+      requesterId: v.id("users"),
+      recipientId: v.id("users"),
+      reference: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_requester", ["requesterId"])
+      .index("by_status", ["status"]),
+    communityDecorations: defineTable({
+      ownerId: v.id("users"),
+      storageId: v.id("_storage"),
+      kind: v.union(v.literal("avatar"), v.literal("profile")),
+      name: v.string(),
+      description: v.string(),
+      animated: v.boolean(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("withdrawn"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_status", ["status"])
+      .index("by_status_kind", ["status", "kind"])
+      .searchIndex("search_name", {
+        searchField: "name",
+        filterFields: ["status", "kind"],
+      }),
     userPresence: defineTable({
       userId: v.id("users"),
       lastHeartbeatAt: v.number(),
@@ -587,6 +691,9 @@ const schema = defineSchema(
           v.literal("user_banner"),
           v.literal("server_icon"),
           v.literal("server_banner"),
+          v.literal("decoration"),
+          v.literal("notification_sound"),
+          v.literal("workspace_background"),
           v.literal("server_emoji"),
           v.literal("bot_icon"),
           v.literal("bot_banner"),

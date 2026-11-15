@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     include: [
       "tests/bots/**/*.test.ts",
+      "tests/premium/**/*.test.ts",
       "tests/io/**/*.test.ts",
       "tests/email/**/*.spec.ts",
       "tests/legal/**/*.test.ts",

@@ -1,3 +1,4 @@
+import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import { mutation } from "./functions";
 import { sha256Hex } from "./sha256";
@@ -27,6 +28,9 @@ export const consume = mutation({
     }
     await ctx.db.patch(row._id, { consumedAt: now });
     return {
+      screenShare: hasPremium(await ctx.db.get(row.userId))
+        ? { width: 2560, height: 1440, frameRate: 60 }
+        : { width: 1280, height: 720, frameRate: 30 },
       roomName: row.roomName,
       identity: row.identity,
       displayName: row.displayName,

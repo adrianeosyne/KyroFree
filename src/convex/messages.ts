@@ -1,3 +1,4 @@
+import { messageLimit } from "../lib/entitlements";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./functions";
@@ -17,7 +18,6 @@ import {
   logAudit,
   markRead,
   MAX_ATTACHMENTS,
-  MAX_MESSAGE_LENGTH,
   notify,
   visiblePresence,
   isBlockedBetween,
@@ -470,9 +470,9 @@ export const send = mutation({
     const content = args.content.trim();
     const requestedRoleMentions = parseRoleMentionIds(content);
     const attachmentInputs = args.attachments ?? [];
-    if (content.length > MAX_MESSAGE_LENGTH) {
+    if (content.length > messageLimit(user)) {
       throw new Error(
-        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
+        `Messages are limited to ${messageLimit(user)} characters.`,
       );
     }
     if (attachmentInputs.length > MAX_ATTACHMENTS) {
@@ -986,7 +986,7 @@ export const send = mutation({
 export const edit = mutation({
   args: { messageId: v.id("messages"), content: v.string() },
   handler: async (ctx, { messageId, content }) => {
-    const { id: userId } = await requireActiveUser(ctx);
+    const { id: userId, user } = await requireActiveUser(ctx);
     const message = await ctx.db.get(messageId);
     if (!message) throw new Error("That message no longer exists.");
     if (message.kind === "bot_response") {
@@ -1002,9 +1002,9 @@ export const edit = mutation({
       message.containerId,
     );
     const trimmed = content.trim();
-    if (trimmed.length > MAX_MESSAGE_LENGTH) {
+    if (trimmed.length > messageLimit(user)) {
       throw new Error(
-        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
+        `Messages are limited to ${messageLimit(user)} characters.`,
       );
     }
     if (!trimmed) throw new Error("A message can't be empty.");
