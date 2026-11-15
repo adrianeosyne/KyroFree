@@ -12,10 +12,7 @@ export type LegalPolicy = {
   sections: LegalSection[];
 };
 
-export const LEGAL_UPDATED = {
-  date: "2026-11-14",
-  label: "November 14, 2026",
-};
+export { LEGAL_POLICY_UPDATED } from "./legalPolicies";
 
 export const TERMS: LegalSection[] = [
   {
@@ -26,10 +23,45 @@ export const TERMS: LegalSection[] = [
     ],
   },
   {
-    heading: "Free access and funding",
+    heading: "Free access, Premium and funding",
     body: [
-      "Kyro is completely free. There are no paid plans, subscriptions, premium tiers or paywalled features, and Kyro will not charge for the features that exist today.",
-      "Limited banner advertisements can support operating costs. Independent costs, such as your internet connection or a third-party service you choose to visit, remain arrangements between you and that provider.",
+      "Kyro offers free core community, messaging, voice and moderation features alongside an optional paid Premium plan. Premium currently costs US$1.99 per month, delivered as 30 days of access for each approved payment. Some enhanced sharing, customization and HQ features require active Premium.",
+      "Optional Premium payments and limited banner advertisements can support operating costs. Your internet connection, payment-provider charges and other third-party services remain arrangements between you and the relevant provider.",
+    ],
+  },
+  {
+    heading: "Premium purchases and manual approval",
+    body: [
+      "Before paying, review the current Premium benefits, price and manual payment instructions in user settings, and contact adrianeosyne for any missing payment details. Kyro currently uses manual payment followed by founder approval; there is no automatic card checkout or automatic recurring charge.",
+      "After paying, submit the transaction reference for your account or the gift recipient you selected. A pending request does not activate Premium. Only the configured founder account, adrianeosyne, can confirm payment and grant or revoke Premium; a badge, role or claim made by another account does not give that authority.",
+    ],
+  },
+  {
+    heading: "Premium duration, renewals and gifts",
+    body: [
+      "An approved payment adds 30 days of Premium to the recipient account. If Premium is already active, the new period extends the remaining time; otherwise it starts on approval. A gift applies to the member selected in the request, so check the recipient before submitting.",
+      "Renewal requires another manual payment and approval. Kyro does not automatically renew Premium or debit a saved payment method. You can stop renewing by making no further payment; the current period ends at the expiry shown in settings. Check the displayed price and payment instructions before each renewal.",
+    ],
+  },
+  {
+    heading: "Premium benefits, limits and expiry",
+    body: [
+      "Premium offers the benefits described in settings, including larger uploads, higher screen-sharing targets, longer messages, additional bot applications, workspace customization and HQ access. Paid benefits remain subject to community permissions, supported devices, network conditions, moderation and platform rules. Target resolution, frame rate and voice bitrate are not guarantees of achieved media quality.",
+      "When Premium expires or is revoked, Premium-only access and customization stop applying and the current free limits apply to new activity. Existing bot applications and supported content can remain, but their continued presence does not grant Premium limits. One included server supercharge benefits one selected community while the supporting Premium entitlement is active; moving it transfers those benefits.",
+    ],
+  },
+  {
+    heading: "Payment problems and refund requests",
+    body: [
+      "Contact support@kyro-chat.cyou or adrianeosyne about a duplicate or mistaken payment, an activation problem, a refund request or a dispute. Provide the relevant Kyro account, transaction reference and a concise explanation. Do not send card security codes, banking passwords, account credentials or unrelated financial information.",
+      "Payments and refunds are handled manually through the payment method used; Kyro currently has no automatic refund workflow. Requests are reviewed using the payment evidence and applicable consumer protections. Nothing in these terms removes a mandatory refund, withdrawal or other consumer right, and an unapproved request is not proof that a payment has been accepted.",
+    ],
+  },
+  {
+    heading: "Community artwork and priority reviews",
+    body: [
+      "Submit only original avatar or profile decorations that you created and have the right to publish. Kyro records the submitting account and reviews static or animated artwork before approved items appear in the community collection. Retaining copyright does not authorize copying another creator's work for submission.",
+      "Premium may give creator-verification and bot-directory submissions priority in the review queue. Priority does not guarantee approval, a response time or an exception to the same ownership, identity, safety and permission checks. Paid membership does not grant staff authority or bypass moderation.",
     ],
   },
   {
@@ -189,7 +221,7 @@ export const TERMS: LegalSection[] = [
   {
     heading: "Advertising placements",
     body: [
-      "Where enabled, clearly identified banner advertisements help fund the free service. Advertising providers may handle device and request information as explained in the Privacy Policy and their own policies.",
+      "Where enabled, clearly identified banner advertisements help fund Kyro alongside optional Premium payments. Advertising providers may handle device and request information as explained in the Privacy Policy and their own policies.",
       "An advertisement is separate from Kyro's community content and does not represent an endorsement. Any purchase or account you create with an advertiser is an arrangement with that advertiser.",
     ],
   },
@@ -320,6 +352,27 @@ export const PRIVACY: LegalSection[] = [
     body: [
       "Kyro stores your account email, username and records needed for registration and sign-in. Registration also records the accepted Terms, Privacy and Copyright versions and the server-recorded acceptance time to document requirements, respond to disputes and meet legal obligations.",
       "Your account email and policy-acceptance records are not public profile fields; acceptance records are included in your private account export. If you post an email in a message or biography, it becomes visible to that content's audience.",
+    ],
+  },
+  {
+    heading: "Premium requests and payment information",
+    body: [
+      "For manual Premium requests, Kyro stores the requester and recipient account identifiers, the transaction reference you submit, request status, submission and review times, the reviewer identifier and any review note. Your account also stores Premium expiry and badge-visibility preferences; grant and revocation actions create administrative audit records.",
+      "These records are used to confirm payment, activate gifts and renewals, enforce limits, handle payment issues and investigate misuse. The Premium request flow requires a transaction reference rather than full card details or banking credentials. A payment provider handles the payment under its own terms and privacy policy; Kyro receives the reference and any relevant confirmation you or the founder supply.",
+    ],
+  },
+  {
+    heading: "Payment records and Premium visibility",
+    body: [
+      "Your submitted payment requests and references are available through your private account history and the founder approval controls. Authorized platform staff can access relevant grant and review audit entries or support records according to their permissions. Other members are not given your transaction reference through public profile or community features.",
+      "Member and profile responses can expose Premium status and expiry. Premium badges, HQ roles and server supporter listings can also reveal membership or support. Hiding the Premium badge does not hide every role, supporter entry or entitlement signal. Payment references are not used as advertising content or to build advertising profiles.",
+    ],
+  },
+  {
+    heading: "Custom artwork, workspace and sound uploads",
+    body: [
+      "Kyro stores uploaded avatars, profile artwork, workspace backgrounds and notification audio, together with associated file metadata and customization settings. Community decoration submissions also include descriptions, ownership confirmations, animation status and staff review records. Creator and bot-review requests include submitted evidence, priority, status and feedback.",
+      "Approved community artwork appears in the shared decoration collection and can be equipped by other members. Submission history and review details are available to the submitting member and authorized reviewers. Workspace backgrounds and notification sounds are used for your selected appearance and playback features; their infrastructure providers handle the stored files as described in this policy.",
     ],
   },
   {
@@ -473,7 +526,7 @@ export const PRIVACY: LegalSection[] = [
     heading: "Purposes for using information",
     body: [
       "Kyro uses information to create accounts, deliver conversations, apply permissions, coordinate calls, support communities and operate integrations. It also uses relevant records to maintain reliability, handle support and investigate platform issues.",
-      "Limited advertising supports the free service. Different purposes require different information: delivering a direct message needs its content and audience, while a theme preference helps display the interface you selected.",
+      "Optional Premium payments and limited advertising support Kyro. Payment references and entitlement records support purchase approval and paid access. Different purposes require different information: delivering a direct message needs its content and audience, while a theme preference helps display the interface you selected.",
     ],
   },
   {
@@ -514,7 +567,7 @@ export const PRIVACY: LegalSection[] = [
   {
     heading: "How long information is kept",
     body: [
-      "Account and content records are generally kept while needed to provide the service or maintain the relevant community. Security, delivery, support and enforcement records can have different lifetimes based on their purpose and applicable obligations.",
+      "Account and content records are generally kept while needed to provide the service or maintain the relevant community. Payment-review, entitlement, security, delivery, support and enforcement records can have different lifetimes based on their purpose and applicable obligations.",
       "This policy does not promise one fixed retention period for every record. Information should not be kept longer than its legitimate purpose requires; ask support about a particular category if its retention matters to your request.",
     ],
   },
@@ -535,7 +588,7 @@ export const PRIVACY: LegalSection[] = [
   {
     heading: "Access and data portability",
     body: [
-      "You can download a self-service export from account settings. It includes selected profile, relationship, community, message, notification and security-summary information; the current export includes up to 5,000 messages and 1,000 notifications.",
+      "You can download a self-service export from account settings. It includes selected profile, relationship, community, message, notification and security-summary information; the current export also includes Premium expiry, submitted payment requests and creator or bot-review requests, alongside up to 5,000 messages and 1,000 notifications.",
       "The export does not necessarily contain every attachment or record type. Contact support for a broader access or portability request where applicable, and store exported files securely because they can reveal personal information.",
     ],
   },

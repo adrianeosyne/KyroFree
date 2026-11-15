@@ -605,7 +605,8 @@ export default function Landing() {
               </h1>
               <p className="mx-auto mt-7 max-w-2xl text-pretty text-base leading-7 text-white/80 sm:text-xl sm:leading-8">
                 Group chat, voice rooms, forums, bots and community tools in one
-                place built for hanging out—not upgrading a subscription.
+                place with free core features and optional Premium for $1.99 per
+                month.
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
@@ -665,7 +666,7 @@ export default function Landing() {
             Made for the group chat
           </p>
           <h2 className="mt-5 text-balance text-4xl font-black uppercase leading-[0.92] tracking-[-0.045em] text-[#17182b] sm:text-6xl lg:text-7xl">
-            Hang out without hitting a paywall
+            Hang out free. Get more with Premium.
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#606378] sm:text-lg sm:leading-8">
             Chat, voice, moderation and everyday customization stay free.

@@ -2,7 +2,7 @@
   "id": "/dashboard",
   "name": "Kyro",
   "short_name": "Kyro",
-  "description": "Free communities, chat, voice, forums and moderation.",
+  "description": "Communities, chat, voice, forums and moderation with free core features and optional Premium.",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

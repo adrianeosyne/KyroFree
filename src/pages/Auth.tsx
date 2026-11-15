@@ -692,7 +692,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                 </CardContent>
               </form>
               <div className="rounded-b-lg border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
-                Kyro is free forever ·{" "}
+                Free core features · optional Premium ·{" "}
                 <Link
                   to="/terms"
                   className="underline transition-colors hover:text-primary"

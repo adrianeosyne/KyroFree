@@ -2,12 +2,13 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router";
 import {
   LEGAL_POLICIES,
-  LEGAL_UPDATED,
+  LEGAL_POLICY_UPDATED,
   type LegalPolicy,
 } from "@/lib/legalContent";
 import { COPYRIGHT_OWNER, LEGAL_POLICY_VERSIONS } from "@/lib/legalPolicies";
 
 function LegalPage({ policy }: { policy: LegalPolicy }) {
+  const updated = LEGAL_POLICY_UPDATED[policy.slug];
   const { hash } = useLocation();
 
   useEffect(() => {
@@ -54,8 +55,7 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
       >
         <h1 className="text-3xl font-bold tracking-tight">{policy.title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Last updated{" "}
-          <time dateTime={LEGAL_UPDATED.date}>{LEGAL_UPDATED.label}</time>
+          Last updated <time dateTime={updated.date}>{updated.label}</time>
           <span aria-hidden="true"> · </span>
           {policy.sections.length} explained sections
         </p>
@@ -149,7 +149,8 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
             Keep passwords and recovery codes private.
           </p>
           <p className="mt-3">
-            Kyro is free for everyone, with no paid tiers or paywalled features.
+            Kyro offers free core features and optional Premium for $1.99 per
+            month, with manual payment and founder approval.
           </p>
         </aside>
 
@@ -174,13 +175,13 @@ export function LegalPolicyContent({
   policy: LegalPolicy["slug"];
 }) {
   const document = LEGAL_POLICIES.find((item) => item.slug === policy)!;
+  const updated = LEGAL_POLICY_UPDATED[policy];
   return (
     <article className="space-y-6 text-sm leading-6">
       <div>
         <h2 className="text-xl font-bold">{document.title}</h2>
         <p className="mt-1 text-muted-foreground">
-          Last updated {LEGAL_UPDATED.label} · Version{" "}
-          {LEGAL_POLICY_VERSIONS[policy]}
+          Last updated {updated.label} · Version {LEGAL_POLICY_VERSIONS[policy]}
         </p>
         <p className="mt-3 text-muted-foreground">{document.intro}</p>
       </div>

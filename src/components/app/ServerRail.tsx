@@ -436,8 +436,8 @@ function DiscoverDialog({
         <DialogHeader>
           <DialogTitle>Explore communities</DialogTitle>
           <DialogDescription>
-            Public Kyro communities you can join right now — all free, no
-            invites required.
+            Join public Kyro communities for free, without an invite. Optional
+            Premium adds enhanced sharing and customization.
           </DialogDescription>
         </DialogHeader>
         <Input
