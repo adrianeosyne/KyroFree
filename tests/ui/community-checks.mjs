@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { checkBadges } from "./badge-checks.mjs";
+import { checkGiftExperience } from "./gift-checks.mjs";
 import assert from "node:assert/strict";
 const base = "http://127.0.0.1:5187";
 async function go(page, path) {
@@ -254,9 +255,7 @@ export async function checkCommunity(page) {
     });
   });
   await go(page, "/dashboard/admin");
-  await page
-    .getByRole("button", { name: "Premium", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Premium", exact: true }).click();
   await page.getByLabel("Premium code duration").selectOption("365");
   await page
     .getByRole("button", { name: "Generate Premium code", exact: true })
@@ -320,6 +319,7 @@ export async function checkCommunity(page) {
     animations: "disabled",
   });
   await checkBadges(page);
+  await checkGiftExperience(page);
   await page.goto(`${base}/dashboard`);
   console.log(
     "PASS: Premium redemption, gift recipient, since tooltip, chat background, lobby editing and routing, mobile layout, Shards and founder code generation",

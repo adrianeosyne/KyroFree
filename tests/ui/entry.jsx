@@ -4,6 +4,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import Dashboard from "@/pages/Dashboard";
+import GiftRoute from "@/pages/Gift";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUiStore } from "@/lib/store";
 import { GifterBadge } from "@/components/app/PremiumBadge";
@@ -18,6 +19,8 @@ createRoot(document.getElementById("root")).render(
     <SiteMotion>
       <TooltipProvider>
         <Routes>
+          <Route path="/auth" element={<p>Sign in fixture</p>} />
+          <Route path="/gift/:code" element={<GiftRoute />} />
           <Route
             path="/dashboard/badge-preview"
             element={

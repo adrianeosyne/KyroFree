@@ -232,6 +232,11 @@ const data = {
   "notifications:unreadCount": 2,
   "notifications:mentionSummary": { count: 0, latestCreationTime: null },
   "notifications:list": empty,
+  "notifications:pendingPremiumGifts": [],
+  "premiumCodes:giftPreview": {
+    valid: false,
+    reason: "This gift has already been claimed.",
+  },
   "voice:incoming": empty,
   "voice:currentCall": null,
   "messages:typingList": empty,
@@ -387,6 +392,16 @@ export function useMutation(reference) {
           ),
         );
       if (name === "premiumCodes:redeem") {
+        if (args.fromGiftLink)
+          window.setFixtureData("notifications:pendingPremiumGifts", [
+            {
+              id: "gift-note",
+              days: 90,
+              premiumUntil: Date.now() + 90 * 86400000,
+              senderName: "Maya Chen",
+              senderUsername: "maya_chen",
+            },
+          ]);
         if (!args.recipientId)
           window.setFixtureData("premium:status", {
             ...data["premium:status"],
@@ -394,8 +409,26 @@ export function useMutation(reference) {
             premiumSince: Date.now(),
             premiumStreakSince: Date.now(),
           });
-        return { ok: true, days: 30, premiumUntil: Date.now() + 30 * 86400000 };
+        return {
+          ok: true,
+          days: 30,
+          premiumUntil: Date.now() + 30 * 86400000,
+          giftReceived: args.fromGiftLink === true,
+        };
       }
+      if (name === "premiumCodes:shareGift")
+        return {
+          ok: true,
+          link: "https://kyro-chat.cyou/gift/KYRO-ABCD-EFGH-ABCD",
+          days: 90,
+        };
+      if (name === "notifications:markRead")
+        window.setFixtureData(
+          "notifications:pendingPremiumGifts",
+          data["notifications:pendingPremiumGifts"].filter(
+            (gift) => !args.ids.includes(gift.id),
+          ),
+        );
       if (name === "lobby:save") {
         window.setFixtureData("lobby:get", {
           ...data["lobby:get"],
@@ -417,7 +450,7 @@ export function useMutation(reference) {
 export const useAction = useMutation;
 const client = { query: async () => empty, mutation: async () => null };
 export const useConvex = () => client;
-export const useConvexAuth = () => ({
-  isLoading: false,
-  isAuthenticated: true,
-});
+export const useConvexAuth = () => {
+  useSyncExternalStore(subscribe, () => fixtureRevision);
+  return { isLoading: false, isAuthenticated: !data["fixture:signedOut"] };
+};

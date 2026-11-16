@@ -19,7 +19,11 @@ const server = await createServer({
       name: "ui-fixture",
       configureServer(server) {
         server.middlewares.use((req, _res, next) => {
-          if (req.url?.startsWith("/dashboard"))
+          if (
+            req.url?.startsWith("/dashboard") ||
+            req.url?.startsWith("/gift/") ||
+            req.url?.startsWith("/auth")
+          )
             req.url = "/tests/ui/index.html";
           next();
         });

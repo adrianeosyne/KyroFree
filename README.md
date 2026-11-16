@@ -107,6 +107,22 @@ The first command previews the account. The second uses the deployed founder
 controls and verifies that Premium, its badge and the Premium HQ role are gone.
 It checks the configured account's username and active status before changing it.
 
+## Premium gifts
+
+In Settings → Premium, enter an unused redeem code and choose **Create gift
+link**. Share the resulting `https://kyro-chat.cyou/gift/<code>` link. The first
+signed-in member to claim it receives its full duration; existing Premium time
+is preserved. The same code or gift URL can also be redeemed in Premium settings.
+
+Recipients receive a popup showing who sent the gift and its duration. Gifts
+remain pending while offline or using another dialog, until acknowledged.
+The sender's gift count increases only after a successful claim. Code generation
+remains founder-only, and full codes are not stored in the database.
+
+Profiles display one Premium tier beside the name. Premium is excluded from
+the general badge tray, and tier tooltips show membership history without
+assignment attribution.
+
 ## Password reset
 
 Codes are hashed with a deployment pepper before storage. Set

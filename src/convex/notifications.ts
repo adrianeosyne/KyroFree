@@ -7,6 +7,28 @@ import {
   requireUser,
 } from "./lib";
 
+/** Gifts remain pending across sessions until the recipient dismisses them. */
+export const pendingPremiumGifts = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const notes = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread_type", (q) =>
+        q.eq("userId", id).eq("read", false).eq("type", "premium_gift"),
+      )
+      .order("asc")
+      .take(20);
+    return notes.map((note) => ({
+      id: note._id,
+      days: note.giftDays ?? 30,
+      premiumUntil: note.giftPremiumUntil ?? null,
+      senderName: note.giftSenderName ?? "A Kyro member",
+      senderUsername: note.giftSenderUsername ?? null,
+    }));
+  },
+});
+
 /** Notification inbox for the signed-in user. */
 export const list = query({
   args: { limit: v.optional(v.number()) },

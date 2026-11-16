@@ -1,11 +1,12 @@
 import { v } from "convex/values";
-import { mutation, query, type MutationCtx } from "./functions";
+import { mutation, query, type MutationCtx, type QueryCtx } from "./functions";
 import { paginationOptsValidator } from "convex/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { isFounderUser, requireActiveUser } from "./lib";
 import { sha256Hex } from "./sha256";
-import { extendPremium, syncPremiumAccess } from "./premium";
+import { extendPremium, syncPremiumAccess, recordPremiumGift } from "./premium";
 import { PREMIUM_DURATIONS, DAY_MS } from "../lib/premiumProgress";
+import { normalizePremiumCode, premiumGiftLink } from "../lib/premiumGifts";
 
 async function createCodes(
   ctx: MutationCtx,
@@ -222,53 +223,124 @@ export const revoke = mutation({
     });
   },
 });
-export const redeem = mutation({
-  args: { code: v.string(), recipientId: v.optional(v.id("users")) },
+async function consumeCodeAttempt(ctx: MutationCtx, id: Id<"users">) {
+  const now = Date.now();
+  const attempt = await ctx.db
+    .query("premiumCodeAttempts")
+    .withIndex("by_user", (q) => q.eq("userId", id))
+    .unique();
+  if (attempt && now - attempt.windowStart < 60000 && attempt.count >= 5)
+    return false;
+  if (attempt)
+    await ctx.db.patch(attempt._id, {
+      windowStart:
+        now - attempt.windowStart < 60000 ? attempt.windowStart : now,
+      count: now - attempt.windowStart < 60000 ? attempt.count + 1 : 1,
+    });
+  else
+    await ctx.db.insert("premiumCodeAttempts", {
+      userId: id,
+      windowStart: now,
+      count: 1,
+    });
+  return true;
+}
+
+async function availableCode(ctx: MutationCtx | QueryCtx, input: string) {
+  const code = normalizePremiumCode(input);
+  if (!code)
+    return {
+      ok: false as const,
+      error: "Enter a code in the format KYRO-XXXX-XXXX-XXXX.",
+    };
+  const row = await ctx.db
+    .query("premiumCodes")
+    .withIndex("by_hash", (q) => q.eq("hash", sha256Hex(code)))
+    .unique();
+  if (!row || row.redeemedAt !== undefined || row.revokedAt !== undefined)
+    return {
+      ok: false as const,
+      error: "This code is invalid or has already been used.",
+    };
+  if (row.expiresAt !== undefined && row.expiresAt <= Date.now())
+    return {
+      ok: false as const,
+      error: "This code has expired. Contact adrianeosyne for help.",
+    };
+  return { ok: true as const, code, row };
+}
+
+/** Bind sender attribution without spending the code or revealing stored secrets. */
+export const shareGift = mutation({
+  args: { code: v.string() },
   handler: async (ctx, args) => {
-    const { id } = await requireActiveUser(ctx),
-      now = Date.now();
-    const attempt = await ctx.db
-      .query("premiumCodeAttempts")
-      .withIndex("by_user", (q) => q.eq("userId", id))
-      .unique();
-    if (attempt && now - attempt.windowStart < 60000 && attempt.count >= 5)
+    const { id, user } = await requireActiveUser(ctx);
+    if (!(await consumeCodeAttempt(ctx, id)))
       return {
         ok: false as const,
         error: "Too many attempts. Try again in a minute.",
       };
-    if (attempt)
-      await ctx.db.patch(attempt._id, {
-        windowStart:
-          now - attempt.windowStart < 60000 ? attempt.windowStart : now,
-        count: now - attempt.windowStart < 60000 ? attempt.count + 1 : 1,
+    const result = await availableCode(ctx, args.code);
+    if (!result.ok) return result;
+    const { row, code } = result;
+    if (row.giftSenderId && row.giftSenderId !== id)
+      return {
+        ok: false as const,
+        error:
+          "This gift link already has a sender. You can claim it for yourself.",
+      };
+    if (!row.giftSenderId)
+      await ctx.db.patch(row._id, {
+        giftSenderId: id,
+        giftSenderName: user.name,
+        giftSenderUsername: user.username,
       });
-    else
-      await ctx.db.insert("premiumCodeAttempts", {
-        userId: id,
-        windowStart: now,
-        count: 1,
-      });
-    const code = args.code.trim().toUpperCase();
-    if (!/^KYRO-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code))
+    return { ok: true as const, link: premiumGiftLink(code), days: row.days };
+  },
+});
+
+/** Opening a gift never consumes it; claiming requires a separate mutation. */
+export const giftPreview = query({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    await requireActiveUser(ctx);
+    const result = await availableCode(ctx, args.code);
+    if (!result.ok) return { valid: false as const, reason: result.error };
+    const sender = await ctx.db.get(
+      result.row.giftSenderId ?? result.row.creatorId,
+    );
+    return {
+      valid: true as const,
+      days: result.row.days,
+      senderName: result.row.giftSenderName ?? sender?.name ?? "A Kyro member",
+      senderUsername: result.row.giftSenderUsername ?? sender?.username ?? null,
+    };
+  },
+});
+
+export const redeem = mutation({
+  args: {
+    code: v.string(),
+    recipientId: v.optional(v.id("users")),
+    fromGiftLink: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const { id } = await requireActiveUser(ctx),
+      now = Date.now();
+    if (!(await consumeCodeAttempt(ctx, id)))
       return {
         ok: false as const,
-        error: "Enter a code in the format KYRO-XXXX-XXXX-XXXX.",
+        error: "Too many attempts. Try again in a minute.",
       };
-    const row = await ctx.db
-      .query("premiumCodes")
-      .withIndex("by_hash", (q) => q.eq("hash", sha256Hex(code)))
-      .unique();
-    if (!row || row.redeemedAt !== undefined || row.revokedAt !== undefined)
-      return {
-        ok: false as const,
-        error: "This code is invalid or has already been used.",
-      };
-    if (row.expiresAt !== undefined && row.expiresAt <= now)
-      return {
-        ok: false as const,
-        error: "This code has expired. Contact adrianeosyne for help.",
-      };
+    const result = await availableCode(ctx, args.code);
+    if (!result.ok) return result;
+    const { row } = result;
     const recipientId = args.recipientId ?? id;
+    if (row.giftSenderId && row.giftSenderId !== id && recipientId !== id)
+      return {
+        ok: false as const,
+        error: "Claim this gift for your own account.",
+      };
     const recipient = await ctx.db.get(recipientId);
     if (!recipient || recipient.deletedAt || recipient.botApplicationId)
       return { ok: false as const, error: "Choose an active Kyro member." };
@@ -278,18 +350,29 @@ export const redeem = mutation({
       recipientId,
       redeemedAt: now,
     });
-    if (recipientId !== id) {
-      const giver = await ctx.db.get(id);
-      await ctx.db.patch(id, {
-        premiumGiftCount: (giver?.premiumGiftCount ?? 0) + 1,
-      });
-    }
+    const premiumUntil =
+      Math.max(now, recipient.premiumUntil ?? 0) + row.days * DAY_MS;
+    const senderId =
+      row.giftSenderId ??
+      (args.fromGiftLink ? row.creatorId : recipientId !== id ? id : null);
+    if (senderId)
+      await recordPremiumGift(
+        ctx,
+        senderId,
+        recipientId,
+        row.days,
+        premiumUntil,
+        row.giftSenderName,
+        row.giftSenderUsername,
+      );
     await syncPremiumAccess(ctx, recipientId);
     await ctx.db.insert("adminActions", {
       createdAt: now,
       actorId: id,
       action:
-        recipientId === id ? "premium_code_redeemed" : "premium_code_gifted",
+        senderId && senderId !== recipientId
+          ? "premium_code_gifted"
+          : "premium_code_redeemed",
       targetType: "user",
       targetId: recipientId,
       details: `${row.days} days · code ending ${row.suffix}`,
@@ -297,8 +380,8 @@ export const redeem = mutation({
     return {
       ok: true as const,
       days: row.days,
-      premiumUntil:
-        Math.max(now, recipient.premiumUntil ?? 0) + row.days * 86400000,
+      premiumUntil,
+      giftReceived: senderId !== null && senderId !== recipientId,
     };
   },
 });

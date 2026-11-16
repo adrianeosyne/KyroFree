@@ -40,9 +40,7 @@ export async function checkBadges(page) {
     history.pushState(null, "", "/dashboard/admin");
     dispatchEvent(new PopStateEvent("popstate"));
   });
-  await page
-    .getByRole("button", { name: "Premium", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Premium", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Remove Premium", exact: true }),
   ).toBeDisabled();
@@ -165,7 +163,13 @@ export async function checkBadges(page) {
     .evaluate((element) => element.blur());
   await expect(page.getByRole("tooltip")).toHaveCount(0);
   await page.locator('[aria-label^="Celestial Premium:"]').hover();
-  await expect(page.getByRole("tooltip")).toContainText("Assigned by founder");
+  await expect(page.getByRole("tooltip")).toContainText("Celestial Premium");
+  await expect(page.getByRole("tooltip")).not.toContainText(
+    /assigned|founder/i,
+  );
+  await expect(
+    page.locator('[aria-label^="Celestial Premium:"]'),
+  ).toContainText("CELESTIAL");
   await expect(
     page.locator('[aria-label^="Celestial Premium:"]'),
   ).not.toHaveCSS("-webkit-text-fill-color", "rgba(0, 0, 0, 0)");
@@ -182,6 +186,6 @@ export async function checkBadges(page) {
   );
   await page.setViewportSize(viewport);
   console.log(
-    "PASS: founder self-assignment, tier reset, member search, removal, gift icons/counts/thresholds, focus tooltip and assigned Premium label",
+    "PASS: founder self-assignment, tier reset, member search, removal, gift icons/counts/thresholds, focus tooltip and Premium tier label",
   );
 }

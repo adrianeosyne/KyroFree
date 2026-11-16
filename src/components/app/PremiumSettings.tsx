@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { hasPremium } from "@/lib/entitlements";
 import { toast } from "sonner";
 import { useNow } from "@/hooks/use-now";
+import { normalizePremiumCode, premiumDuration } from "@/lib/premiumGifts";
 
 const perks = [
   [
@@ -80,10 +81,12 @@ export function PremiumSettings() {
   const lounge = useMutation(api.premium.enterLounge);
   const navigate = useNavigate();
   const redeem = useMutation(api.premiumCodes.redeem);
+  const shareGift = useMutation(api.premiumCodes.shareGift);
   const [code, setCode] = useState("");
   const [recipient, setRecipient] = useState("");
   const [gift, setGift] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [giftLink, setGiftLink] = useState<string | null>(null);
   if (!data) return <p role="status">Loading Premium…</p>;
   return (
     <div className="space-y-6">
@@ -219,9 +222,9 @@ export function PremiumSettings() {
       <section className="space-y-4 rounded-2xl border border-fuchsia-400/25 bg-gradient-to-br from-fuchsia-500/10 to-panel p-5">
         <h3 className="text-lg font-semibold">Redeem Premium</h3>
         <p className="text-sm text-muted-foreground">
-          Get a code from adrianeosyne after manual payment. Redeem it here for
-          immediate access. Available for 1, 3 or 6 months, or 1 year. Active
-          time stacks with your current membership.
+          Get a code from adrianeosyne after manual payment, or receive a gift
+          link. Redeem it here for immediate access. Available for 1, 3 or 6
+          months, or 1 year. Active time stacks with your current membership.
         </p>
         {data.instructions && (
           <p className="rounded-xl bg-surface p-3 text-sm text-muted-foreground">
@@ -232,8 +235,11 @@ export function PremiumSettings() {
           aria-label="Premium redeem code"
           placeholder="KYRO-XXXX-XXXX-XXXX"
           value={code}
-          maxLength={19}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          maxLength={512}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setGiftLink(null);
+          }}
           className="font-mono tracking-widest"
         />
         <label className="flex items-center gap-2 text-sm">
@@ -251,7 +257,7 @@ export function PremiumSettings() {
           <PremiumMemberPicker label="Gift recipient" onSelect={setRecipient} />
         )}
         <Button
-          disabled={busy || code.trim().length !== 19 || (gift && !recipient)}
+          disabled={busy || !normalizePremiumCode(code) || (gift && !recipient)}
           onClick={async () => {
             setBusy(true);
             try {
@@ -261,6 +267,8 @@ export function PremiumSettings() {
               });
               if (!result.ok) throw new Error(result.error);
               setCode("");
+              setGiftLink(null);
+              if (!gift && result.giftReceived) navigate("/dashboard");
               toast.success(
                 gift
                   ? "Premium gifted! Your Gifter badge has been updated."
@@ -277,6 +285,64 @@ export function PremiumSettings() {
         >
           {busy ? "Redeeming…" : gift ? "Redeem and gift" : "Redeem code"}
         </Button>
+        <div className="space-y-3 border-t border-fuchsia-400/15 pt-4">
+          <h4 className="font-semibold">Send Premium as a gift link</h4>
+          <p className="text-sm text-muted-foreground">
+            Enter an unused code above and create a link to share. The first
+            person to claim receives it. Creating the link keeps the code
+            unused, and your gift count increases when someone claims.
+          </p>
+          <Button
+            variant="outline"
+            disabled={busy || !normalizePremiumCode(code)}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const result = await shareGift({ code });
+                if (!result.ok) throw new Error(result.error);
+                setGiftLink(result.link);
+                toast.success(
+                  `Gift link ready: ${premiumDuration(result.days)} of Premium.`,
+                );
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Could not create a gift link.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Create gift link
+          </Button>
+          {giftLink && (
+            <div className="space-y-2">
+              <Input
+                aria-label="Premium gift link"
+                value={giftLink}
+                readOnly
+                onFocus={(event) => event.target.select()}
+              />
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(giftLink);
+                    toast.success("Gift link copied.");
+                  } catch {
+                    toast.error(
+                      "Could not copy. Select the link and copy it manually.",
+                    );
+                  }
+                }}
+              >
+                Copy gift link
+              </Button>
+            </div>
+          )}
+        </div>
       </section>
       <section className="space-y-4 rounded-2xl border border-border bg-panel p-5">
         <h3 className="text-xl font-bold">Your Premium badge levels up</h3>

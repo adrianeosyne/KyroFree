@@ -36,16 +36,12 @@ export function PremiumBadge({
             compact && "ml-1.5 px-1.5 py-0.5 text-[9px]",
           )}
         >
-          <span aria-hidden="true">{tier.symbol}</span> PREMIUM
+          <span aria-hidden="true">{tier.symbol}</span>{" "}
+          {tier.name.toUpperCase()}
         </span>
       </TooltipTrigger>
       <TooltipContent className="z-[100] max-w-72 border border-white/15 bg-[#161321] p-3 text-white">
-        <strong className="block">
-          {tier.name} ·{" "}
-          {user.premiumBadgeTier === tier.name
-            ? "Assigned by founder"
-            : tier.label}
-        </strong>
+        <strong className="block">{tier.name} Premium</strong>
         <span className="mt-1 block text-xs">{since}</span>
         <span className="mt-1 block text-xs text-fuchsia-200">
           {days} {days === 1 ? "day" : "days"} in a row

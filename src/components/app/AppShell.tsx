@@ -13,6 +13,7 @@ import { api } from "@/convex/_generated/api";
 import { ClaimUsername } from "@/components/app/ClaimUsername";
 import { Inbox } from "@/components/app/Inbox";
 import { ProfileCard } from "@/components/app/ProfileCard";
+import { PremiumGiftNotice } from "@/components/app/PremiumGiftNotice";
 import { UserPreviewPanel } from "@/components/app/UserPreviewPanel";
 import { SearchOverlay } from "@/components/app/SearchOverlay";
 import { ServerRail } from "@/components/app/ServerRail";
@@ -402,6 +403,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Profile popups are opened by adding ?user=<id> anywhere in the app. */}
       <UserPreviewPanel />
       <ProfileCard />
+      <PremiumGiftNotice
+        defer={
+          settingsOpen ||
+          inboxOpen ||
+          searchOpen ||
+          mobileNavOpen ||
+          searchParams.has("user") ||
+          searchParams.has("previewUser")
+        }
+      />
       {/* A ringing DM call surfaces over every view of the app. */}
       <IncomingCallBanner />
     </div>

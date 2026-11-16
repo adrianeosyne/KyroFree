@@ -1672,6 +1672,7 @@ function ProfilePreviewCard({
         </div>
         {me.badges.length > 0 && (
           <BadgeTray
+            user={me}
             badges={me.badges}
             primaryBadge={me.primaryBadge}
             official={me.official}
@@ -2181,45 +2182,49 @@ function ProfileTab() {
             still shows in the tray.
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {me.badges.map((badge) => {
-              const active =
-                (badgeSel === undefined
-                  ? me.primaryBadge && me.primaryBadge !== "none"
-                    ? me.primaryBadge
-                    : me.badges[0]
-                  : badgeSel) === badge;
-              return (
-                <button
-                  key={badge}
-                  type="button"
-                  onClick={() => {
-                    setBadgeSel(badge);
-                    void update({ primaryBadge: badge }).catch((error) => {
-                      setBadgeSel(undefined);
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : "Could not save that badge.",
-                      );
-                    });
-                  }}
-                  className={cn(
-                    "relative flex flex-col items-center gap-1.5 rounded-xl border p-3 text-xs transition-colors",
-                    active
-                      ? "border-indigo-300/30 bg-[#151d32] text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_rgba(2,6,23,.24)] ring-1 ring-indigo-400/20"
-                      : "border-indigo-300/10 bg-[#11182a]/35 text-muted-foreground hover:border-indigo-300/25 hover:bg-[#151d32]/80 hover:text-indigo-50",
-                  )}
-                >
-                  {active && (
-                    <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                      ✓
-                    </span>
-                  )}
-                  <GlobalBadgeIcon badge={badge} className="size-6" />
-                  {GLOBAL_BADGE_META[badge].label}
-                </button>
-              );
-            })}
+            {me.badges
+              .filter((badge) => badge !== "premium")
+              .map((badge) => {
+                const active =
+                  (badgeSel === undefined
+                    ? me.primaryBadge &&
+                      me.primaryBadge !== "none" &&
+                      me.primaryBadge !== "premium"
+                      ? me.primaryBadge
+                      : me.badges.find((badge) => badge !== "premium")
+                    : badgeSel) === badge;
+                return (
+                  <button
+                    key={badge}
+                    type="button"
+                    onClick={() => {
+                      setBadgeSel(badge);
+                      void update({ primaryBadge: badge }).catch((error) => {
+                        setBadgeSel(undefined);
+                        toast.error(
+                          error instanceof Error
+                            ? error.message
+                            : "Could not save that badge.",
+                        );
+                      });
+                    }}
+                    className={cn(
+                      "relative flex flex-col items-center gap-1.5 rounded-xl border p-3 text-xs transition-colors",
+                      active
+                        ? "border-indigo-300/30 bg-[#151d32] text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_20px_rgba(2,6,23,.24)] ring-1 ring-indigo-400/20"
+                        : "border-indigo-300/10 bg-[#11182a]/35 text-muted-foreground hover:border-indigo-300/25 hover:bg-[#151d32]/80 hover:text-indigo-50",
+                    )}
+                  >
+                    {active && (
+                      <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+                        ✓
+                      </span>
+                    )}
+                    <GlobalBadgeIcon badge={badge} className="size-6" />
+                    {GLOBAL_BADGE_META[badge].label}
+                  </button>
+                );
+              })}
           </div>
         </section>
 
@@ -2668,7 +2673,7 @@ function ProfilePreviewPane({
   const linkRows = links ?? me.links;
 
   return (
-    <div>
+    <div role="region" aria-label="Profile preview">
       <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
         Preview
       </p>
@@ -2715,6 +2720,7 @@ function ProfilePreviewPane({
               <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
             </span>
             <BadgeTray
+              user={me}
               badges={me.badges}
               primaryBadge={badgeId}
               official={me.official}

@@ -10,6 +10,7 @@ import {
   isPlatformStaff,
 } from "./lib";
 import { DAY_MS } from "../lib/premiumProgress";
+import { premiumDuration } from "../lib/premiumGifts";
 import { hasPremium } from "../lib/entitlements";
 import { premiumBadgeTierValidator } from "./schema";
 import type { Doc } from "./_generated/dataModel";
@@ -30,6 +31,38 @@ export async function extendPremium(
 }
 import { joinKyroHq } from "./servers";
 import { serverBenefits, requirePremiumChannel } from "./premiumBenefits";
+
+export async function recordPremiumGift(
+  ctx: MutationCtx,
+  senderId: Id<"users">,
+  recipientId: Id<"users">,
+  days: number,
+  premiumUntil: number,
+  senderName?: string,
+  senderUsername?: string,
+) {
+  if (senderId === recipientId) return;
+  const sender = await ctx.db.get(senderId);
+  if (sender)
+    await ctx.db.patch(senderId, {
+      premiumGiftCount: (sender.premiumGiftCount ?? 0) + 1,
+    });
+  const name = senderName ?? sender?.name ?? "A Kyro member";
+  await ctx.db.insert("notifications", {
+    userId: recipientId,
+    type: "premium_gift",
+    actorId: senderId,
+    title: "You received Premium!",
+    body: `${name} sent you ${premiumDuration(days)} of Premium.`,
+    giftDays: days,
+    giftPremiumUntil: premiumUntil,
+    giftSenderName: name,
+    giftSenderUsername: senderUsername ?? sender?.username,
+    link: "/dashboard?settings=premium",
+    read: false,
+    createdAt: Date.now(),
+  });
+}
 
 export async function syncPremiumAccess(
   ctx: Parameters<typeof joinKyroHq>[0],
@@ -191,6 +224,15 @@ export const review = mutation({
       throw new Error("This recipient is no longer available.");
     if (args.approve && recipient) await extendPremium(ctx, recipient, 30);
     if (args.approve && recipient) await syncPremiumAccess(ctx, recipient._id);
+    if (args.approve && recipient && request.requesterId !== recipient._id) {
+      await recordPremiumGift(
+        ctx,
+        request.requesterId,
+        recipient._id,
+        30,
+        Math.max(Date.now(), recipient.premiumUntil ?? 0) + 30 * DAY_MS,
+      );
+    }
     await ctx.db.patch(request._id, {
       status: args.approve ? "approved" : "rejected",
       reviewedAt: Date.now(),

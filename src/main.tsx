@@ -33,6 +33,7 @@ const CopyrightPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.CopyrightPage })),
 );
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
+const GiftRoute = lazy(() => import("./pages/Gift.tsx"));
 
 /** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
  *  crashing the whole app (e.g. hook errors in the browser runtime). */
@@ -113,6 +114,7 @@ const convex = new ConvexReactClient(convexUrl);
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
+    if (location.pathname.startsWith("/gift/")) return;
     window.parent.postMessage(
       { type: "iframe-route-change", path: location.pathname },
       "*",
@@ -173,6 +175,7 @@ createRoot(document.getElementById("root")!).render(
                 <Route path="/privacy" element={<PrivacyPage />} />
                 <Route path="/copyright" element={<CopyrightPage />} />
                 <Route path="/invite/:code" element={<InviteRoute />} />
+                <Route path="/gift/:code" element={<GiftRoute />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

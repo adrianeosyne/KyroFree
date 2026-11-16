@@ -1,4 +1,4 @@
-import { PremiumBadge, GifterBadge } from "./PremiumBadge";
+import { GifterBadge } from "./PremiumBadge";
 import type { PremiumHistory } from "@/lib/premiumProgress";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import {
@@ -316,7 +316,9 @@ export function BadgeTray({
   official?: boolean;
   className?: string;
 }) {
-  const ordered = BADGE_PRIORITY.filter((badge) => badges.includes(badge));
+  const ordered = BADGE_PRIORITY.filter(
+    (badge) => badge !== "premium" && badges.includes(badge),
+  );
   const lead =
     primaryBadge &&
     primaryBadge !== "none" &&
@@ -348,8 +350,6 @@ export function BadgeTray({
         </BadgeTip>
       ) : null}
       {display.map((badge) => {
-        if (badge === "premium")
-          return <PremiumBadge key={badge} user={user ?? { badges }} />;
         const meta = GLOBAL_BADGE_META[badge];
         return (
           <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
@@ -870,7 +870,8 @@ export function GlobalBadges({
   badges: GlobalBadgeKey[];
   className?: string;
 }) {
-  if (badges.length === 0) {
+  const display = badges.filter((badge) => badge !== "premium");
+  if (display.length === 0) {
     return (
       <p className={cn("text-xs text-muted-foreground", className)}>
         No global badges yet.
@@ -879,7 +880,7 @@ export function GlobalBadges({
   }
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
-      {badges.map((badge) => (
+      {display.map((badge) => (
         <GlobalBadgeChip key={badge} badge={badge} />
       ))}
     </div>

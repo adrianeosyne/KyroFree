@@ -1,8 +1,10 @@
-import { me } from "./convex.js";
-export const useAuth = () => ({
-  user: me,
-  isLoading: false,
-  isAuthenticated: true,
-  signIn: async () => {},
-  signOut: async () => {},
-});
+import { me, useConvexAuth } from "./convex.js";
+export const useAuth = () => {
+  const auth = useConvexAuth();
+  return {
+    user: auth.isAuthenticated ? me : null,
+    ...auth,
+    signIn: async () => {},
+    signOut: async () => {},
+  };
+};
