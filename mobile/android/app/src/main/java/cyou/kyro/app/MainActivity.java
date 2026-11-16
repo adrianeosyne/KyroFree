@@ -252,7 +252,15 @@ public class MainActivity extends Activity {
         String url = intent == null ? null : intent.getDataString();
         webView.loadUrl(NavigationPolicy.isKyro(url) ? url : NavigationPolicy.HOME);
     }
-    private void goBack() { if (webView.canGoBack()) webView.goBack(); else finish(); }
+    private void goBack() {
+        webView.evaluateJavascript(
+            "(() => { const open = [...document.querySelectorAll('[role=dialog], [role=alertdialog]')]"
+                + ".some(el => el.getAttribute('data-state') !== 'closed' && el.getClientRects().length);"
+                + " if (!open) return false; document.dispatchEvent(new KeyboardEvent('keydown',"
+                + " {key: 'Escape', bubbles: true, cancelable: true})); return true; })()",
+            handled -> { if (!"true".equals(handled)) { if (webView.canGoBack()) webView.goBack(); else finish(); } }
+        );
+    }
     @Override public void onBackPressed() { goBack(); }
     @Override protected void onSaveInstanceState(Bundle state) { super.onSaveInstanceState(state); webView.saveState(state); }
     @Override protected void onDestroy() {

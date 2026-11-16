@@ -1,6 +1,13 @@
 import { WorkspaceAppearance } from "./WorkspaceStudio";
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Home, Menu, Search, User } from "@/components/icons";
+import {
+  Bell,
+  Home,
+  Menu,
+  Search,
+  User,
+  MessageCircle,
+} from "@/components/icons";
 import { AppLoading } from "@/components/AppLoading";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
@@ -22,6 +29,8 @@ import { Sidebar } from "@/components/app/Sidebar";
 import { IncomingCallBanner } from "@/components/app/Voice";
 import { ConnectionBanner } from "@/components/app/ConnectionBanner";
 import { QuickAppearance } from "@/components/app/QuickAppearance";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { KyroMark } from "@/components/KyroMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
@@ -97,6 +106,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     lobbyMatch?.params.serverId ??
     serverMatch?.params.serverId;
   const settingsOpen = searchParams.get("settings") !== null;
+  const isConversationView =
+    Boolean(channelMatch) || location.pathname.startsWith("/dashboard/dm/");
 
   // Presence heartbeat: keeps this account visible as online for others.
   // Fires immediately, every 60s, and whenever the tab comes back to the
@@ -209,11 +220,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         ? "Developer portal"
         : location.pathname.startsWith("/dashboard/bots")
           ? "Bot directory"
-          : location.pathname === "/dashboard"
-            ? "Friends"
-            : activeServerId
-              ? "Community"
-              : "Direct Messages";
+          : location.pathname === "/dashboard/chats"
+            ? "Messages"
+            : location.pathname === "/dashboard"
+              ? "Friends"
+              : activeServerId
+                ? "Community"
+                : "Direct Messages";
 
   return (
     <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
@@ -265,27 +278,37 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="hidden md:flex">{sidebar}</div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-panel/90 px-2 backdrop-blur-xl md:hidden">
+          <header
+            className={cn(
+              "mobile-app-header h-16 shrink-0 items-center gap-3 px-4 md:hidden",
+              isConversationView ? "hidden" : "flex",
+            )}
+          >
             <button
               type="button"
               aria-label="Open navigation"
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border/60 bg-panel text-muted-foreground active:bg-primary/10"
               onClick={() => setMobileNav(true)}
             >
               <Menu className="size-5" />
             </button>
 
-            <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold">
-              <KyroMark className="size-6" /> Kyro
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-base font-extrabold tracking-tight">
+                <KyroMark className="size-5" /> kyro
+                <span className="text-primary">.</span>
+              </span>
+              <p className="truncate text-[10px] font-medium text-muted-foreground">
+                {desktopTitle}
+              </p>
+            </div>
 
             <div className="ml-auto flex items-center gap-1">
-              <QuickAppearance />
               <button
                 type="button"
                 aria-label="Search Kyro"
                 onClick={() => setSearchOpen(true)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                className="grid size-11 place-items-center rounded-2xl text-muted-foreground active:bg-panel"
               >
                 <Search className="size-5" />
               </button>
@@ -293,7 +316,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 aria-label="Inbox"
                 onClick={() => setInboxOpen(!inboxOpen)}
-                className="relative rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                className="relative grid size-11 place-items-center rounded-2xl text-muted-foreground active:bg-panel"
               >
                 <Bell className="size-5" />
                 {(unread ?? 0) > 0 && (
@@ -304,6 +327,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
           </header>
+          <MobileDownloadBanner />
 
           <main className="min-h-0 flex-1 bg-background">
             <div
@@ -317,13 +341,27 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Phone-first dock: large touch targets, safe-area padding and one
             thumb-reachable route to every core surface. Account/status tools
             remain in the navigation sheet's UserBar. */}
-          <nav className="grid shrink-0 grid-cols-5 border-t border-border/70 bg-panel/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
+          <nav
+            aria-label="Mobile navigation"
+            className={cn(
+              "mobile-dock shrink-0 grid-cols-5 md:hidden",
+              isConversationView ? "hidden" : "grid",
+            )}
+          >
             {[
               {
                 label: "Home",
                 icon: Home,
                 active: location.pathname === "/dashboard",
                 action: () => navigate("/dashboard"),
+              },
+              {
+                label: "Chats",
+                icon: MessageCircle,
+                active:
+                  location.pathname === "/dashboard/chats" ||
+                  location.pathname.includes("/dashboard/dm/"),
+                action: () => navigate("/dashboard/chats"),
               },
               {
                 label: "Servers",
@@ -338,12 +376,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 action: () => setInboxOpen(true),
               },
               {
-                label: "Search",
-                icon: Search,
-                active: searchOpen,
-                action: () => setSearchOpen(true),
-              },
-              {
                 label: "You",
                 icon: User,
                 active: settingsOpen,
@@ -354,14 +386,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={entry.label}
                 type="button"
                 onClick={entry.action}
+                aria-pressed={entry.active}
                 className={cn(
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-colors",
+                  "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-semibold transition-colors",
                   entry.active
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground active:bg-surface active:text-foreground",
                 )}
               >
-                <entry.icon className="size-5" />
+                {entry.label === "You" && me ? (
+                  <UserAvatar user={me} size="xs" />
+                ) : (
+                  <entry.icon className="size-5" />
+                )}
                 {entry.label}
               </button>
             ))}
@@ -373,7 +410,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNav}>
         <SheetContent
           side="left"
-          className="w-[92vw] max-w-sm gap-0 border-r-border/70 p-0"
+          className="mobile-navigation-sheet w-[94vw] max-w-sm gap-0 rounded-r-3xl border-r-border/70 p-0"
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full">

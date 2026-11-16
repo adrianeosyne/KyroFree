@@ -8,6 +8,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import { checkSettings } from "../tests/ui/settings-checks.mjs";
+import { checkMobile } from "../tests/ui/mobile-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -22,7 +23,8 @@ const server = await createServer({
           if (
             req.url?.startsWith("/dashboard") ||
             req.url?.startsWith("/gift/") ||
-            req.url?.startsWith("/auth")
+            req.url?.startsWith("/auth") ||
+            req.url?.startsWith("/download")
           )
             req.url = "/tests/ui/index.html";
           next();
@@ -293,6 +295,7 @@ try {
     "Voice preview fits phone",
   );
   await checkOffline(browser);
+  await checkMobile(browser);
   assert.deepEqual(errors, []);
   console.log(
     "PASS: favorites persistence, keyboard switcher, appearance controls, friend and unread filters, isolated replies and drafts, reconnect banner, responsive layouts, discovery filters, communities and voice preview",

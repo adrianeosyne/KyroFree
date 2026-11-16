@@ -1,4 +1,5 @@
 import { hasPremium } from "@/lib/entitlements";
+import { isAndroidApp } from "@/lib/mobile";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
   ConnectionState,
@@ -869,20 +870,22 @@ export function LiveKitVoiceRoom({
               <VideoOff className="size-4" />
             )}
           </Button>
-          <Button
-            size="sm"
-            variant={sharing ? "default" : "outline"}
-            className="h-9 px-2.5"
-            disabled={!connected || !allowedSources.includes("screen_share")}
-            onClick={() => void toggleScreenShare()}
-            aria-label={sharing ? "Stop screen sharing" : "Share screen"}
-          >
-            {sharing ? (
-              <ScreenShareOff className="size-4" />
-            ) : (
-              <ScreenShare className="size-4" />
-            )}
-          </Button>
+          {!isAndroidApp() && (
+            <Button
+              size="sm"
+              variant={sharing ? "default" : "outline"}
+              className="h-9 px-2.5"
+              disabled={!connected || !allowedSources.includes("screen_share")}
+              onClick={() => void toggleScreenShare()}
+              aria-label={sharing ? "Stop screen sharing" : "Share screen"}
+            >
+              {sharing ? (
+                <ScreenShareOff className="size-4" />
+              ) : (
+                <ScreenShare className="size-4" />
+              )}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="destructive"

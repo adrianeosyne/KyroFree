@@ -4,7 +4,11 @@ declare const __KYRO_WEB_BUILD__: string;
 
 /** No native bridge: desktop refreshes use only the site's public build ID. */
 export function startDesktopWebUpdates() {
-  if (!import.meta.env.PROD || !/Electron\//.test(navigator.userAgent)) return;
+  if (
+    !import.meta.env.PROD ||
+    !/Electron\/|KyroAndroid\//.test(navigator.userAgent)
+  )
+    return;
   let lastActivity = Date.now();
   let pendingBuild: string | null = null;
   let checking = false;

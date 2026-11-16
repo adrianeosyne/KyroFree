@@ -12,6 +12,7 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 import "@/lib/installApp";
 import { startDesktopWebUpdates } from "@/lib/desktopWebUpdates";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
 
 startDesktopWebUpdates();
 
@@ -149,6 +150,7 @@ createRoot(document.getElementById("root")!).render(
       <ConvexAuthProvider client={convex}>
         <BrowserRouter>
           <RouteSyncer />
+          <MobileDownloadBanner floating />
           <SiteMotion>
             <Suspense fallback={<AppLoading />}>
               <Routes>

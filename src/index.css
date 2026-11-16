@@ -4,6 +4,90 @@
 @import "./workspaceFonts.css";
 @custom-variant dark (&:is(.dark *));
 
+.mobile-download-inline,
+.mobile-download-floating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--primary) 22%, var(--border));
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--foreground);
+}
+.mobile-download-inline {
+  flex-shrink: 0;
+  margin: 8px 12px;
+}
+.mobile-download-floating {
+  position: fixed;
+  z-index: 70;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(calc(100% - 24px), 480px);
+  transform: translateX(-50%);
+  box-shadow: 0 12px 50px #00000035;
+}
+@media (max-width: 767px) {
+  .mobile-app-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(64px + env(safe-area-inset-top));
+    background: var(--background);
+  }
+  .mobile-dock {
+    margin: 8px 12px max(10px, env(safe-area-inset-bottom));
+    padding: 5px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: color-mix(in oklab, var(--panel) 97%, transparent);
+    box-shadow: 0 5px 24px #00000010;
+  }
+  .mobile-friends > header {
+    display: none;
+  }
+  .mobile-friends .friends-welcome {
+    margin-bottom: 20px;
+    padding: 22px 20px;
+    border-radius: 24px;
+  }
+  .mobile-friends .friends-welcome > .relative {
+    max-width: 100%;
+  }
+  .mobile-friends .friends-orbit {
+    display: none;
+  }
+  .mobile-friends [aria-label="Friend filters"] {
+    border: 0;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .mobile-friends [aria-label="Friend filters"] button {
+    min-height: 44px;
+    border-radius: 14px;
+  }
+  .mobile-chats input,
+  .kyro-app-shell input:not([type="checkbox"]):not([type="range"]),
+  .kyro-app-shell textarea {
+    font-size: 16px;
+  }
+  .mobile-composer {
+    padding-inline: 10px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .mobile-composer textarea {
+    min-height: 44px;
+  }
+  .mobile-composer button,
+  .mobile-composer label[title="Attach files"] {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .mobile-chat-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(64px + env(safe-area-inset-top));
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   html[data-custom-cursor="true"] body {
     cursor: var(

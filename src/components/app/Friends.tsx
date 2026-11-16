@@ -119,7 +119,7 @@ export function FriendsView() {
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="mobile-friends flex h-full min-h-0 flex-col bg-background">
       <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 px-5 sm:px-7">
         <span className="flex items-center gap-3 text-sm font-semibold">
           <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">

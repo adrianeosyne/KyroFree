@@ -107,6 +107,21 @@ The first command previews the account. The second uses the deployed founder
 controls and verifies that Premium, its badge and the Premium HQ role are gone.
 It checks the configured account's username and active status before changing it.
 
+## Android app
+
+[Download Kyro for Android](https://github.com/adrianeosyne/KyroFree/releases/download/android-v1.0.0/Kyro-Android-1.0.0.apk)
+for Android 10 and newer. The full native project, Gradle wrapper, tests and
+build instructions are in [mobile/android](mobile/android/README.md). Shared
+web and backend source remain in `src/`. GitHub releases include signed APKs,
+Android App Bundles, checksums and links to the exact source tag. The app uses
+the live Kyro site with Android navigation, permission prompts and uploads.
+
+On Android browsers, Kyro shows a dismissible download prompt. In the native
+app, the prompt is hidden. The mobile interface has a Messages screen with
+search and unread filters, a five-tab dock, larger controls, and a conversation
+layout that leaves more room for chat and the keyboard. iPhone users can add
+the web app to their home screen; there is no native iOS release.
+
 ## Premium gifts
 
 In Settings → Premium, enter an unused redeem code and choose **Create gift

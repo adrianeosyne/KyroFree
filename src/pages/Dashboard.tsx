@@ -18,6 +18,7 @@ import { DiscoverView } from "@/components/app/DiscoverView";
 import { FriendsView } from "@/components/app/Friends";
 import { ForumChannelPage } from "@/components/app/ForumChannelPage";
 import { MembershipGate } from "@/components/app/MembershipGate";
+import { MobileChatsView } from "@/components/app/MobileChats";
 
 import { ServerThemeScope } from "@/components/app/ServerThemeScope";
 import { VoiceChannelPage } from "@/components/app/VoiceChannelPage";
@@ -59,6 +60,7 @@ export default function Dashboard() {
         >
           <Routes>
             <Route index element={<FriendsView />} />
+            <Route path="chats" element={<MobileChatsView />} />
             <Route path="discover" element={<DiscoverView />} />
             <Route path="s/:serverId/lobby" element={<LobbyRoute />} />
             <Route path="developers/:applicationId?" element={<Developers />} />

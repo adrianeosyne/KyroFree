@@ -45,7 +45,8 @@ the public signing certificate in `public/.well-known/assetlinks.json`.
 
 Use your existing Kyro account. Chats, communities, uploads, voice and video
 use the current hosted Kyro services, so they need an internet connection.
-Android Back follows page history before closing the app. Camera/microphone
+Android Back closes an open dialog, then follows page history before closing
+the app. Camera/microphone
 access is requested only after starting a feature that needs it. External
 links open in the appropriate Android app. The OS saves HTTPS downloads in
 Downloads. Browser-generated files such as account exports can be saved from

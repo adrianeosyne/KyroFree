@@ -3032,7 +3032,7 @@ function AppearanceTab() {
 
       <Section
         title="Desktop & mobile app"
-        description="Download Kyro for Windows or install the web app through your browser."
+        description="Download Kyro for Android or Windows, or install the web app through your browser."
       >
         <InstallAppButton />
       </Section>

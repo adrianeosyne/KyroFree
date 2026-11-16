@@ -1,7 +1,14 @@
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Check, Hash, Loader2, MessagesSquare } from "@/components/icons";
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Hash,
+  Loader2,
+  MessagesSquare,
+} from "@/components/icons";
 import { useEffect, useState, type ReactNode } from "react";
-import { Navigate, useSearchParams } from "react-router";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Composer, type MentionRole } from "@/components/app/Composer";
@@ -100,6 +107,7 @@ function ChatSurface({
     containerId,
   });
   const [reply, setReply] = useState<ReplyTarget | null>(null);
+  const navigate = useNavigate();
   const [report, setReport] = useState<{
     reportedUserId?: string;
     messageId?: string;
@@ -127,7 +135,23 @@ function ChatSurface({
 
   return (
     <div className="kyro-chat-surface relative isolate flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 bg-background px-3 sm:h-16 sm:gap-2.5 sm:px-6">
+      <div className="mobile-chat-header flex h-16 shrink-0 items-center gap-2 border-b border-border/70 bg-background px-2 sm:gap-2.5 sm:px-6">
+        <button
+          type="button"
+          aria-label={
+            containerType === "conversation"
+              ? "Back to messages"
+              : "Back to channels"
+          }
+          className="grid size-11 shrink-0 place-items-center rounded-2xl text-muted-foreground active:bg-panel md:hidden"
+          onClick={() =>
+            containerType === "conversation"
+              ? navigate("/dashboard/chats")
+              : useUiStore.getState().setMobileNav(true)
+          }
+        >
+          <ArrowLeft className="size-5" />
+        </button>
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           {icon}
         </span>

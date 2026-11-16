@@ -3,6 +3,11 @@ import { Link } from "react-router";
 import { Download, MonitorSmartphone } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
+  ANDROID_DOWNLOAD_URL,
+  ANDROID_SOURCE_URL,
+  isAndroidApp,
+} from "@/lib/mobile";
+import {
   getInstallState,
   requestAppInstall,
   subscribeInstallState,
@@ -17,6 +22,28 @@ export function InstallAppButton() {
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <div>
+          <p className="text-sm font-semibold">Kyro for Android</p>
+          <p className="text-xs text-muted-foreground">
+            {isAndroidApp()
+              ? "You're using the Android app."
+              : "Android 10 and newer. Your people, in your pocket."}
+          </p>
+          <a
+            href={ANDROID_SOURCE_URL}
+            className="mt-2 inline-block text-xs text-primary underline underline-offset-4"
+          >
+            View Android source
+          </a>
+        </div>
+        <Button asChild size="sm">
+          <a href={ANDROID_DOWNLOAD_URL}>
+            <Download className="mr-1.5 size-4" />
+            Download for Android
+          </a>
+        </Button>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-surface p-4">
         <div>
           <p className="text-sm font-semibold">Kyro for Windows</p>

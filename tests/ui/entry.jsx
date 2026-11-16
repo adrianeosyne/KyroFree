@@ -5,6 +5,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router";
 import Dashboard from "@/pages/Dashboard";
 import GiftRoute from "@/pages/Gift";
+import DownloadPage from "@/pages/Download";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUiStore } from "@/lib/store";
 import { GifterBadge } from "@/components/app/PremiumBadge";
@@ -16,10 +18,12 @@ window.setFixtureTheme = (theme) =>
   useUiStore.getState().setPreference("theme", theme);
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
+    <MobileDownloadBanner floating />
     <SiteMotion>
       <TooltipProvider>
         <Routes>
           <Route path="/auth" element={<p>Sign in fixture</p>} />
+          <Route path="/download" element={<DownloadPage />} />
           <Route path="/gift/:code" element={<GiftRoute />} />
           <Route
             path="/dashboard/badge-preview"
