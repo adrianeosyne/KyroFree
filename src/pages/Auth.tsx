@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { KyroMark } from "@/components/KyroMark";
+import { PremiumPrice } from "@/components/PremiumPrice";
 import {
   ArrowRight,
   Check,
@@ -477,9 +478,15 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
             {[
               "Communities, messages and everyday uploads",
               "Every moderation tool, included for all",
-              "Optional Premium for $1.99 per month",
+              <>
+                Optional Premium for{" "}
+                <PremiumPrice suffix=" per month" showOfferLabel />
+              </>,
             ].map((line) => (
-              <li key={line} className="flex items-start gap-2.5 text-sm">
+              <li
+                key={typeof line === "string" ? line : "premium"}
+                className="flex items-start gap-2.5 text-sm"
+              >
                 <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-success/15 text-[10px] font-bold text-success">
                   <Check className="size-3" />
                 </span>

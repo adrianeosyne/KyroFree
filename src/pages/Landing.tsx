@@ -22,6 +22,7 @@ import { useQuery } from "convex/react";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { PremiumPrice } from "@/components/PremiumPrice";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -605,8 +606,8 @@ export default function Landing() {
               </h1>
               <p className="mx-auto mt-7 max-w-2xl text-pretty text-base leading-7 text-white/80 sm:text-xl sm:leading-8">
                 Group chat, voice rooms, forums, bots and community tools in one
-                place with free core features and optional Premium for $1.99 per
-                month.
+                place with free core features and optional Premium for{" "}
+                <PremiumPrice suffix=" per month" showOfferLabel />.
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
@@ -671,7 +672,8 @@ export default function Landing() {
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#606378] sm:text-lg sm:leading-8">
             Chat, voice, moderation and everyday customization stay free.
             Optional Premium adds bigger uploads, sharper screen sharing and a
-            studio to make Kyro yours for $1.99 per month.
+            studio to make Kyro yours for{" "}
+            <PremiumPrice suffix=" per month" showOfferLabel />.
           </p>
         </Reveal>
       </section>
@@ -924,7 +926,10 @@ export default function Landing() {
             <p>
               © {new Date().getFullYear()} Adrian Eosyne. All rights reserved.
             </p>
-            <p>Free core features. Optional Premium: $1.99/month.</p>
+            <p>
+              Free core features. Optional Premium:{" "}
+              <PremiumPrice suffix="/month" showOfferLabel />.
+            </p>
           </div>
         </div>
       </footer>

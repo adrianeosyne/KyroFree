@@ -17,6 +17,7 @@ import { useSystemReducedMotion } from "@/hooks/use-system-reduced-motion";
 import { useUiStore } from "@/lib/store";
 import { toast } from "sonner";
 import { useNow } from "@/hooks/use-now";
+import { PremiumPrice } from "@/components/PremiumPrice";
 
 export function WorkspaceAppearance() {
   const data = useQuery(api.workspace.get);
@@ -107,8 +108,9 @@ export function WorkspaceStudio() {
         <h2 className="mt-3 text-2xl font-bold">Build your own Kyro.</h2>
         <p className="mt-3 text-sm text-muted-foreground">
           Unlock workspace colors, backgrounds, typography, panels and layout
-          including animated images, font themes and your own cursor, for $1.99
-          per month. Open Premium in settings to request activation.
+          including animated images, font themes and your own cursor, for{" "}
+          <PremiumPrice suffix=" per month" showOfferLabel />. Open Premium in
+          settings to request activation.
         </p>
       </section>
     );

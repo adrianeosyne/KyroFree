@@ -1,6 +1,6 @@
 // These versions are stored with registration acceptance. Bump when policies change.
 export const LEGAL_POLICY_VERSIONS = {
-  terms: "2026-11-16-r1",
+  terms: "2026-11-16-r2",
   privacy: "2026-11-16-r1",
   copyright: "2026-11-14-r2",
 } as const;

@@ -25,7 +25,7 @@ export const TERMS: LegalSection[] = [
   {
     heading: "Free access, Premium and funding",
     body: [
-      "Kyro offers free core community, messaging, voice and moderation features alongside an optional paid Premium plan. Premium currently costs US$1.99 per month, delivered through founder-issued redemption codes. Some enhanced sharing, customization and HQ features require active Premium.",
+      "Kyro offers free core community, messaging, voice and moderation features alongside an optional paid Premium plan. The regular Premium price is US$1.99 per month, delivered through founder-issued redemption codes. The two-week Celebrate official Kyro Release offer lowers the price to US$0.99 per month from November 16, 2026 at 15:50:48 UTC until November 30, 2026 at 15:50:48 UTC; the regular price applies afterwards. Some enhanced sharing, customization and HQ features require active Premium.",
       "Optional Premium payments and limited banner advertisements can support operating costs. Your internet connection, payment-provider charges and other third-party services remain arrangements between you and the relevant provider.",
     ],
   },

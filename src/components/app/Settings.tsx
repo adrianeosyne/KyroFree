@@ -139,7 +139,8 @@ const TABS: {
     label: "Premium",
     icon: Sparkles,
     group: "Your account",
-    description: "More room to play and create. $1.99 per month.",
+    description:
+      "More room to play and create. Explore Premium and current offers.",
     keywords: "payment gift subscription badge 1440p 60fps 200mb",
   },
   {

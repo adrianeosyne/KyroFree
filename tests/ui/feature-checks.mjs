@@ -13,8 +13,11 @@ export async function checkFeatures(page) {
     settings.getByRole("heading", { name: "Play. Create. Make it yours." }),
   ).toBeVisible();
   await expect(
-    settings.getByText("$1.99", { exact: false }).first(),
+    settings.locator("[data-premium-current-price]").first(),
   ).toBeVisible();
+  await expect(
+    settings.locator("[data-premium-current-price]").first(),
+  ).toHaveText(/^\$(0\.99|1\.99)$/);
   await page.screenshot({
     path: "test-results/kyro-premium-desktop.png",
     animations: "disabled",

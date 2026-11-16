@@ -6,6 +6,7 @@ import {
   type LegalPolicy,
 } from "@/lib/legalContent";
 import { COPYRIGHT_OWNER, LEGAL_POLICY_VERSIONS } from "@/lib/legalPolicies";
+import { PremiumPrice } from "@/components/PremiumPrice";
 
 function LegalPage({ policy }: { policy: LegalPolicy }) {
   const updated = LEGAL_POLICY_UPDATED[policy.slug];
@@ -149,8 +150,9 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
             Keep passwords and recovery codes private.
           </p>
           <p className="mt-3">
-            Kyro offers free core features and optional Premium for $1.99 per
-            month, with manual payment and founder approval.
+            Kyro offers free core features and optional Premium for{" "}
+            <PremiumPrice suffix=" per month" showOfferLabel />, with manual
+            payment and founder approval.
           </p>
         </aside>
 

@@ -23,6 +23,7 @@ import { hasPremium } from "@/lib/entitlements";
 import { toast } from "sonner";
 import { useNow } from "@/hooks/use-now";
 import { normalizePremiumCode, premiumDuration } from "@/lib/premiumGifts";
+import { PremiumPrice, PremiumReleaseOffer } from "@/components/PremiumPrice";
 
 const perks = [
   [
@@ -96,7 +97,7 @@ export function PremiumSettings() {
   if (!data) return <p role="status">Loading Premium…</p>;
   return (
     <div className="space-y-6">
-      <div className="relative overflow-hidden rounded-3xl border border-fuchsia-400/25 bg-gradient-to-br from-violet-600/25 via-panel to-cyan-500/15 p-7">
+      <div className="relative overflow-hidden rounded-3xl border border-fuchsia-400/25 bg-gradient-to-br from-violet-600/25 via-panel to-cyan-500/15 p-4 sm:p-7">
         <p className="text-xs font-bold uppercase tracking-[.25em] text-fuchsia-300">
           Kyro Premium
         </p>
@@ -107,11 +108,12 @@ export function PremiumSettings() {
           Everything you love about Kyro, with more room to express yourself.
         </p>
         <p className="mt-5 text-3xl font-bold">
-          $1.99{" "}
+          <PremiumPrice showRegularPrice />{" "}
           <span className="text-sm font-normal text-muted-foreground">
             per month
           </span>
         </p>
+        <PremiumReleaseOffer />
         <p className="mt-2 text-xs text-muted-foreground">
           Redeem a Premium code · no application · no automatic billing
         </p>

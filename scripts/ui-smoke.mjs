@@ -1,5 +1,6 @@
 import { checkCommunity, checkOffline } from "../tests/ui/community-checks.mjs";
 import { checkFeatures } from "../tests/ui/feature-checks.mjs";
+import { checkReleasePromotion } from "../tests/ui/premium-release-checks.mjs";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -82,6 +83,7 @@ try {
   ).toBeVisible({ timeout: 120000 });
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
   await checkSettings(page, context);
+  await checkReleasePromotion(browser);
   await checkFeatures(page);
   await checkCommunity(page);
   await page
