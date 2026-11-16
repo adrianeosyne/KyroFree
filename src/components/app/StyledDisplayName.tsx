@@ -24,11 +24,11 @@ export function StyledDisplayName({
   children?: ReactNode;
 }) {
   return (
-    <span
-      className={cn("display-name", className)}
-      style={{ ...displayNameStyle(user, roleColor), ...style }}
-    >
-      {children ?? name ?? user.name}
+    <span className={cn("display-name", className)}>
+      {/* Gradient text fill must stay on the name so badges remain readable. */}
+      <span style={{ ...displayNameStyle(user, roleColor), ...style }}>
+        {children ?? name ?? user.name}
+      </span>
       <PremiumBadge user={user} compact />
       {user.botApplicationId && (
         <span
