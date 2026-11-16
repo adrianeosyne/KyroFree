@@ -52,24 +52,6 @@ export async function recordMessage(
     xp: row.xp + (eligible ? 10 : 0),
     lastXpAt: eligible ? now : row.lastXpAt,
   });
-  const global = await ctx.db
-    .query("playerLevels")
-    .withIndex("by_user", (q) => q.eq("userId", user._id))
-    .unique();
-  if (global) {
-    const eligible = global.lastXpAt === 0 || now - global.lastXpAt >= 60000;
-    await ctx.db.patch(global._id, {
-      active: true,
-      xp: global.xp + (eligible ? 10 : 0),
-      lastXpAt: eligible ? now : global.lastXpAt,
-    });
-  } else
-    await ctx.db.insert("playerLevels", {
-      userId: user._id,
-      active: true,
-      xp: 10,
-      lastXpAt: now,
-    });
 }
 export async function creditInvite(
   ctx: MutationCtx,

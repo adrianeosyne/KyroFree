@@ -11,7 +11,6 @@
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi } from "convex/server";
 import type * as accountRecovery from "../accountRecovery.js";
-import type * as activity from "../activity.js";
 import type * as activityLib from "../activityLib.js";
 import type * as admin from "../admin.js";
 import type * as applications from "../applications.js";
@@ -105,7 +104,6 @@ import type * as workspaceSchema from "../workspaceSchema.js";
 
 const fullApi: ApiFromModules<{
   "accountRecovery": typeof accountRecovery,
-  "activity": typeof activity,
   "activityLib": typeof activityLib,
   "admin": typeof admin,
   "applications": typeof applications,

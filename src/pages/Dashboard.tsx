@@ -40,11 +40,6 @@ const ServerLobby = lazy(() =>
     default: m.ServerLobby,
   })),
 );
-const ShardsBoard = lazy(() =>
-  import("@/components/app/ServerLobby").then((m) => ({
-    default: m.ShardsBoard,
-  })),
-);
 
 /** The signed-in product: everything lives inside the AppShell frame and is
  *  routed underneath it — friends home, DMs, community channels and the
@@ -65,7 +60,6 @@ export default function Dashboard() {
           <Routes>
             <Route index element={<FriendsView />} />
             <Route path="discover" element={<DiscoverView />} />
-            <Route path="shards" element={<ShardsBoard />} />
             <Route path="s/:serverId/lobby" element={<LobbyRoute />} />
             <Route path="developers/:applicationId?" element={<Developers />} />
             <Route

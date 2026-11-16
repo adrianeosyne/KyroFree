@@ -221,7 +221,6 @@ const data = {
     feed: [],
     feedConnected: false,
   },
-  "activity:topPlayers": [],
   "premiumCodes:list": [],
   "premium:queue": [],
   "admin:overview": { allowed: false },

@@ -223,9 +223,8 @@ export async function checkCommunity(page) {
     animations: "disabled",
   });
   await go(page, "/dashboard/shards");
-  await expect(
-    page.getByRole("heading", { name: "The top 50", exact: true }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.locator('a[href="/dashboard/shards"]')).toHaveCount(0);
   await page.evaluate(() => {
     window.setFixtureData("users:me", {
       ...window.fixtureData["users:currentUser"],
@@ -359,7 +358,7 @@ export async function checkCommunity(page) {
   await checkGiftExperience(page);
   await page.goto(`${base}/dashboard`);
   console.log(
-    "PASS: Premium redemption, gift recipient, since tooltip, chat background, lobby editing and routing, mobile layout, Shards and founder code generation",
+    "PASS: Premium redemption, gift recipient, since tooltip, chat background, lobby editing and routing, mobile layout, removed Shards route and founder code generation",
   );
 }
 export async function checkOffline(browser) {

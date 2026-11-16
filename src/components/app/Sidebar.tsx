@@ -859,12 +859,6 @@ function HomeSection() {
         Discover
       </Link>
       <NavLink
-        to="/dashboard/shards"
-        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60"
-      >
-        ✦ Shards level board
-      </NavLink>
-      <NavLink
         to="/dashboard/bots"
         className={({ isActive }) =>
           cn(

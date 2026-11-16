@@ -188,7 +188,7 @@ Scheduled expiry invalidates live queries when a month ends. Renewals extend the
 
 Server Settings > Lobby lets owners enable a welcome page, choose stacked, two-column or spotlight layouts, set colors and links, and reorder up to 12 sections. Owners can also edit directly on the lobby page. Drag handles support touch; arrow buttons support keyboard ordering. All reads require server membership and only the owner may save or manage feed tokens.
 
-Lobby boards show top levels, messages in the current UTC Monday-to-Monday week, and successful unique invites. Activity starts with new messages after rollout. Human messages award 10 XP at most once per minute; bots do not earn XP. Rejoining the same server never credits another invite. Shards shows the top 50 global level entries, with no cash value.
+Lobby boards show top levels, messages in the current UTC Monday-to-Monday week, and successful unique invites. Activity starts with new messages after rollout. Human messages award 10 XP at most once per minute within each server; bots do not earn XP. Rejoining the same server never credits another invite.
 
 Outside apps can POST `title`, `text`, `source`, `clientId` and optional HTTPS `url` as JSON to the displayed lobby feed endpoint. Set `Authorization: Bearer <token>` on the app's server. Duplicate client IDs are idempotent. The feed accepts at most 30 new entries per hour; owner token rotation or disconnection invalidates the old token. Tokens are shown once and stored as hashes.
 

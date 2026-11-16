@@ -520,6 +520,7 @@ const schema = defineSchema(
         "weeklyMessages",
       ])
       .index("by_server_invites", ["serverId", "active", "invites"]),
+    /** Historical global scores, retained only for account export and deletion. */
     playerLevels: defineTable({
       userId: v.id("users"),
       active: v.boolean(),

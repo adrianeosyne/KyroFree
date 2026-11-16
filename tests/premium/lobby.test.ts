@@ -166,10 +166,32 @@ describe("Community lobbies and activity", () => {
     expect(
       board.boards.messages.find((r) => r.user?.id === f.ids.member)?.value,
     ).toBe(3);
-    const top = await f.member.query(api.activity.topPlayers);
-    expect(top.find((r) => r.user?.id === f.ids.member)?.xp).toBe(20);
+    const activity = await f.t.run((ctx) =>
+      ctx.db
+        .query("serverActivity")
+        .withIndex("by_server_user", (q) =>
+          q.eq("serverId", f.serverId).eq("userId", f.ids.member),
+        )
+        .unique(),
+    );
+    expect(activity?.xp).toBe(20);
+    expect(
+      await f.t.run((ctx) => ctx.db.query("playerLevels").collect()),
+    ).toEqual([]);
+    const historicalScore = await f.t.run((ctx) =>
+      ctx.db.insert("playerLevels", {
+        userId: f.ids.member,
+        active: true,
+        xp: 700,
+        lastXpAt: 0,
+      }),
+    );
     vi.setSystemTime(weekStart() + 7 * 86400000 + 1000);
     await send();
+    expect(await f.t.run((ctx) => ctx.db.get(historicalScore))).toMatchObject({
+      xp: 700,
+      lastXpAt: 0,
+    });
     board = await f.member.query(api.lobby.get, { serverId: f.serverId });
     expect(
       board.boards.messages.find((r) => r.user?.id === f.ids.member)?.value,
