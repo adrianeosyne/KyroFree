@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cyou.kyro.app",
+      "sha256_cert_fingerprints": [
+        "3A:C8:7B:BD:62:B0:F6:D9:18:3E:5B:A8:D7:B3:06:D0:FE:3E:4F:60:EA:89:94:85:A8:15:7D:8A:02:59:4B:C2"
+      ]
+    }
+  }
+]
