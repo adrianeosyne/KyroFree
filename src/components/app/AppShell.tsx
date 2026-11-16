@@ -28,6 +28,7 @@ import { SettingsDialog } from "@/components/app/Settings";
 import { Sidebar } from "@/components/app/Sidebar";
 import { IncomingCallBanner } from "@/components/app/Voice";
 import { ConnectionBanner } from "@/components/app/ConnectionBanner";
+import { PremiumExpiryBanner } from "@/components/app/PremiumExpiryBanner";
 import { QuickAppearance } from "@/components/app/QuickAppearance";
 import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
 import { UserAvatar } from "@/components/app/UserAvatar";
@@ -273,6 +274,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
       <WorkspaceAppearance />
       <ConnectionBanner />
+      <PremiumExpiryBanner premiumUntil={me?.premiumUntil} />
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
         <div className="hidden md:flex">{sidebar}</div>

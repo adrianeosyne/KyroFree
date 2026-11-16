@@ -50,6 +50,8 @@ const schema = defineSchema(
       premiumUntil: v.optional(v.number()),
       premiumSince: v.optional(v.number()),
       premiumStreakSince: v.optional(v.number()),
+      /** Expiry timestamp for which the one-day renewal reminder was sent. */
+      premiumReminderFor: v.optional(v.number()),
       /** Founder-assigned badge tier, independent of the real Premium streak. */
       premiumBadgeTier: v.optional(premiumBadgeTierValidator),
       premiumGiftCount: v.optional(v.number()),
@@ -179,6 +181,7 @@ const schema = defineSchema(
     })
       .index("email", ["email"]) // index for the email. do not remove or modify
       .index("by_username", ["username"])
+      .index("by_premium_until", ["premiumUntil"])
       .index("by_active_recent", ["deletedAt", "lastSeen"])
       .searchIndex("search_name", {
         searchField: "name",

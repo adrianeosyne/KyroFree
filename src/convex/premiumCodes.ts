@@ -5,7 +5,11 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { isFounderUser, requireActiveUser } from "./lib";
 import { sha256Hex } from "./sha256";
 import { extendPremium, syncPremiumAccess, recordPremiumGift } from "./premium";
-import { PREMIUM_DURATIONS, DAY_MS } from "../lib/premiumProgress";
+import {
+  validPremiumDuration,
+  MAX_PREMIUM_DAYS,
+  DAY_MS,
+} from "../lib/premiumProgress";
 import { normalizePremiumCode, premiumGiftLink } from "../lib/premiumGifts";
 
 async function createCodes(
@@ -18,8 +22,10 @@ async function createCodes(
   const { id, user } = await requireActiveUser(ctx);
   if (!isFounderUser(user))
     throw new Error("Only adrianeosyne can generate Premium codes.");
-  if (!PREMIUM_DURATIONS.some((d) => d.days === days))
-    throw new Error("Choose 1, 3 or 6 months, or 1 year.");
+  if (!validPremiumDuration(days))
+    throw new Error(
+      `Choose a whole-number duration from 1 to ${MAX_PREMIUM_DAYS} days.`,
+    );
   if (!Number.isInteger(count) || count < 1 || count > 20)
     throw new Error("Generate between 1 and 20 codes at a time.");
   if (expiresInDays !== undefined && ![7, 30, 90].includes(expiresInDays))

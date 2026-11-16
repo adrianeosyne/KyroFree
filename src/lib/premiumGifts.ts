@@ -31,6 +31,6 @@ export function premiumGiftLink(code: string): string {
 export function premiumDuration(days: number): string {
   return (
     PREMIUM_DURATIONS.find((duration) => duration.days === days)?.label ??
-    `${days} days`
+    `${days} ${days === 1 ? "day" : "days"}`
   );
 }

@@ -2,6 +2,11 @@ import {
   PREMIUM_TIERS,
   PREMIUM_DURATIONS,
   premiumTier,
+  premiumDays,
+  DAY_MS,
+  MAX_PREMIUM_DAYS,
+  validPremiumDuration,
+  type PremiumHistory,
   type PremiumBadgeTier,
 } from "@/lib/premiumProgress";
 import { PremiumBadge, GifterBadge } from "./PremiumBadge";
@@ -11,6 +16,7 @@ import { useMutation, useQuery, usePaginatedQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { FunctionArgs } from "convex/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasPremium } from "@/lib/entitlements";
@@ -410,6 +416,8 @@ export function PremiumAdmin() {
   const review = useMutation(api.premium.review);
   const grant = useMutation(api.premium.grant);
   const setBadgeTier = useMutation(api.premium.setBadgeTier);
+  const updateSubscription = useMutation(api.premium.updateSubscription);
+  const [grantDays, setGrantDays] = useState(30);
   const [userId, setUserId] = useState("");
   const [tier, setTier] = useState<PremiumBadgeTier | "automatic">("Premium");
   const member = useQuery(
@@ -454,15 +462,24 @@ export function PremiumAdmin() {
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
+          <DurationInput
+            label="Grant duration"
+            days={grantDays}
+            onChange={setGrantDays}
+            disabled={busy}
+          />
           <Button
-            disabled={busy || !userId}
+            disabled={busy || !userId || !validPremiumDuration(grantDays)}
             onClick={() =>
               void perform(() =>
-                grant({ userId: userId.trim() as Id<"users"> }),
+                grant({
+                  userId: userId.trim() as Id<"users">,
+                  ...(grantDays === 30 ? {} : { days: grantDays }),
+                }),
               )
             }
           >
-            Grant a month
+            {grantDays === 30 ? "Grant a month" : `Grant ${grantDays} days`}
           </Button>
           <Button
             variant="outline"
@@ -476,6 +493,15 @@ export function PremiumAdmin() {
             Remove Premium
           </Button>
         </div>
+        {userId && member && (
+          <PremiumSubscriptionEditor
+            key={`${userId}:${member.premiumUntil}:${member.premiumSince}:${member.premiumStreakSince}`}
+            userId={userId as Id<"users">}
+            member={member}
+            busy={busy}
+            onSave={(args) => perform(() => updateSubscription(args))}
+          />
+        )}
         <div className="mt-5 border-t border-border pt-4">
           <label
             htmlFor="admin-premium-badge-tier"
@@ -539,14 +565,18 @@ export function PremiumAdmin() {
             </p>
             <div className="flex gap-2">
               <Button
-                disabled={busy}
+                disabled={busy || !validPremiumDuration(grantDays)}
                 onClick={() =>
                   void perform(() =>
-                    review({ requestId: r._id, approve: true }),
+                    review({
+                      requestId: r._id,
+                      approve: true,
+                      days: grantDays,
+                    }),
                   )
                 }
               >
-                Payment verified · approve
+                Payment verified · approve {premiumDuration(grantDays)}
               </Button>
               <Button
                 disabled={busy}
@@ -564,6 +594,208 @@ export function PremiumAdmin() {
         ))
       )}
     </div>
+  );
+}
+
+function DurationInput({
+  label,
+  days,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  days: number;
+  onChange: (days: number) => void;
+  disabled: boolean;
+}) {
+  const [custom, setCustom] = useState(
+    !PREMIUM_DURATIONS.some((duration) => duration.days === days),
+  );
+  return (
+    <div className="min-w-0 space-y-2">
+      <label className="block text-sm">
+        {label}
+        <select
+          aria-label={label}
+          value={custom ? "custom" : days}
+          disabled={disabled}
+          onChange={(event) => {
+            setCustom(event.target.value === "custom");
+            if (event.target.value !== "custom")
+              onChange(Number(event.target.value));
+          }}
+          className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+        >
+          {PREMIUM_DURATIONS.map((duration) => (
+            <option key={duration.days} value={duration.days}>
+              {duration.label} · {duration.days} days
+            </option>
+          ))}
+          <option value="custom">Custom days</option>
+        </select>
+      </label>
+      {custom && (
+        <label className="block text-xs text-muted-foreground">
+          Number of days
+          <Input
+            type="number"
+            aria-label={`${label} in days`}
+            value={days}
+            min={1}
+            max={MAX_PREMIUM_DAYS}
+            step={1}
+            disabled={disabled}
+            onChange={(event) => onChange(Number(event.target.value))}
+            className="mt-1"
+          />
+        </label>
+      )}
+    </div>
+  );
+}
+
+function localDateTime(timestamp: number) {
+  const date = new Date(timestamp);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+function PremiumSubscriptionEditor({
+  userId,
+  member,
+  busy,
+  onSave,
+}: {
+  userId: Id<"users">;
+  member: PremiumHistory;
+  busy: boolean;
+  onSave: (
+    args: FunctionArgs<typeof api.premium.updateSubscription>,
+  ) => Promise<void>;
+}) {
+  const now = useNow(30_000);
+  const [baseline] = useState(() => {
+    const initialNow = Date.now();
+    const active = hasPremium(member, initialNow);
+    const initialStart = active
+      ? (member.premiumStreakSince ?? initialNow)
+      : initialNow;
+    const totalDays = active
+      ? (member.premiumUntil! - initialStart) / DAY_MS
+      : 30;
+    return {
+      initialSince: localDateTime(member.premiumSince ?? initialNow),
+      initialStreak: premiumDays(member, initialNow),
+      initialDuration: Math.max(1, Math.ceil(totalDays)),
+      initialStart,
+      totalDays,
+      until: active ? member.premiumUntil! : null,
+    };
+  });
+  const {
+    initialSince,
+    initialStreak,
+    initialDuration,
+    initialStart,
+    totalDays,
+  } = baseline;
+  const [since, setSince] = useState(initialSince);
+  const [streakDays, setStreakDays] = useState(initialStreak);
+  const [durationDays, setDurationDays] = useState(initialDuration);
+  const sinceChanged = since !== initialSince;
+  const streakChanged = streakDays !== initialStreak;
+  const durationChanged = durationDays !== initialDuration;
+  const timingChanged = streakChanged || durationChanged;
+  const end = timingChanged
+    ? (streakChanged ? now - streakDays * DAY_MS : initialStart) +
+      (durationChanged ? durationDays : totalDays) * DAY_MS
+    : baseline.until;
+  const sinceTime = new Date(since).getTime();
+  const valid =
+    validPremiumDuration(durationDays) &&
+    Number.isInteger(streakDays) &&
+    streakDays >= 0 &&
+    streakDays <= MAX_PREMIUM_DAYS &&
+    Number.isFinite(sinceTime) &&
+    sinceTime <= now;
+  return (
+    <section
+      className="mt-5 space-y-3 border-t border-border pt-4"
+      aria-label="Premium subscription dates"
+    >
+      <h3 className="text-sm font-semibold">
+        Subscription dates and days in a row
+      </h3>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-sm">
+          Premium since
+          <Input
+            type="datetime-local"
+            aria-label="Premium since"
+            value={since}
+            max={localDateTime(now)}
+            disabled={busy}
+            onChange={(event) => setSince(event.target.value)}
+            className="mt-2 min-w-0"
+          />
+        </label>
+        <DurationInput
+          label="Subscription duration"
+          days={durationDays}
+          onChange={setDurationDays}
+          disabled={busy}
+        />
+        <label className="block text-sm">
+          Days in a row
+          <Input
+            type="number"
+            aria-label="Premium days in a row"
+            value={streakDays}
+            min={0}
+            max={MAX_PREMIUM_DAYS}
+            step={1}
+            disabled={busy}
+            onChange={(event) => setStreakDays(Number(event.target.value))}
+            className="mt-2"
+          />
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The duration is the total length of this uninterrupted subscription. A
+        30-day plan with 29 days in a row has one day left. Changing only
+        Premium since keeps the existing expiry date.
+      </p>
+      <p className="rounded-xl bg-primary/5 p-3 text-sm" role="status">
+        {end === null
+          ? "No active subscription. Set a duration or days in a row to start one."
+          : end <= now
+            ? "This plan has already ended. Saving removes Premium and its perks."
+            : `Premium expires ${new Date(end).toLocaleString()} · ${Math.ceil((end - now) / DAY_MS)} ${Math.ceil((end - now) / DAY_MS) === 1 ? "day" : "days"} remaining.`}
+      </p>
+      {end !== null && end > now && end - now <= DAY_MS && (
+        <p className="text-xs text-amber-500">
+          One day or less remains. The renewal warning is sent immediately when
+          this is saved.
+        </p>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Members receive a renewal warning 24 hours before expiry. Their Premium
+        badge and perks end automatically if they do not renew.
+      </p>
+      <Button
+        disabled={busy || !valid || (!sinceChanged && !timingChanged)}
+        onClick={() =>
+          void onSave({
+            userId,
+            ...(sinceChanged ? { premiumSince: sinceTime } : {}),
+            ...(durationChanged ? { durationDays } : {}),
+            ...(streakChanged ? { streakDays } : {}),
+          })
+        }
+      >
+        Save subscription
+      </Button>
+    </section>
   );
 }
 
@@ -686,22 +918,12 @@ function PremiumCodeAdmin() {
         once. Copy codes now; full codes are shown only when generated.
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
-        <label className="block text-sm">
-          Duration
-          <select
-            aria-label="Premium code duration"
-            value={days}
-            disabled={busy}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
-          >
-            {PREMIUM_DURATIONS.map((d) => (
-              <option key={d.days} value={d.days}>
-                {d.label} · {d.days} days
-              </option>
-            ))}
-          </select>
-        </label>
+        <DurationInput
+          label="Premium code duration"
+          days={days}
+          onChange={setDays}
+          disabled={busy}
+        />
         <label className="block text-sm">
           Number of codes
           <select
@@ -775,7 +997,10 @@ function PremiumCodeAdmin() {
       </div>
       <Button
         disabled={
-          busy || generated.length > 0 || (senderMode === "member" && !senderId)
+          busy ||
+          !validPremiumDuration(days) ||
+          generated.length > 0 ||
+          (senderMode === "member" && !senderId)
         }
         onClick={async () => {
           setBusy(true);

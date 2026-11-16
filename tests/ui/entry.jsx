@@ -37,6 +37,19 @@ createRoot(document.getElementById("root")).render(
                 <div data-testid="gifts-only-profile">
                   <BadgeTray badges={[]} user={{ premiumGiftCount: 25 }} />
                 </div>
+                <BadgeTray badges={["moderator"]} />
+                {["Premium", "Ember"].map((tier) => (
+                  <div key={tier} data-testid={`premium-tier-${tier}`}>
+                    <StyledDisplayName
+                      user={{
+                        name: tier,
+                        badges: ["premium"],
+                        premiumUntil: Date.now() + 86400000,
+                        premiumBadgeTier: tier,
+                      }}
+                    />
+                  </div>
+                ))}
                 <StyledDisplayName
                   user={{
                     name: "Adrian Eosyne",

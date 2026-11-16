@@ -15,7 +15,7 @@ export async function checkGiftExperience(page) {
       ...window.fixtureData["users:me"],
       badges: ["premium", "verified"],
       primaryBadge: "premium",
-      premiumUntil: Date.now() + 86400000,
+      premiumUntil: Date.now() + 23 * 60 * 60 * 1000,
       premiumBadgeTier: "Glacier",
       premiumSince: Date.now(),
       premiumStreakSince: Date.now(),
@@ -30,21 +30,26 @@ export async function checkGiftExperience(page) {
       serverJoinedAt: null,
     });
   });
+  await expect(
+    page.getByRole("complementary", {
+      name: "Premium renewal warning",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Renew Premium", exact: true }),
+  ).toHaveAttribute("href", "/dashboard?settings=premium");
   const assertSingleTier = async (container) => {
-    await expect(
-      container.locator('[aria-label^="Glacier Premium:"]'),
-    ).toHaveCount(1);
+    await expect(container.locator('[aria-label^="Glacier:"]')).toHaveCount(1);
     await expect(
       container.locator(
-        '[aria-label="Profile badges"] [aria-label*="Premium:"]',
+        '[aria-label="Profile badges"] [aria-label^="Glacier:"]',
       ),
     ).toHaveCount(0);
-    await expect(
-      container.locator('[aria-label^="Glacier Premium:"]'),
-    ).toContainText("GLACIER");
-    await expect(
-      container.locator('[aria-label^="Premium Premium:"]'),
-    ).toHaveCount(0);
+    await expect(container.locator('[aria-label^="Glacier:"]')).toContainText(
+      "GLACIER",
+    );
+    await expect(container.locator('[aria-label^="Premium:"]')).toHaveCount(0);
   };
   await page
     .getByRole("button", { name: /Alex Morgan.*Making something good/ })

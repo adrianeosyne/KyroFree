@@ -7,6 +7,12 @@ import {
 
 const crons = cronJobs();
 crons.interval(
+  "reconcile Premium warnings and expiry",
+  { minutes: 5 },
+  makeFunctionReference<"mutation">("premium:reconcileExpirations"),
+  {},
+);
+crons.interval(
   "expire presence leases",
   { minutes: 1 },
   makeFunctionReference<"mutation">("presence:expire"),

@@ -1,5 +1,9 @@
 import { hasPremium } from "./entitlements";
 export const DAY_MS = 86400000;
+export const MAX_PREMIUM_DAYS = 36500;
+export function validPremiumDuration(days: number) {
+  return Number.isInteger(days) && days >= 1 && days <= MAX_PREMIUM_DAYS;
+}
 export const PREMIUM_DURATIONS = [
   { days: 30, label: "1 month" },
   { days: 90, label: "3 months" },

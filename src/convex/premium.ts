@@ -9,7 +9,11 @@ import {
   requireServerAccess,
   isPlatformStaff,
 } from "./lib";
-import { DAY_MS } from "../lib/premiumProgress";
+import {
+  DAY_MS,
+  MAX_PREMIUM_DAYS,
+  validPremiumDuration,
+} from "../lib/premiumProgress";
 import { premiumDuration } from "../lib/premiumGifts";
 import { hasPremium } from "../lib/entitlements";
 import { premiumBadgeTierValidator } from "./schema";
@@ -22,11 +26,13 @@ export async function extendPremium(
 ) {
   const now = Date.now(),
     active = (user.premiumUntil ?? 0) > now;
+  await clearExpiryReminder(ctx, user);
   await ctx.db.patch(user._id, {
     premiumUntil: Math.max(now, user.premiumUntil ?? 0) + days * DAY_MS,
     premiumSince: user.premiumSince ?? now,
     premiumStreakSince: active ? (user.premiumStreakSince ?? now) : now,
     premiumBadgeTier: active ? user.premiumBadgeTier : undefined,
+    premiumReminderFor: undefined,
   });
 }
 import { joinKyroHq } from "./servers";
@@ -70,7 +76,19 @@ export async function syncPremiumAccess(
 ) {
   await joinKyroHq(ctx, userId);
   const user = await ctx.db.get(userId);
-  if (user?.premiumUntil && user.premiumUntil > Date.now())
+  if (user?.premiumUntil && user.premiumUntil > Date.now()) {
+    const warningAt = user.premiumUntil - DAY_MS;
+    if (warningAt <= Date.now())
+      await sendExpiryReminder(ctx, userId, user.premiumUntil);
+    else
+      await ctx.scheduler.runAt(
+        warningAt,
+        makeFunctionReference<
+          "mutation",
+          { userId: Id<"users">; expectedUntil: number }
+        >("premium:remindExpiry"),
+        { userId, expectedUntil: user.premiumUntil },
+      );
     await ctx.scheduler.runAt(
       user.premiumUntil,
       makeFunctionReference<
@@ -79,6 +97,65 @@ export async function syncPremiumAccess(
       >("premium:expire"),
       { userId, expectedUntil: user.premiumUntil },
     );
+  }
+}
+
+async function sendExpiryReminder(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  expectedUntil: number,
+) {
+  const user = await ctx.db.get(userId);
+  const now = Date.now();
+  if (
+    !user ||
+    user.deletedAt ||
+    user.botApplicationId ||
+    user.premiumUntil !== expectedUntil ||
+    user.premiumReminderFor === expectedUntil ||
+    expectedUntil <= now ||
+    expectedUntil - now > DAY_MS
+  )
+    return false;
+  await ctx.db.insert("notifications", {
+    userId,
+    type: "system",
+    title: "Premium expires in one day or less",
+    body: `Your Premium ends ${new Date(expectedUntil).toISOString()}. Renew before then to keep your Premium badge and perks.`,
+    link: "/dashboard?settings=premium",
+    containerKey: `premium-expiry:${expectedUntil}`,
+    read: false,
+    createdAt: now,
+  });
+  await ctx.db.patch(userId, { premiumReminderFor: expectedUntil });
+  return true;
+}
+
+async function removePremium(ctx: MutationCtx, user: Doc<"users">) {
+  await clearExpiryReminder(ctx, user);
+  await ctx.db.patch(user._id, {
+    premiumUntil: undefined,
+    premiumStreakSince: undefined,
+    premiumBadgeTier: undefined,
+    premiumReminderFor: undefined,
+    ...(user.primaryBadge === "premium" ? { primaryBadge: undefined } : {}),
+  });
+  await syncPremiumAccess(ctx, user._id);
+}
+
+async function clearExpiryReminder(ctx: MutationCtx, user: Doc<"users">) {
+  if (user.premiumReminderFor === undefined) return;
+  const warnings = await ctx.db
+    .query("notifications")
+    .withIndex("by_user_container_unread", (q) =>
+      q
+        .eq("userId", user._id)
+        .eq("containerKey", `premium-expiry:${user.premiumReminderFor}`)
+        .eq("read", false),
+    )
+    .collect();
+  for (const warning of warnings)
+    await ctx.db.patch(warning._id, { read: true });
 }
 
 export const communityBenefits = query({
@@ -210,6 +287,7 @@ export const review = mutation({
   args: {
     requestId: v.id("premiumRequests"),
     approve: v.boolean(),
+    days: v.optional(v.number()),
     note: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -222,15 +300,20 @@ export const review = mutation({
     const recipient = await ctx.db.get(request.recipientId);
     if (args.approve && (!recipient || recipient.deletedAt))
       throw new Error("This recipient is no longer available.");
-    if (args.approve && recipient) await extendPremium(ctx, recipient, 30);
+    const days = args.days ?? 30;
+    if (!validPremiumDuration(days))
+      throw new Error(
+        `Choose a duration from 1 to ${MAX_PREMIUM_DAYS} whole days.`,
+      );
+    if (args.approve && recipient) await extendPremium(ctx, recipient, days);
     if (args.approve && recipient) await syncPremiumAccess(ctx, recipient._id);
     if (args.approve && recipient && request.requesterId !== recipient._id) {
       await recordPremiumGift(
         ctx,
         request.requesterId,
         recipient._id,
-        30,
-        Math.max(Date.now(), recipient.premiumUntil ?? 0) + 30 * DAY_MS,
+        days,
+        Math.max(Date.now(), recipient.premiumUntil ?? 0) + days * DAY_MS,
       );
     }
     await ctx.db.patch(request._id, {
@@ -247,12 +330,16 @@ export const review = mutation({
         : "premium_payment_rejected",
       targetType: "user",
       targetId: request.recipientId,
-      details: "Manual monthly Premium request reviewed.",
+      details: `Manual ${days}-day Premium request reviewed.`,
     });
   },
 });
 export const grant = mutation({
-  args: { userId: v.id("users"), revoke: v.optional(v.boolean()) },
+  args: {
+    userId: v.id("users"),
+    revoke: v.optional(v.boolean()),
+    days: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     const { id, user } = await requireActiveUser(ctx);
     if (!isFounderUser(user))
@@ -260,22 +347,126 @@ export const grant = mutation({
     const target = await ctx.db.get(args.userId);
     if (!target || target.deletedAt || target.botApplicationId)
       throw new Error("Choose an active member.");
-    if (args.revoke)
-      await ctx.db.patch(target._id, {
-        premiumUntil: undefined,
-        premiumStreakSince: undefined,
-        premiumBadgeTier: undefined,
-      });
-    else await extendPremium(ctx, target, 30);
-    await syncPremiumAccess(ctx, target._id);
+    const days = args.days ?? 30;
+    if (!validPremiumDuration(days))
+      throw new Error(
+        `Choose a duration from 1 to ${MAX_PREMIUM_DAYS} whole days.`,
+      );
+    if (args.revoke) await removePremium(ctx, target);
+    else {
+      await extendPremium(ctx, target, days);
+      await syncPremiumAccess(ctx, target._id);
+    }
     await ctx.db.insert("adminActions", {
       createdAt: Date.now(),
       actorId: id,
       action: args.revoke ? "premium_revoked" : "premium_granted",
       targetType: "user",
       targetId: target._id,
-      details: args.revoke ? "Premium revoked." : "30 days of Premium granted.",
+      details: args.revoke
+        ? "Premium revoked."
+        : `${days} days of Premium granted.`,
     });
+  },
+});
+
+/** Founder edits history independently; timing edits use total and elapsed days. */
+export const updateSubscription = mutation({
+  args: {
+    userId: v.id("users"),
+    premiumSince: v.optional(v.number()),
+    durationDays: v.optional(v.number()),
+    streakDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const { id, user } = await requireActiveUser(ctx);
+    if (!isFounderUser(user))
+      throw new Error("Only adrianeosyne can manage Premium.");
+    const target = await ctx.db.get(args.userId);
+    if (!target || target.deletedAt || target.botApplicationId)
+      throw new Error("Choose an active member.");
+    const now = Date.now();
+    if (
+      args.premiumSince === undefined &&
+      args.durationDays === undefined &&
+      args.streakDays === undefined
+    )
+      throw new Error(
+        "Change the Premium since date, duration or days in a row.",
+      );
+    if (
+      args.premiumSince !== undefined &&
+      (!Number.isFinite(args.premiumSince) ||
+        args.premiumSince < 0 ||
+        args.premiumSince > now)
+    )
+      throw new Error(
+        "Premium since must be a valid date that is not in the future.",
+      );
+    if (
+      args.durationDays !== undefined &&
+      !validPremiumDuration(args.durationDays)
+    )
+      throw new Error(
+        `Choose a duration from 1 to ${MAX_PREMIUM_DAYS} whole days.`,
+      );
+    if (
+      args.streakDays !== undefined &&
+      (!Number.isInteger(args.streakDays) ||
+        args.streakDays < 0 ||
+        args.streakDays > MAX_PREMIUM_DAYS)
+    )
+      throw new Error(
+        `Days in a row must be a whole number from 0 to ${MAX_PREMIUM_DAYS}.`,
+      );
+    const timingChanged =
+      args.durationDays !== undefined || args.streakDays !== undefined;
+    const active = hasPremium(target, now);
+    const oldStart = active ? (target.premiumStreakSince ?? now) : now;
+    const durationDays =
+      args.durationDays ??
+      (active ? (target.premiumUntil! - oldStart) / DAY_MS : 30);
+    const streakSince =
+      args.streakDays === undefined ? oldStart : now - args.streakDays * DAY_MS;
+    const until = timingChanged
+      ? streakSince + durationDays * DAY_MS
+      : target.premiumUntil;
+    if (timingChanged && until !== target.premiumUntil)
+      await clearExpiryReminder(ctx, target);
+    await ctx.db.patch(target._id, {
+      ...(args.premiumSince !== undefined
+        ? { premiumSince: args.premiumSince }
+        : timingChanged && target.premiumSince === undefined
+          ? { premiumSince: streakSince }
+          : {}),
+      ...(timingChanged
+        ? {
+            premiumUntil: until,
+            premiumStreakSince: streakSince,
+            premiumBadgeTier: active ? target.premiumBadgeTier : undefined,
+            premiumReminderFor:
+              until === target.premiumUntil
+                ? target.premiumReminderFor
+                : undefined,
+          }
+        : {}),
+    });
+    if (timingChanged) {
+      if (until! <= now)
+        await removePremium(ctx, (await ctx.db.get(target._id))!);
+      else await syncPremiumAccess(ctx, target._id);
+    }
+    await ctx.db.insert("adminActions", {
+      createdAt: now,
+      actorId: id,
+      action: "premium_subscription_updated",
+      targetType: "user",
+      targetId: target._id,
+      details: `Premium since ${new Date(args.premiumSince ?? target.premiumSince ?? streakSince).toISOString()}${timingChanged ? ` · ${durationDays} total days · ends ${new Date(until!).toISOString()}` : " · expiry unchanged"}.`,
+    });
+    return {
+      premiumUntil: timingChanged && until! <= now ? null : (until ?? null),
+    };
   },
 });
 
@@ -336,18 +527,74 @@ export const expire = internalMutation({
   args: { userId: v.id("users"), expectedUntil: v.number() },
   handler: async (ctx, { userId, expectedUntil }) => {
     const user = await ctx.db.get(userId);
+    if (!user || user.premiumUntil !== expectedUntil || user.deletedAt) return;
+    if (expectedUntil > Date.now()) {
+      await ctx.scheduler.runAt(
+        expectedUntil + 1,
+        makeFunctionReference<
+          "mutation",
+          { userId: Id<"users">; expectedUntil: number }
+        >("premium:expire"),
+        { userId, expectedUntil },
+      );
+      return;
+    }
+    await removePremium(ctx, user);
+  },
+});
+
+export const remindExpiry = internalMutation({
+  args: { userId: v.id("users"), expectedUntil: v.number() },
+  handler: async (ctx, { userId, expectedUntil }) => {
+    const user = await ctx.db.get(userId);
     if (
       !user ||
+      user.deletedAt ||
       user.premiumUntil !== expectedUntil ||
-      expectedUntil > Date.now()
+      user.premiumReminderFor === expectedUntil
     )
-      return;
-    await ctx.db.patch(userId, {
-      premiumUntil: undefined,
-      premiumStreakSince: undefined,
-      premiumBadgeTier: undefined,
-    });
-    await syncPremiumAccess(ctx, userId);
+      return false;
+    if (Date.now() < expectedUntil - DAY_MS) {
+      await ctx.scheduler.runAt(
+        expectedUntil - DAY_MS + 1,
+        makeFunctionReference<
+          "mutation",
+          { userId: Id<"users">; expectedUntil: number }
+        >("premium:remindExpiry"),
+        { userId, expectedUntil },
+      );
+      return false;
+    }
+    return sendExpiryReminder(ctx, userId, expectedUntil);
+  },
+});
+
+/** Covers existing subscriptions and recovers missed scheduled jobs in bounded batches. */
+export const reconcileExpirations = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const due = await ctx.db
+      .query("users")
+      .withIndex("by_premium_until", (q) =>
+        q.gt("premiumUntil", 0).lte("premiumUntil", now + DAY_MS),
+      )
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("deletedAt"), undefined),
+          q.eq(q.field("botApplicationId"), undefined),
+          q.or(
+            q.lte(q.field("premiumUntil"), now),
+            q.neq(q.field("premiumReminderFor"), q.field("premiumUntil")),
+          ),
+        ),
+      )
+      .take(100);
+    for (const user of due) {
+      if (user.premiumUntil! <= now) await removePremium(ctx, user);
+      else await sendExpiryReminder(ctx, user._id, user.premiumUntil!);
+    }
+    return { processed: due.length };
   },
 });
 

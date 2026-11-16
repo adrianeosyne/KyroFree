@@ -124,6 +124,10 @@ the web app to their home screen; there is no native iOS release.
 
 ## Premium gifts
 
+The founder can edit subscription dates, durations and days in a row in the
+Admin Portal. Members receive a one-day renewal warning, and Premium perks end
+automatically at expiry. See [Premium subscription controls](docs/premium-subscriptions.md).
+
 In Settings → Premium, enter an unused redeem code and choose **Create gift
 link**. Share the resulting `https://kyro-chat.cyou/gift/<code>` link. The first
 signed-in member to claim it receives its full duration; existing Premium time

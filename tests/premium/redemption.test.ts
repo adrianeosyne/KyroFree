@@ -44,6 +44,22 @@ async function setup() {
   };
 }
 describe("Premium redeem codes", () => {
+  it("redeems a custom whole-day duration and rejects out-of-range durations", async () => {
+    const f = await setup();
+    for (const days of [-1, 1.5, 36501]) {
+      await expect(
+        f.founder.mutation(api.premiumCodes.generate, { days }),
+      ).rejects.toThrow("whole-number duration");
+    }
+    const { code } = await f.founder.mutation(api.premiumCodes.generate, {
+      days: 45,
+    });
+    expect(
+      await f.user.mutation(api.premiumCodes.redeem, { code }),
+    ).toMatchObject({ ok: true, days: 45 });
+    const status = await f.user.query(api.premium.status);
+    expect(status.premiumUntil).toBe(status.premiumStreakSince! + 45 * DAY_MS);
+  });
   it("lets only the configured founder generate supported durations and never stores or lists full codes", async () => {
     const f = await setup();
     for (const actor of [f.user, f.other, f.staff])
@@ -51,8 +67,8 @@ describe("Premium redeem codes", () => {
         actor.mutation(api.premiumCodes.generate, { days: 30 }),
       ).rejects.toThrow("Only adrianeosyne");
     await expect(
-      f.founder.mutation(api.premiumCodes.generate, { days: 7 }),
-    ).rejects.toThrow("1, 3 or 6");
+      f.founder.mutation(api.premiumCodes.generate, { days: 0 }),
+    ).rejects.toThrow("whole-number duration");
     for (const duration of PREMIUM_DURATIONS) {
       const { code } = await f.founder.mutation(api.premiumCodes.generate, {
         days: duration.days,

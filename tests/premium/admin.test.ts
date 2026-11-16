@@ -252,4 +252,218 @@ describe("Founder Premium administration", () => {
       }),
     ).rejects.toThrow();
   });
+
+  it("lets only the configured founder edit subscription dates and custom durations", async () => {
+    const f = await setup();
+    for (const userId of [
+      f.ids.member,
+      f.ids.admin,
+      f.ids.staff,
+      f.ids.impostor,
+    ]) {
+      const actor = f.t.withIdentity({ subject: userId });
+      await expect(
+        actor.mutation(api.premium.updateSubscription, {
+          userId: f.ids.member,
+          durationDays: 45,
+          streakDays: 29,
+        }),
+      ).rejects.toThrow("Only adrianeosyne");
+    }
+    for (const days of [0, -1, 1.5, 36501]) {
+      await expect(
+        f.founder.mutation(api.premium.updateSubscription, {
+          userId: f.ids.member,
+          durationDays: days,
+        }),
+      ).rejects.toThrow("whole days");
+    }
+    for (const streakDays of [-1, 0.5, 36501]) {
+      await expect(
+        f.founder.mutation(api.premium.updateSubscription, {
+          userId: f.ids.member,
+          streakDays,
+        }),
+      ).rejects.toThrow("Days in a row");
+    }
+    await expect(
+      f.founder.mutation(api.premium.updateSubscription, {
+        userId: f.ids.member,
+        premiumSince: Date.now() + DAY_MS,
+      }),
+    ).rejects.toThrow("not in the future");
+    await f.t.run((ctx) =>
+      ctx.db.patch(f.ids.member, { deletedAt: Date.now() }),
+    );
+    await expect(
+      f.founder.mutation(api.premium.updateSubscription, {
+        userId: f.ids.member,
+        durationDays: 45,
+      }),
+    ).rejects.toThrow("active member");
+  });
+
+  it("edits Premium since without altering the expiry or real streak", async () => {
+    const f = await setup();
+    const now = Date.now();
+    await f.founder.mutation(api.premium.grant, {
+      userId: f.ids.member,
+      days: 45,
+    });
+    const before = await f.member.query(api.premium.status);
+    await f.founder.mutation(api.premium.updateSubscription, {
+      userId: f.ids.member,
+      premiumSince: now - 200 * DAY_MS,
+    });
+    const after = await f.member.query(api.premium.status);
+    expect(after.premiumSince).toBe(now - 200 * DAY_MS);
+    expect(after.premiumUntil).toBe(before.premiumUntil);
+    expect(after.premiumStreakSince).toBe(before.premiumStreakSince);
+    expect(
+      (await f.member.query(api.users.profile, { userId: f.ids.member }))?.user
+        .premiumSince,
+    ).toBe(after.premiumSince);
+  });
+
+  it("warns immediately for 29 elapsed days of a 30-day plan and automatically removes Premium on day 30", async () => {
+    const f = await setup();
+    const now = Date.now();
+    await f.founder.mutation(api.premium.setBadgeTier, {
+      userId: f.ids.member,
+      tier: "Celestial",
+    });
+    await f.t.run((ctx) =>
+      ctx.db.patch(f.ids.member, { primaryBadge: "premium" }),
+    );
+    await f.founder.mutation(api.premium.updateSubscription, {
+      userId: f.ids.member,
+      premiumSince: now - 29 * DAY_MS,
+      streakDays: 29,
+    });
+    await vi.advanceTimersByTimeAsync(10);
+    const status = await f.member.query(api.premium.status);
+    expect(status.premiumUntil).toBe(status.premiumStreakSince! + 30 * DAY_MS);
+    expect(Math.round((status.premiumUntil! - Date.now()) / DAY_MS)).toBe(1);
+    expect(premiumDays(status)).toBe(29);
+    const warnings = await f.t.run((ctx) =>
+      ctx.db.query("notifications").collect(),
+    );
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      userId: f.ids.member,
+      type: "system",
+      read: false,
+      link: "/dashboard?settings=premium",
+    });
+    await f.t.mutation(internal.premium.remindExpiry, {
+      userId: f.ids.member,
+      expectedUntil: status.premiumUntil!,
+    });
+    expect(
+      await f.t.run((ctx) => ctx.db.query("notifications").collect()),
+    ).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(status.premiumUntil! - Date.now() + 10);
+    await f.t.finishInProgressScheduledFunctions();
+    const expired = await f.member.query(api.premium.status);
+    expect(expired.premiumUntil).toBeNull();
+    expect(expired.premiumBadgeTier).toBeNull();
+    expect(expired.premiumStreakSince).toBeNull();
+    expect(expired.premiumSince).toBe(now - 29 * DAY_MS);
+    expect(
+      (await f.member.query(api.users.profile, { userId: f.ids.member }))?.user
+        .badges,
+    ).not.toContain("premium");
+    expect(
+      (await f.t.run((ctx) => ctx.db.get(f.ids.member)))?.primaryBadge,
+    ).toBeUndefined();
+    await expect(
+      f.member.mutation(api.premium.enterLounge, {}),
+    ).rejects.toThrow("Premium lounge");
+  });
+
+  it("sends the scheduled warning at 24 hours and keeps renewals safe from old warnings and expiry jobs", async () => {
+    const f = await setup();
+    // Native JavaScript timers cap delays below 25 days; the 29/30-day case
+    // above covers a backdated month while this case exercises future jobs.
+    await f.founder.mutation(api.premium.grant, {
+      userId: f.ids.member,
+      days: 3,
+    });
+    const original = (await f.member.query(api.premium.status)).premiumUntil!;
+    await vi.advanceTimersByTimeAsync(original - DAY_MS - Date.now() - 1);
+    await f.t.finishInProgressScheduledFunctions();
+    expect(
+      await f.t.run((ctx) => ctx.db.query("notifications").collect()),
+    ).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(10);
+    await f.t.finishInProgressScheduledFunctions();
+    expect(
+      await f.t.run((ctx) => ctx.db.query("notifications").collect()),
+    ).toHaveLength(1);
+    await f.founder.mutation(api.premium.grant, {
+      userId: f.ids.member,
+      days: 5,
+    });
+    const renewal = (await f.member.query(api.premium.status)).premiumUntil!;
+    expect(renewal).toBe(original + 5 * DAY_MS);
+    await vi.advanceTimersByTimeAsync(original - Date.now() + 10);
+    await f.t.finishInProgressScheduledFunctions();
+    expect((await f.member.query(api.premium.status)).premiumUntil).toBe(
+      renewal,
+    );
+    expect(
+      (await f.t.run((ctx) => ctx.db.query("notifications").collect()))[0].read,
+    ).toBe(true);
+    expect(
+      await f.t.mutation(internal.premium.remindExpiry, {
+        userId: f.ids.member,
+        expectedUntil: original,
+      }),
+    ).toBe(false);
+    await vi.advanceTimersByTimeAsync(renewal - DAY_MS - Date.now() + 10);
+    await f.t.finishInProgressScheduledFunctions();
+    const warnings = await f.t.run((ctx) =>
+      ctx.db.query("notifications").collect(),
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings.filter((warning) => !warning.read)).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(DAY_MS);
+    await f.t.finishInProgressScheduledFunctions();
+    expect(hasPremium(await f.member.query(api.premium.status))).toBe(false);
+  });
+
+  it("recovers warnings and expiry for existing subscriptions, including immediately ended custom plans", async () => {
+    const f = await setup();
+    const now = Date.now();
+    await f.t.run((ctx) =>
+      ctx.db.patch(f.ids.member, {
+        premiumUntil: now + DAY_MS / 2,
+        premiumSince: now - 29 * DAY_MS,
+        premiumStreakSince: now - 29 * DAY_MS,
+      }),
+    );
+    expect(
+      await f.t.mutation(internal.premium.reconcileExpirations, {}),
+    ).toEqual({ processed: 1 });
+    expect(
+      await f.t.mutation(internal.premium.reconcileExpirations, {}),
+    ).toEqual({ processed: 0 });
+    vi.setSystemTime(now + DAY_MS);
+    await f.t.mutation(internal.premium.reconcileExpirations, {});
+    expect((await f.member.query(api.premium.status)).premiumUntil).toBeNull();
+    await f.founder.mutation(api.premium.updateSubscription, {
+      userId: f.ids.member,
+      durationDays: 30,
+      streakDays: 30,
+    });
+    expect(hasPremium(await f.member.query(api.premium.status))).toBe(false);
+    await f.founder.mutation(api.premium.updateSubscription, {
+      userId: f.ids.member,
+      durationDays: 45,
+      streakDays: 29,
+    });
+    const custom = await f.member.query(api.premium.status);
+    expect(custom.premiumUntil).toBe(custom.premiumStreakSince! + 45 * DAY_MS);
+    expect(Math.round((custom.premiumUntil! - Date.now()) / DAY_MS)).toBe(16);
+  });
 });
