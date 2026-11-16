@@ -1,23 +1,50 @@
 import { useQuery } from "convex/react";
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import {
+  Component,
+  lazy,
+  Suspense,
+  type ErrorInfo,
+  type ReactNode,
+} from "react";
 import { Navigate, Route, Routes, useParams } from "react-router";
 import { ArrowLeft, Hash } from "@/components/icons";
 import { AppLoading } from "@/components/AppLoading";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { AdminPortal } from "@/components/app/AdminPortal";
+
 import { AppShell } from "@/components/app/AppShell";
 import { ChannelChat, DirectChat } from "@/components/app/ChatView";
 import { DiscoverView } from "@/components/app/DiscoverView";
 import { FriendsView } from "@/components/app/Friends";
 import { ForumChannelPage } from "@/components/app/ForumChannelPage";
 import { MembershipGate } from "@/components/app/MembershipGate";
-import { ServerSettings } from "@/components/app/ServerSettings";
+
 import { ServerThemeScope } from "@/components/app/ServerThemeScope";
 import { VoiceChannelPage } from "@/components/app/VoiceChannelPage";
 import { Button } from "@/components/ui/button";
 import Developers from "./Developers";
 import BotDirectory, { BotAuthorization } from "./BotDirectory";
+
+const AdminPortal = lazy(() =>
+  import("@/components/app/AdminPortal").then((m) => ({
+    default: m.AdminPortal,
+  })),
+);
+const ServerSettings = lazy(() =>
+  import("@/components/app/ServerSettings").then((m) => ({
+    default: m.ServerSettings,
+  })),
+);
+const ServerLobby = lazy(() =>
+  import("@/components/app/ServerLobby").then((m) => ({
+    default: m.ServerLobby,
+  })),
+);
+const ShardsBoard = lazy(() =>
+  import("@/components/app/ServerLobby").then((m) => ({
+    default: m.ShardsBoard,
+  })),
+);
 
 /** The signed-in product: everything lives inside the AppShell frame and is
  *  routed underneath it — friends home, DMs, community channels and the
@@ -30,38 +57,46 @@ export default function Dashboard() {
     // preview-runtime-error stack.
     <RouteErrorBoundary>
       <AppShell>
-        <Routes>
-          <Route index element={<FriendsView />} />
-          <Route path="discover" element={<DiscoverView />} />
-          <Route path="developers/:applicationId?" element={<Developers />} />
-          <Route
-            path="bots/authorize/:applicationId"
-            element={<BotAuthorization />}
-          />
-          <Route path="bots/:applicationId?" element={<BotDirectory />} />
-          {/* Staff console — admins and moderators sign in with their Kyro
+        <Suspense
+          fallback={
+            <AppLoading fullScreen={false} label="Opening your space" />
+          }
+        >
+          <Routes>
+            <Route index element={<FriendsView />} />
+            <Route path="discover" element={<DiscoverView />} />
+            <Route path="shards" element={<ShardsBoard />} />
+            <Route path="s/:serverId/lobby" element={<LobbyRoute />} />
+            <Route path="developers/:applicationId?" element={<Developers />} />
+            <Route
+              path="bots/authorize/:applicationId"
+              element={<BotAuthorization />}
+            />
+            <Route path="bots/:applicationId?" element={<BotDirectory />} />
+            {/* Staff console — admins and moderators sign in with their Kyro
             account; the page itself gates access server-side. */}
-          <Route path="admin" element={<AdminPortal />} />
-          <Route path="dm" element={<Navigate to="/dashboard" replace />} />
-          <Route path="dm/:conversationId" element={<DirectChatRoute />} />
-          <Route path="s/:serverId" element={<ServerIndexRoute />} />
-          <Route path="s/:serverId/c/:channelId" element={<ChannelRoute />} />
-          <Route
-            path="s/:serverId/v/:channelId"
-            element={<VoiceChannelRoute />}
-          />
-          <Route
-            path="s/:serverId/f/:channelId"
-            element={<ForumChannelRoute />}
-          />
-          <Route
-            path="s/:serverId/settings/*"
-            element={<ServerSettingsRoute />}
-          />
-          {/* Wildcard must be last: any unknown slug within the dashboard falls back
+            <Route path="admin" element={<AdminPortal />} />
+            <Route path="dm" element={<Navigate to="/dashboard" replace />} />
+            <Route path="dm/:conversationId" element={<DirectChatRoute />} />
+            <Route path="s/:serverId" element={<ServerIndexRoute />} />
+            <Route path="s/:serverId/c/:channelId" element={<ChannelRoute />} />
+            <Route
+              path="s/:serverId/v/:channelId"
+              element={<VoiceChannelRoute />}
+            />
+            <Route
+              path="s/:serverId/f/:channelId"
+              element={<ForumChannelRoute />}
+            />
+            <Route
+              path="s/:serverId/settings/*"
+              element={<ServerSettingsRoute />}
+            />
+            {/* Wildcard must be last: any unknown slug within the dashboard falls back
             to the current community instead of a hard 404. */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </Suspense>
       </AppShell>
     </RouteErrorBoundary>
   );
@@ -190,6 +225,10 @@ function ServerIndexRoute() {
 
 function ServerIndexContent() {
   const { serverId } = useParams();
+  const lobby = useQuery(
+    api.lobby.status,
+    serverId ? { serverId: serverId as Id<"servers"> } : "skip",
+  );
   const channels = useQuery(
     api.channels.list,
     serverId ? { serverId: serverId as Id<"servers"> } : "skip",
@@ -197,9 +236,12 @@ function ServerIndexContent() {
 
   if (!serverId) return <Navigate to="/dashboard" replace />;
 
-  if (channels === undefined) {
+  if (channels === undefined || lobby === undefined) {
     return <AppLoading fullScreen={false} label="Opening this community" />;
   }
+
+  if (lobby?.enabled)
+    return <Navigate to={`/dashboard/s/${serverId}/lobby`} replace />;
 
   // Prefer a text channel as the landing view; fall back to the first voice
   // channel (routed through /v/) when that's all the community has.
@@ -227,5 +269,16 @@ function ServerIndexContent() {
         sidebar, or invite people to start the conversation.
       </p>
     </div>
+  );
+}
+
+function LobbyRoute() {
+  const { serverId } = useParams();
+  return serverId ? (
+    <MembershipGate serverId={serverId}>
+      <ServerLobby key={serverId} serverId={serverId} />
+    </MembershipGate>
+  ) : (
+    <Navigate to="/dashboard" replace />
   );
 }

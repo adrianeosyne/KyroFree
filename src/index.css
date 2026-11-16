@@ -967,3 +967,26 @@ html[data-workspace="true"] .kyro-app-shell .message-row {
     width: calc(var(--workspace-sidebarWidth) * 1px);
   }
 }
+
+html[data-workspace="true"] .kyro-chat-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--workspace-image);
+  background-size: var(--workspace-backgroundFit);
+  background-position: var(--workspace-backgroundPosition);
+  opacity: calc(var(--workspace-backgroundOpacity) * 0.01);
+  filter: blur(calc(var(--workspace-backgroundBlur) * 1px));
+}
+html[data-workspace="true"] .kyro-chat-surface {
+  background: var(--workspace-background);
+}
+html[data-workspace="true"] .kyro-chat-surface > .bg-panel {
+  background-color: color-mix(in srgb, var(--workspace-panel) 85%, transparent);
+}
+
+html[data-chat-backgrounds="false"] .kyro-chat-surface::before {
+  display: none;
+}

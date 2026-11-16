@@ -77,6 +77,10 @@ import {
 } from "@/components/ui/dialog";
 
 export interface MessageAuthor {
+  premiumUntil?: number | null;
+  premiumSince?: number | null;
+  premiumStreakSince?: number | null;
+  premiumGiftCount?: number;
   botApplicationId?: string | null;
   id: string;
   name: string;
@@ -205,6 +209,7 @@ export function MessageList({
   mentionUsers?: { id: string; name: string; username: string | null }[];
 }) {
   const [olderPages, setOlderPages] = useState<MessageDto[][]>([]);
+  const groupMessages = useUiStore((state) => state.groupMessages);
   const [cursor, setCursor] = useState<{
     container: string;
     at: number;
@@ -357,6 +362,7 @@ export function MessageList({
                   !previous ||
                   dayKey(previous.createdAt) !== dayKey(message.createdAt);
                 const grouped =
+                  groupMessages &&
                   !newDay &&
                   previous?.authorId === message.authorId &&
                   previous?.kind === message.kind &&
@@ -519,6 +525,7 @@ function MessageRow({
 }) {
   const [editing, setEditing] = useState(false);
   const mediaPreviews = useUiStore((state) => state.mediaPreviews);
+  const timestampFormat = useUiStore((state) => state.timestampFormat);
   const [draft, setDraft] = useState(message.content);
   const [, setParams] = useSearchParams();
   const convex = useConvex();
@@ -845,7 +852,7 @@ function MessageRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{label}</p>
           <p className="text-[11px] text-muted-foreground">
-            {formatTime(message.createdAt)}
+            {formatTime(message.createdAt, timestampFormat)}
           </p>
         </div>
       </div>
@@ -918,7 +925,7 @@ function MessageRow({
                   ) : null}
                   <span className="text-[11px] text-muted-foreground">
                     {dayLabel(message.createdAt)}{" "}
-                    {formatTime(message.createdAt)}
+                    {formatTime(message.createdAt, timestampFormat)}
                   </span>
                   {message.pinnedAt && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">

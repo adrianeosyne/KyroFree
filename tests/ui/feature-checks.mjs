@@ -199,7 +199,7 @@ export async function checkFeatures(page) {
   await page.getByLabel("Search server settings").fill("");
   await page
     .getByRole("navigation", { name: "Server settings" })
-    .getByRole("button", { name: "Events & supercharge" })
+    .getByRole("button", { name: "Events" })
     .click();
   await expect(
     page.getByRole("heading", { name: "Schedule an event" }),

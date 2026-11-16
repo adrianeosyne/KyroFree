@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "./functions";
 import { requireActiveUser, requireServerAccess } from "./lib";
 import { PERMISSIONS, hasPermission } from "../lib/permissions";
-import { hasPremium } from "../lib/entitlements";
+
 import type { Ctx } from "./lib";
 import type { Id } from "./_generated/dataModel";
 async function access(ctx: Ctx, serverId: Id<"servers">) {
@@ -228,46 +228,5 @@ export const setTicketStatus = mutation({
       ...(args.claim ? { assignedTo: a.id } : {}),
       updatedAt: Date.now(),
     });
-  },
-});
-export const supercharge = mutation({
-  args: { serverId: v.id("servers") },
-  handler: async (ctx, { serverId }) => {
-    const a = await access(ctx, serverId);
-    if (!hasPremium(a.user))
-      throw new Error("Supercharge requires active Premium.");
-    const row = await ctx.db
-      .query("serverSupercharges")
-      .withIndex("by_user", (q) => q.eq("userId", a.id))
-      .unique();
-    if (row)
-      await ctx.db.patch(row._id, { serverId, until: a.user.premiumUntil! });
-    else
-      await ctx.db.insert("serverSupercharges", {
-        serverId,
-        userId: a.id,
-        until: a.user.premiumUntil!,
-      });
-  },
-});
-export const supporters = query({
-  args: { serverId: v.id("servers") },
-  handler: async (ctx, { serverId }) => {
-    await access(ctx, serverId);
-    const rows = await ctx.db
-      .query("serverSupercharges")
-      .withIndex("by_server", (q) => q.eq("serverId", serverId))
-      .collect();
-    const people = await Promise.all(
-      rows
-        .filter((r) => r.until > Date.now())
-        .map(async (r) => {
-          const user = await ctx.db.get(r.userId);
-          return hasPremium(user)
-            ? { id: r.userId, name: user?.name ?? "Member" }
-            : null;
-        }),
-    );
-    return people.filter((x) => x !== null);
   },
 });

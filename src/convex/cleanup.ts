@@ -284,6 +284,18 @@ export async function deleteServerData(
     .withIndex("by_server", (q) => q.eq("serverId", serverId))
     .collect();
   for (const row of charges) await ctx.db.delete(row._id);
+  for (const table of [
+    "serverLobbies",
+    "lobbyFeed",
+    "serverActivity",
+    "serverInviteCredits",
+  ] as const) {
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect();
+    for (const row of rows) await ctx.db.delete(row._id);
+  }
   await ctx.db.delete(serverId);
 }
 

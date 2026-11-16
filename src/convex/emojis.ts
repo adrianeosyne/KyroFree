@@ -45,7 +45,7 @@ export const forServer = query({
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
     return {
-      emojiLimit: (await serverBenefits(ctx, serverId)).emojiSlots,
+      emojiLimit: (await serverBenefits()).emojiSlots,
       canManage:
         can(access.permissions, PERMISSIONS.MANAGE_EMOJIS) ||
         can(access.permissions, PERMISSIONS.MANAGE_SERVER),
@@ -228,7 +228,7 @@ export const create = mutation({
       .query("serverEmojis")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
-    const emojiLimit = (await serverBenefits(ctx, serverId)).emojiSlots;
+    const emojiLimit = (await serverBenefits()).emojiSlots;
     if (existing.length >= emojiLimit) {
       throw new Error(
         `This server can have up to ${emojiLimit} custom emojis.`,

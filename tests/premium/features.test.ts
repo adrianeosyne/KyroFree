@@ -1,3 +1,4 @@
+import { requireOwnedUpload } from "../../src/convex/uploadSecurity";
 import { readFileSync } from "node:fs";
 import { cursorPngSize } from "../../src/lib/cursorPng";
 import { FONT_THEMES, CURSOR_THEMES } from "../../src/lib/workspaceStyles";
@@ -7,7 +8,6 @@ import { serverBenefits } from "../../src/convex/premiumBenefits";
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Id } from "../../src/convex/_generated/dataModel";
 import schema from "../../src/convex/schema";
 import { api, internal } from "../../src/convex/_generated/api";
 import { WORKSPACE_DEFAULTS } from "../../src/lib/workspaceTheme";
@@ -22,7 +22,6 @@ import {
 } from "../../src/lib/decorations";
 import { PROFILE_THEMES } from "../../src/lib/profileThemes";
 import { AVATAR_FRAMES } from "../../src/lib/frames";
-import { requireOwnedUpload } from "../../src/convex/uploadSecurity";
 const modules = import.meta.glob("../../src/convex/**/*.{ts,tsx}");
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -525,60 +524,26 @@ describe("Premium, original artwork and community access", () => {
       multiple: false,
     });
   });
-  it("transfers supercharge benefits and keeps larger files confined to the boosted server", async () => {
+  it("keeps base community limits after Supercharge removal, even with legacy contributions", async () => {
     const f = await fixture();
-    const first = await f.owner.mutation(api.servers.create, {
-      name: "First squad",
+    const server = await f.owner.mutation(api.servers.create, {
+      name: "My squad",
       isPublic: true,
     });
-    const second = await f.owner.mutation(api.servers.create, {
-      name: "Second squad",
-      isPublic: true,
-    });
-    await f.other.mutation(api.servers.join, { serverId: first });
     await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
-    await f.owner.mutation(api.communityHub.supercharge, { serverId: first });
-    expect(await f.t.run((ctx) => serverBenefits(ctx, first))).toMatchObject({
-      active: true,
-      emojiSlots: 200,
-      audioBitrate: 128000,
+    await f.t.run(async (ctx) => {
+      await ctx.db.insert("serverSupercharges", {
+        serverId: server,
+        userId: f.ids.owner,
+        until: Date.now() + 86400000,
+      });
     });
-    const channel = (
-      await f.other.query(api.channels.list, { serverId: first })
-    ).channels.find((c) => c.kind === "text")!;
-    const file = await f.t.run((ctx) =>
-      ctx.storage.store(
-        new Blob([new Uint8Array(11 * 1024 * 1024)], { type: "video/webm" }),
-      ),
-    );
-    const attachment = await f.other.mutation(api.files.registerUpload, {
-      storageId: file,
-      name: "clip.webm",
-      channelId: channel.id as Id<"channels">,
+    expect(await f.t.run(() => serverBenefits())).toEqual({
+      active: false,
+      emojiSlots: 100,
+      uploadBytes: 10 * 1024 * 1024,
+      audioBitrate: 64000,
     });
-    await expect(
-      f.t.run((ctx) => requireOwnedUpload(ctx, f.ids.other, file)),
-    ).rejects.toThrow("upload limit");
-    await f.other.mutation(api.messages.send, {
-      containerType: "channel",
-      containerId: channel.id,
-      content: "",
-      attachments: [attachment],
-    });
-    await f.owner.mutation(api.communityHub.supercharge, { serverId: second });
-    expect((await f.t.run((ctx) => serverBenefits(ctx, first))).active).toBe(
-      false,
-    );
-    expect((await f.t.run((ctx) => serverBenefits(ctx, second))).active).toBe(
-      true,
-    );
-    await f.founder.mutation(api.premium.grant, {
-      userId: f.ids.owner,
-      revoke: true,
-    });
-    expect((await f.t.run((ctx) => serverBenefits(ctx, second))).active).toBe(
-      false,
-    );
   });
   it("orders paid review requests first without bypassing admin checks or granting automatic verification", async () => {
     const f = await fixture();
@@ -694,7 +659,7 @@ describe("Premium, original artwork and community access", () => {
     });
     expect((await f.owner.query(api.premium.status)).premiumUntil).toBeNull();
   });
-  it("raises the emoji cap only while the community has active support", async () => {
+  it("keeps the 100 emoji cap for Premium server owners", async () => {
     const f = await fixture();
     const serverId = await f.owner.mutation(api.servers.create, {
       name: "Emoji squad",
@@ -712,6 +677,7 @@ describe("Premium, original artwork and community access", () => {
           createdAt: Date.now(),
         });
     });
+    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
     await expect(
       f.owner.mutation(api.emojis.create, {
         serverId,
@@ -719,31 +685,6 @@ describe("Premium, original artwork and community access", () => {
         name: "extra_emoji",
       }),
     ).rejects.toThrow("100");
-    await f.founder.mutation(api.premium.grant, { userId: f.ids.owner });
-    await f.owner.mutation(api.communityHub.supercharge, { serverId });
-    await f.owner.mutation(api.emojis.create, {
-      serverId,
-      storageId,
-      name: "extra_emoji",
-    });
-    expect(
-      (await f.owner.query(api.emojis.forServer, { serverId })).emojis,
-    ).toHaveLength(101);
-    await f.founder.mutation(api.premium.grant, {
-      userId: f.ids.owner,
-      revoke: true,
-    });
-    const next = await asset(f);
-    await expect(
-      f.owner.mutation(api.emojis.create, {
-        serverId,
-        storageId: next,
-        name: "another_emoji",
-      }),
-    ).rejects.toThrow("100");
-    expect(
-      (await f.owner.query(api.emojis.forServer, { serverId })).emojis,
-    ).toHaveLength(101);
   });
 });
 

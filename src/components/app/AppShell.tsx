@@ -86,12 +86,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const voiceMatch = useMatch("/dashboard/s/:serverId/v/:channelId");
   const forumMatch = useMatch("/dashboard/s/:serverId/f/:channelId");
   const serverSettingsMatch = useMatch("/dashboard/s/:serverId/settings/*");
+  const lobbyMatch = useMatch("/dashboard/s/:serverId/lobby");
   const serverMatch = useMatch("/dashboard/s/:serverId");
   const activeServerId =
     channelMatch?.params.serverId ??
     voiceMatch?.params.serverId ??
     forumMatch?.params.serverId ??
     serverSettingsMatch?.params.serverId ??
+    lobbyMatch?.params.serverId ??
     serverMatch?.params.serverId;
   const settingsOpen = searchParams.get("settings") !== null;
 

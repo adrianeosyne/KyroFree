@@ -78,6 +78,7 @@ function PreferenceToggle({
 export function ChatSettings() {
   const sendOnEnter = useUiStore((state) => state.sendOnEnter);
   const chatFontSize = useUiStore((state) => state.chatFontSize);
+  const timestampFormat = useUiStore((state) => state.timestampFormat);
   const setPreference = useUiStore((state) => state.setPreference);
   return (
     <>
@@ -102,6 +103,36 @@ export function ChatSettings() {
           title="Show image and GIF previews"
           description="Display images from direct links in chat. Turn off to show the links instead."
         />
+        <PreferenceToggle
+          preference="chatBackgrounds"
+          title="Show personal backgrounds in chats"
+          description="Use your Workspace Studio image behind conversations. Turn off for a plain chat surface."
+        />
+      </SettingsGroup>
+      <SettingsGroup title="Reading messages">
+        <PreferenceToggle
+          preference="groupMessages"
+          title="Group consecutive messages"
+          description="Combine messages from the same person. Turn off to show their name and time on each message."
+        />
+        <label className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+          <span className="text-sm font-medium">Timestamp format</span>
+          <select
+            aria-label="Chat timestamp format"
+            value={timestampFormat}
+            onChange={(e) =>
+              setPreference(
+                "timestampFormat",
+                e.target.value as Preferences["timestampFormat"],
+              )
+            }
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="locale">Device default</option>
+            <option value="12h">12-hour clock</option>
+            <option value="24h">24-hour clock</option>
+          </select>
+        </label>
       </SettingsGroup>
       <SettingsGroup
         title="Message text size"

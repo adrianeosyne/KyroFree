@@ -25,29 +25,29 @@ export const TERMS: LegalSection[] = [
   {
     heading: "Free access, Premium and funding",
     body: [
-      "Kyro offers free core community, messaging, voice and moderation features alongside an optional paid Premium plan. Premium currently costs US$1.99 per month, delivered as 30 days of access for each approved payment. Some enhanced sharing, customization and HQ features require active Premium.",
+      "Kyro offers free core community, messaging, voice and moderation features alongside an optional paid Premium plan. Premium currently costs US$1.99 per month, delivered through founder-issued redemption codes. Some enhanced sharing, customization and HQ features require active Premium.",
       "Optional Premium payments and limited banner advertisements can support operating costs. Your internet connection, payment-provider charges and other third-party services remain arrangements between you and the relevant provider.",
     ],
   },
   {
-    heading: "Premium purchases and manual approval",
+    heading: "Premium purchases and redemption codes",
     body: [
-      "Before paying, review the current Premium benefits, price and manual payment instructions in user settings, and contact adrianeosyne for any missing payment details. Kyro currently uses manual payment followed by founder approval; there is no automatic card checkout or automatic recurring charge.",
-      "After paying, submit the transaction reference for your account or the gift recipient you selected. A pending request does not activate Premium. Only the configured founder account, adrianeosyne, can confirm payment and grant or revoke Premium; a badge, role or claim made by another account does not give that authority.",
+      "Before paying, review the current Premium benefits, price and manual payment instructions in user settings, and contact adrianeosyne for any missing payment details. Kyro currently uses manual payment followed by a redemption code issued by adrianeosyne. There is no automatic card checkout or automatic recurring charge.",
+      "After payment is confirmed with adrianeosyne, redeem the supplied KYRO code in Premium settings. You do not need to submit an application. Only the configured founder account, adrianeosyne, can issue or revoke unused codes and directly grant or revoke Premium; another badge, role or account claim does not give that authority. Each code is single-use. Keep it private until you redeem or gift it. The founder may set a 7, 30 or 90-day deadline for redeeming unused codes. Check the agreed deadline before paying; it does not shorten membership already activated. Contact adrianeosyne for help if a paid code expires before redemption.",
     ],
   },
   {
     heading: "Premium duration, renewals and gifts",
     body: [
-      "An approved payment adds 30 days of Premium to the recipient account. If Premium is already active, the new period extends the remaining time; otherwise it starts on approval. A gift applies to the member selected in the request, so check the recipient before submitting.",
-      "Renewal requires another manual payment and approval. Kyro does not automatically renew Premium or debit a saved payment method. You can stop renewing by making no further payment; the current period ends at the expiry shown in settings. Check the displayed price and payment instructions before each renewal.",
+      "Codes provide 30, 90, 180 or 365 days of Premium, labelled 1 month, 3 months, 6 months and 1 year. Check the duration and agreed price with adrianeosyne before paying. Redemption activates access immediately and extends any active time. You may redeem a code for yourself or gift it to another active member; check the recipient because a used code cannot be redeemed again. Completed gifts contribute to cosmetic Gifter badges.",
+      "Renewal requires another code or an authorized founder grant. Kyro does not automatically renew Premium or debit a saved payment method. You can stop renewing by making no further payment; the current period ends at the expiry shown in settings. Check the displayed price and payment instructions before each renewal.",
     ],
   },
   {
     heading: "Premium benefits, limits and expiry",
     body: [
       "Premium offers the benefits described in settings, including larger uploads, higher screen-sharing targets, longer messages, additional bot applications, workspace customization and HQ access. Paid benefits remain subject to community permissions, supported devices, network conditions, moderation and platform rules. Target resolution, frame rate and voice bitrate are not guarantees of achieved media quality.",
-      "When Premium expires or is revoked, Premium-only access and customization stop applying and the current free limits apply to new activity. Existing bot applications and supported content can remain, but their continued presence does not grant Premium limits. One included server supercharge benefits one selected community while the supporting Premium entitlement is active; moving it transfers those benefits.",
+      "When Premium expires or is revoked, Premium-only access and customization stop applying and the current free limits apply to new activity. Existing bot applications and supported content can remain, but their continued presence does not grant Premium limits. Server limits remain separate from your personal Premium limits.",
     ],
   },
   {
@@ -312,7 +312,7 @@ export const TERMS: LegalSection[] = [
   {
     heading: "Kyro materials and licensing",
     body: [
-      `Copyright © 2026 ${COPYRIGHT_OWNER}. Rights in original Kyro code, branding, artwork and written materials are reserved to the extent owned by ${COPYRIGHT_OWNER}. Use of the service does not grant permission to copy, rebrand or redistribute protected Kyro files or use them to host another service.`,
+      `Copyright Â© 2026 ${COPYRIGHT_OWNER}. Rights in original Kyro code, branding, artwork and written materials are reserved to the extent owned by ${COPYRIGHT_OWNER}. Use of the service does not grant permission to copy, rebrand or redistribute protected Kyro files or use them to host another service.`,
       "The Copyright Policy and repository LICENSE explain permitted uses. Third-party licenses, previously granted valid licenses and statutory exceptions remain effective. Copyright restrictions do not prohibit independently written software merely because it has similar unprotected ideas or functions.",
     ],
   },
@@ -355,23 +355,30 @@ export const PRIVACY: LegalSection[] = [
     ],
   },
   {
-    heading: "Premium requests and payment information",
+    heading: "Premium payments and historical requests",
     body: [
-      "For manual Premium requests, Kyro stores the requester and recipient account identifiers, the transaction reference you submit, request status, submission and review times, the reviewer identifier and any review note. Your account also stores Premium expiry and badge-visibility preferences; grant and revocation actions create administrative audit records.",
-      "These records are used to confirm payment, activate gifts and renewals, enforce limits, handle payment issues and investigate misuse. The Premium request flow requires a transaction reference rather than full card details or banking credentials. A payment provider handles the payment under its own terms and privacy policy; Kyro receives the reference and any relevant confirmation you or the founder supply.",
+      "Premium currently uses manual payment followed by a redeemable code issued by adrianeosyne. Kyro stores code durations, creation and redemption times, founder grants and revocations, entitlement expiry and badge preferences. Payment providers process payments under their own terms and privacy policies. Do not send card details, banking credentials or passwords to Kyro.",
+      "Historical payment applications retain account identifiers, submitted transaction references, request status, review times and reviewer notes. These records and administrative audit entries support payment issues and misuse investigations. New members activate Premium by redeeming a code without submitting an application.",
     ],
   },
   {
     heading: "Payment records and Premium visibility",
     body: [
-      "Your submitted payment requests and references are available through your private account history and the founder approval controls. Authorized platform staff can access relevant grant and review audit entries or support records according to their permissions. Other members are not given your transaction reference through public profile or community features.",
-      "Member and profile responses can expose Premium status and expiry. Premium badges, HQ roles and server supporter listings can also reveal membership or support. Hiding the Premium badge does not hide every role, supporter entry or entitlement signal. Payment references are not used as advertising content or to build advertising profiles.",
+      "Historical payment references are available in your private account history and founder review controls. Authorized staff can access relevant audit and support records according to their permissions. Public profile and community features do not expose your transaction reference.",
+      "Member and profile responses can expose Premium status and expiry. Premium badges and HQ roles reveal membership. Hiding the Premium badge does not hide every role or entitlement signal. Payment references are not used for advertising profiles.",
+    ],
+  },
+  {
+    heading: "Premium codes and membership milestones",
+    body: [
+      "Premium codes are stored as hashes with a short suffix, duration, creator, optional redemption deadline and redemption or revocation records. Full codes are shown to the founder only when generated. Kyro records first Premium ownership, continuous membership dates and completed gift counts. First ownership dates can remain after access expires, while a lapse resets the active streak.",
+      "Visible Premium badges display the membership tier, original since date and continuous day count. Gifter badges display completed gifts. Account-based redemption attempt counters limit code guessing. Code gifts immediately activate the selected recipient's membership; keep unused codes private. A founder-set redemption deadline applies only to unused codes and does not shorten membership already activated. Contact adrianeosyne if a paid code expires before redemption.",
     ],
   },
   {
     heading: "Custom artwork, workspace and sound uploads",
     body: [
-      "Kyro stores uploaded avatars, profile artwork, static or animated workspace backgrounds, cursor images and notification audio, together with associated file metadata, cursor click points and customization settings. Community decoration submissions also include descriptions, ownership confirmations, animation status and staff review records. Creator and bot-review requests include submitted evidence, priority, status and feedback.",
+      "Kyro stores uploaded avatars, profile artwork, static or animated workspace backgrounds, cursor images and notification audio, together with associated file metadata, cursor click points and customization settings. Community decoration submissions also include descriptions, ownership confirmations, animation status and staff review records. Creator and bot-review requests include submitted evidence, priority, status and feedback. Server lobbies store owner-selected layouts, colors, links and section content. Human message activity and successful unique invite joins contribute to level, weekly-message and invite leaderboards. External apps may post feed updates using an owner-issued private token; feed updates are visible to server members.",
       "Approved community artwork appears in the shared decoration collection and can be equipped by other members. Submission history and review details are available to the submitting member and authorized reviewers. Workspace backgrounds, cursor images and notification sounds are used for your selected appearance and playback features; their infrastructure providers handle the stored files as described in this policy.",
     ],
   },
@@ -379,7 +386,7 @@ export const PRIVACY: LegalSection[] = [
     heading: "Authentication and security records",
     body: [
       "Authentication uses protected credential records, sessions and tokens. When enabled, two-factor security also uses records needed to validate codes and manage recovery, rather than making those secrets part of your public profile.",
-      "These records keep accounts accessible to authorized users and support recovery and session revocation. Protect your own credentials and contact support about unfamiliar access without sending passwords or recovery codes.",
+      "Lost-phone recovery requires password verification and an emailed one-time link. Kyro stores a hash of the token, its expiry, the current authenticator record and request times for abuse limits. Tokens expire after 15 minutes; successful recovery disables that authenticator and signs out sessions. Email hints use masked accounts saved on your current device. Protect passwords and backup codes.",
     ],
   },
   {
@@ -526,7 +533,7 @@ export const PRIVACY: LegalSection[] = [
     heading: "Purposes for using information",
     body: [
       "Kyro uses information to create accounts, deliver conversations, apply permissions, coordinate calls, support communities and operate integrations. It also uses relevant records to maintain reliability, handle support and investigate platform issues.",
-      "Optional Premium payments and limited advertising support Kyro. Payment references and entitlement records support purchase approval and paid access. Different purposes require different information: delivering a direct message needs its content and audience, while a theme preference helps display the interface you selected.",
+      "Optional Premium payments and limited advertising support Kyro. Historical payment references and entitlement records support payment questions, code issuance and paid access. Different purposes require different information: delivering a direct message needs its content and audience, while a theme preference helps display the interface you selected.",
     ],
   },
   {
@@ -588,7 +595,7 @@ export const PRIVACY: LegalSection[] = [
   {
     heading: "Access and data portability",
     body: [
-      "You can download a self-service export from account settings. It includes selected profile, relationship, community, message, notification and security-summary information; the current export also includes Premium expiry, submitted payment requests and creator or bot-review requests, alongside up to 5,000 messages and 1,000 notifications.",
+      "You can download a self-service export from account settings. It includes selected profile, relationship, community, message, notification and security-summary information; the current export also includes Premium expiry and membership history, gift counts, activity summaries, historical payment requests and creator or bot-review requests, alongside up to 5,000 messages and 1,000 notifications.",
       "The export does not necessarily contain every attachment or record type. Contact support for a broader access or portability request where applicable, and store exported files securely because they can reveal personal information.",
     ],
   },
@@ -661,7 +668,7 @@ export const COPYRIGHT: LegalSection[] = [
   {
     heading: "Kyro's own materials",
     body: [
-      `Copyright © 2026 ${COPYRIGHT_OWNER}. All rights reserved in original Kyro source code, desktop code, branding, artwork and written materials to the extent owned by ${COPYRIGHT_OWNER}. Third-party components and member contributions remain with their respective rights holders.`,
+      `Copyright Â© 2026 ${COPYRIGHT_OWNER}. All rights reserved in original Kyro source code, desktop code, branding, artwork and written materials to the extent owned by ${COPYRIGHT_OWNER}. Third-party components and member contributions remain with their respective rights holders.`,
       `Without prior written permission from ${COPYRIGHT_OWNER}, protected Kyro files may not be copied, adapted, rebranded, redistributed, sold, sublicensed or used to create or host another service, whether free or commercial. The repository LICENSE describes permitted uses and applicable exceptions.`,
     ],
   },

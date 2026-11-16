@@ -10,6 +10,9 @@
 
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi } from "convex/server";
+import type * as accountRecovery from "../accountRecovery.js";
+import type * as activity from "../activity.js";
+import type * as activityLib from "../activityLib.js";
 import type * as admin from "../admin.js";
 import type * as applications from "../applications.js";
 import type * as auth from "../auth.js";
@@ -33,6 +36,7 @@ import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
 import type * as communityDecorations from "../communityDecorations.js";
 import type * as communityHub from "../communityHub.js";
+import type * as communityMigration from "../communityMigration.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
 import type * as emailDelivery from "../emailDelivery.js";
@@ -50,6 +54,7 @@ import type * as http from "../http.js";
 import type * as ioMaintenance from "../ioMaintenance.js";
 import type * as legalAcceptance from "../legalAcceptance.js";
 import type * as lib from "../lib.js";
+import type * as lobby from "../lobby.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as metricsLib from "../metricsLib.js";
@@ -62,6 +67,7 @@ import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
 import type * as premium from "../premium.js";
 import type * as premiumBenefits from "../premiumBenefits.js";
+import type * as premiumCodes from "../premiumCodes.js";
 import type * as presence from "../presence.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
@@ -98,6 +104,9 @@ import type * as workspaceCursors from "../workspaceCursors.js";
 import type * as workspaceSchema from "../workspaceSchema.js";
 
 const fullApi: ApiFromModules<{
+  "accountRecovery": typeof accountRecovery,
+  "activity": typeof activity,
+  "activityLib": typeof activityLib,
   "admin": typeof admin,
   "applications": typeof applications,
   "auth": typeof auth,
@@ -121,6 +130,7 @@ const fullApi: ApiFromModules<{
   "cleanup": typeof cleanup,
   "communityDecorations": typeof communityDecorations,
   "communityHub": typeof communityHub,
+  "communityMigration": typeof communityMigration,
   "conversations": typeof conversations,
   "crons": typeof crons,
   "emailDelivery": typeof emailDelivery,
@@ -138,6 +148,7 @@ const fullApi: ApiFromModules<{
   "ioMaintenance": typeof ioMaintenance,
   "legalAcceptance": typeof legalAcceptance,
   "lib": typeof lib,
+  "lobby": typeof lobby,
   "maintenance": typeof maintenance,
   "messages": typeof messages,
   "metricsLib": typeof metricsLib,
@@ -150,6 +161,7 @@ const fullApi: ApiFromModules<{
   "polls": typeof polls,
   "premium": typeof premium,
   "premiumBenefits": typeof premiumBenefits,
+  "premiumCodes": typeof premiumCodes,
   "presence": typeof presence,
   "reports": typeof reports,
   "roles": typeof roles,

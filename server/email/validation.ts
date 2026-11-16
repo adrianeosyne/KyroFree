@@ -7,6 +7,7 @@ export const EMAIL_TEMPLATES = [
   "delivery_test",
   "password_reset",
   "email_verification",
+  "two_factor_recovery",
   "temporary_ban",
   "permanent_ban",
   "warning",

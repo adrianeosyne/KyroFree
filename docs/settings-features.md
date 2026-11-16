@@ -79,8 +79,8 @@ This release exposes at least 60 distinct controls and workflows in each setting
 56. Underlined links
 57. Custom cursor toggle, 10 additional Premium cursor styles and owned PNG cursor uploads (64 × 64, 128 KB) with adjustable click point
 58. Microphone check and processing
-59. Manual monthly Premium request
-60. Gift Premium to another member
+59. Redeem a founder-issued Premium code
+60. Redeem a code as a Premium gift with evolving Gifter badges
 
 ## Server settings
 
@@ -158,13 +158,13 @@ This release exposes at least 60 distinct controls and workflows in each setting
 55. Ticket categories
 56. Staff replies and ticket claim
 57. Close and reopen tickets
-58. Premium community supporter board
+58. Lobby activity and invite leaderboards
 59. Expiring/revocable invite links
 60. Configuration backup export
 
 ## Premium and moderation behavior
 
-Premium costs $1.99 per month. Manual payment requires approval by the account whose immutable ID is configured as `KYRO_FOUNDER_USER_ID`. Approval adds 30 days, renewals extend remaining time, and grants/revocations are logged. No automatic payment processing or billing is enabled. Set `KYRO_PREMIUM_PAYMENT_INSTRUCTIONS` in Convex to provide the real manual payment instructions.
+Premium costs $1.99 per month. Manual payments are arranged with adrianeosyne, who alone can issue single-use `KYRO-XXXX-XXXX-XXXX` codes for 30, 90, 180 or 365 days. Users redeem codes immediately without applying. Codes store hashes and suffixes; full codes appear only at generation. Renewals extend active time; expired memberships start a new streak. Founder grants and revocations remain audited. No automatic billing is enabled.
 
 Active Premium enables 200 MB uploads, 4,000-character human messages, 5 MB decoration submissions, 10 bot applications, the workspace editor and 1440p/60 fps display-capture targets. Free accounts retain 10 MB uploads, 2,000-character messages, 2 MB decorations and 2 bot applications. Existing applications are retained when access expires. Screen capture targets are negotiated from a server-verified entitlement; actual resolution/frame rate depends on the browser, device, connection and LiveKit service.
 
@@ -176,12 +176,34 @@ Community decoration search and the staff review queue use pagination so every p
 
 `npm run typecheck`, `npm run build`, `npm run test:features`, `npm run test:ui`, `npm run test:voice` and the existing Vitest suites cover build compatibility, Premium permissions and expiry, upload ownership and quotas, moderation state, private ticket access, event capacity, image galleries, retry/removal, object URL cleanup, settings persistence and responsive layouts. Browser checks use isolated fixtures and do not send messages or payments to live accounts.
 
-## Premium HQ and supercharge perks
-
-One active Premium contribution can support one server: 200 custom emoji slots, 50 MB member message uploads and a 128 kbps microphone audio target (normally 100 slots, 10 MB and 64 kbps). Transferring support moves the benefits. Existing emojis remain when support expires, but creating more obeys the lower cap. Larger server uploads cannot be claimed as personal profile assets or sent outside a supported server unless the sender has their own Premium entitlement.
+## Premium HQ perks
 
 Premium members receive a pink role and a private `#premium-chat` lounge in the official Kyro HQ. Lounge reads, search, polls, voice access and notification previews require current Premium or platform staff access. Free members upload files in HQ's `#media`; Premium and staff can upload across HQ. HQ polls require creator verification, Premium or staff access. These HQ policies do not restrict ordinary communities.
 
 Premium badges may be hidden independently of paid benefits. Creator verification and bot directory submissions appear in an indexed, paginated staff queue, with Premium submissions first. Priority is set when submitting. Administrators still review ownership, identity or bot behavior, must provide feedback, and cannot review their own submission. Revised bot listing details require a new review. New directory listings remain private until approved.
 
 Scheduled expiry invalidates live queries when a month ends. Renewals extend the current period and stale expiry jobs cannot revoke a renewal. Actual voice bitrate and capture quality depend on the browser, device, network and LiveKit service.
+
+## Lobbies, milestones and offline access
+
+Server Settings > Lobby lets owners enable a welcome page, choose stacked, two-column or spotlight layouts, set colors and links, and reorder up to 12 sections. Owners can also edit directly on the lobby page. Drag handles support touch; arrow buttons support keyboard ordering. All reads require server membership and only the owner may save or manage feed tokens.
+
+Lobby boards show top levels, messages in the current UTC Monday-to-Monday week, and successful unique invites. Activity starts with new messages after rollout. Human messages award 10 XP at most once per minute; bots do not earn XP. Rejoining the same server never credits another invite. Shards shows the top 50 global level entries, with no cash value.
+
+Outside apps can POST `title`, `text`, `source`, `clientId` and optional HTTPS `url` as JSON to the displayed lobby feed endpoint. Set `Authorization: Bearer <token>` on the app's server. Duplicate client IDs are idempotent. The feed accepts at most 30 new entries per hour; owner token rotation or disconnection invalidates the old token. Tokens are shown once and stored as hashes.
+
+Premium badges evolve after 30, 90, 180, 365, 730, 1095 and 1825 continuous days. Prepaid duration does not skip elapsed-time milestones. Profile and name badges show the original Premium since date and current streak. Gifter tiers are earned after 1, 10, 25 and 50 completed code gifts. HQ OG roles sync to profile badges.
+
+After the first online visit installs the service worker, failed offline navigations show a standalone Kyro page with retry and automatic reconnect. It needs no JavaScript bundles, fonts or API access. Chat backgrounds use the same uploaded image and motion-safe still frame as Workspace Studio.
+
+2FA already provides 10 single-use backup codes. Lost-phone recovery requires password proof and a one-time emailed link that expires in 15 minutes, is bound to the current authenticator and signs out sessions after disabling it. Email hints use accounts saved on the current device. Google sign-in is excluded at the user's request.
+
+## November 16 additions
+
+Founder code tools support generating 1, 5, 10 or 20 codes at once. Each code grants the chosen 30, 90, 180 or 365-day membership. An optional 7, 30 or 90-day redemption window limits when unused codes can activate membership; it does not shorten membership already redeemed. Full codes appear only during generation and can be copied together. The paginated masked history supports status filters and searches by code-ending prefix, including records beyond the previous 100-code view.
+
+Lobby owners can apply six color presets, duplicate sections and undo or redo the last 50 draft changes. Presets preserve content and links. Draft history resets on save or discard and stays isolated to each server. Live members see only saved changes.
+
+Chat settings now include consecutive-message grouping, personal chat background visibility and device-default, 12-hour or 24-hour timestamps. These preferences save on the current device and are available to free and Premium members; background uploads still require Premium.
+
+AutoMod offers Relaxed, Balanced and Strict presets. Presets preserve blocked words and role/channel exemptions, and remain drafts until Save AutoMod. Staff can discard a draft to restore the last saved configuration. Existing server permission checks and audit records apply.

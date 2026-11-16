@@ -1,3 +1,4 @@
+import { creditInvite } from "./activityLib";
 import { canUsePremiumLounge } from "./premiumBenefits";
 import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
@@ -250,7 +251,7 @@ export const discover = query({
 
 /** Everything the sidebar needs for one community. */
 /**
- * Public preview behind a worn community tag — name, description, member
+ * Public preview behind a worn community tag â€” name, description, member
  * count and owner, shown when someone taps a tag on a profile or message.
  */
 export const previewByTag = query({
@@ -522,7 +523,7 @@ export const members = query({
   },
 });
 
-/** Public invite preview — what someone sees before joining. */
+/** Public invite preview â€” what someone sees before joining. */
 export const invitePreview = query({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
@@ -621,7 +622,7 @@ export const invitePreview = query({
 /* Mutations                                                           */
 /* ------------------------------------------------------------------ */
 
-/** Kyro HQ — the platform's home community, owned by the founder. */
+/** Kyro HQ â€” the platform's home community, owned by the founder. */
 const HQ_NAME = "Kyro HQ";
 
 async function ensurePremiumHq(
@@ -713,7 +714,7 @@ async function createHq(
   const serverId = await ctx.db.insert("servers", {
     name: HQ_NAME,
     description:
-      "The official Kyro home base — announcements, support and hangouts for everyone on Kyro.",
+      "The official Kyro home base â€” announcements, support and hangouts for everyone on Kyro.",
     ownerId,
     isPublic: true,
     isPlatformHome: true,
@@ -808,7 +809,7 @@ export const create = mutation({
     const { id } = await requireProfile(ctx);
     const cleanName = name.trim();
     if (cleanName.length < 2 || cleanName.length > SERVER_NAME_MAX) {
-      throw new Error("Community names are 2–64 characters.");
+      throw new Error("Community names are 2â€“64 characters.");
     }
     const serverId = await ctx.db.insert("servers", {
       name: cleanName,
@@ -907,7 +908,7 @@ export const update = mutation({
     if (args.name !== undefined) {
       const name = args.name.trim();
       if (name.length < 2 || name.length > SERVER_NAME_MAX) {
-        throw new Error("Community names are 2–64 characters.");
+        throw new Error("Community names are 2â€“64 characters.");
       }
       patch.name = name;
     }
@@ -932,7 +933,7 @@ export const update = mutation({
       } else {
         const tag = args.tag.trim().toUpperCase().slice(0, 4);
         if (!/^[A-Z0-9]{2,4}$/.test(tag)) {
-          throw new Error("Community tags are 2–4 letters or numbers.");
+          throw new Error("Community tags are 2â€“4 letters or numbers.");
         }
         patch.tag = tag;
       }
@@ -953,7 +954,7 @@ export const update = mutation({
         for (const link of links) {
           if (!/^https?:\/\//i.test(link.url)) {
             throw new Error(
-              `Links need to start with http:// or https:// — check "${link.label}".`,
+              `Links need to start with http:// or https:// â€” check "${link.label}".`,
             );
           }
         }
@@ -1797,6 +1798,7 @@ export const joinByCode = mutation({
       });
       if (invite && !invite.revoked) {
         await ctx.db.patch(invite._id, { uses: invite.uses + 1 });
+        await creditInvite(ctx, server._id, id, invite.creatorId);
       }
       await logAudit(ctx, {
         serverId: server._id,
@@ -1813,7 +1815,7 @@ export const joinByCode = mutation({
 
 /**
  * Pick the community's permanent invite path: kyro.app/invite/<code>.
- * Letters, numbers, dashes and underscores — never expires, never capped.
+ * Letters, numbers, dashes and underscores â€” never expires, never capped.
  */
 export const setVanity = mutation({
   args: { serverId: v.id("servers"), code: v.string() },
@@ -1837,7 +1839,7 @@ export const setVanity = mutation({
     }
     if (!/^[a-z0-9][a-z0-9_-]{2,23}$/.test(clean)) {
       throw new Error(
-        "Custom links are 3–24 characters: letters, numbers, dashes and underscores.",
+        "Custom links are 3â€“24 characters: letters, numbers, dashes and underscores.",
       );
     }
     const taken = await ctx.db
@@ -1845,7 +1847,7 @@ export const setVanity = mutation({
       .withIndex("by_vanity", (q) => q.eq("vanityCode", clean))
       .unique();
     if (taken && taken._id !== serverId) {
-      throw new Error("That link is already taken — try another one.");
+      throw new Error("That link is already taken â€” try another one.");
     }
     const inviteClash = await ctx.db
       .query("invites")

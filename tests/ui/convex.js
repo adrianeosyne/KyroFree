@@ -1,6 +1,7 @@
+import { LOBBY_DEFAULTS } from "../../src/lib/lobby";
 import { WORKSPACE_DEFAULTS } from "../../src/lib/workspaceTheme";
 import { getFunctionName } from "convex/server";
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 const person = (id, name, presence, customStatus = null) => ({
   id,
@@ -70,8 +71,25 @@ const discovery = servers.map((server, index) => ({
   memberCount: [126, 82, 54][index],
   onlineCount: [18, 9, 4][index],
   createdAt: 1700000000000 + index * 100000,
-  permissions: ["manage_server","manage_channels","manage_roles","create_invites","manage_messages","kick_members","ban_members","view_audit_log","manage_emojis"],
-  isOwner:true,roles:[],links:[],verificationLevel:"none",applicationQuestions:[],tag:null,themeAccent:null,themeTint:null,
+  permissions: [
+    "manage_server",
+    "manage_channels",
+    "manage_roles",
+    "create_invites",
+    "manage_messages",
+    "kick_members",
+    "ban_members",
+    "view_audit_log",
+    "manage_emojis",
+  ],
+  isOwner: true,
+  roles: [],
+  links: [],
+  verificationLevel: "none",
+  applicationQuestions: [],
+  tag: null,
+  themeAccent: null,
+  themeTint: null,
   isJoined: true,
   applyToJoin: false,
 }));
@@ -125,7 +143,7 @@ const messages = [
     friends[0],
     "Exactly what I was thinking. A few good playlists, some sketches, and no pressure.",
   ],
-  [me, "Sounds perfect. Let's share it with the others ✨"],
+  [me, "Sounds perfect. Let's share it with the others Ã¢Å“Â¨"],
   [friends[0], "That sounds like a plan!"],
 ].map(([author, content], i) => ({
   id: `message-${i}`,
@@ -139,8 +157,12 @@ const messages = [
   replyTo: null,
 }));
 let connected = true;
-let fixtureRevision=0;
-window.setFixtureData=(name,value)=>{data[name]=value;fixtureRevision++;listeners.forEach(l=>l());};
+let fixtureRevision = 0;
+window.setFixtureData = (name, value) => {
+  data[name] = value;
+  fixtureRevision++;
+  listeners.forEach((l) => l());
+};
 const listeners = new Set();
 window.setFixtureConnection = (value) => {
   connected = value;
@@ -163,15 +185,46 @@ const data = {
     recoveryCodesRemaining: 0,
   },
   "users:me": me,
-  "automod:getSettings": {enabled:true,blockedWords:[],blockInvites:true,blockLinks:false,maxMentions:10,blockCaps:true,blockSpam:true,exemptRoleIds:[],exemptChannelIds:[]},
-  "workspace:get": {premiumUntil:null,theme:WORKSPACE_DEFAULTS,backgroundUrl:null},
-  "trustReviews:mine": {verified:false,requests:[]},
-  "premium:status": {premiumUntil:null,instructions:"Contact adrianeosyne for manual payment instructions.",requests:[]},
+  "automod:getSettings": {
+    enabled: true,
+    blockedWords: [],
+    blockInvites: true,
+    blockLinks: false,
+    maxMentions: 10,
+    blockCaps: true,
+    blockSpam: true,
+    exemptRoleIds: [],
+    exemptChannelIds: [],
+  },
+  "workspace:get": {
+    premiumUntil: null,
+    theme: WORKSPACE_DEFAULTS,
+    backgroundUrl: null,
+  },
+  "trustReviews:mine": { verified: false, requests: [] },
+  "premium:status": {
+    premiumUntil: null,
+    instructions: "Contact adrianeosyne for manual payment instructions.",
+    requests: [],
+  },
   "communityDecorations:catalog": [],
   "communityDecorations:mine": [],
   "communityHub:events": [],
   "communityHub:tickets": [],
-  "communityHub:supporters": [],
+  "lobby:status": { enabled: false },
+  "lobby:get": {
+    config: { ...LOBBY_DEFAULTS, title: "Welcome to Creative Studio" },
+    isOwner: true,
+    serverName: "Creative Studio",
+    rules: "Be kind. Share original work.",
+    boards: { levels: [], messages: [], invites: [] },
+    feed: [],
+    feedConnected: false,
+  },
+  "activity:topPlayers": [],
+  "premiumCodes:list": [],
+  "premium:queue": [],
+  "admin:overview": { allowed: false },
   "users:currentUser": me,
   "social:list": { friends, incoming: [], outgoing: [], blocked: [] },
   "servers:listMine": servers,
@@ -209,6 +262,7 @@ const data = {
     },
   ],
 };
+window.fixtureData = data;
 export function useQuery(reference, args) {
   useSyncExternalStore(subscribe, () => fixtureRevision);
   if (args === "skip") return undefined;
@@ -247,9 +301,36 @@ export function useQuery(reference, args) {
     );
   return Object.hasOwn(data, name) ? data[name] : empty;
 }
-export function usePaginatedQuery() {
-  return { results: empty, status: "Exhausted", loadMore: () => {} };
+export function usePaginatedQuery(reference, args, options) {
+  useSyncExternalStore(subscribe, () => fixtureRevision);
+  const name = getFunctionName(reference);
+  const key = JSON.stringify({ name, args });
+  const initial = options?.initialNumItems ?? 25;
+  const [pagination, setPagination] = useState({ key, count: initial });
+  const count = pagination.key === key ? pagination.count : initial;
+  if (name !== "premiumCodes:history")
+    return { results: empty, status: "Exhausted", loadMore: () => {} };
+  const rows = data["premiumCodes:list"].filter((row) => {
+    const status =
+      row.redeemedAt !== undefined
+        ? "redeemed"
+        : row.revokedAt !== undefined
+          ? "revoked"
+          : row.expiresAt !== undefined && row.expiresAt <= Date.now()
+            ? "expired"
+            : "available";
+    return (
+      (!args.status || args.status === "all" || args.status === status) &&
+      row.suffix.startsWith(args.suffix ?? "")
+    );
+  });
+  return {
+    results: rows.slice(0, count),
+    status: rows.length > count ? "CanLoadMore" : "Exhausted",
+    loadMore: (size) => setPagination({ key, count: count + size }),
+  };
 }
+
 const mutations = new Map();
 export function useMutation(reference) {
   const name = getFunctionName(reference);
@@ -257,9 +338,76 @@ export function useMutation(reference) {
     mutations.set(name, async (args) => {
       window.fixtureMutations ??= [];
       window.fixtureMutations.push({ name, args });
-      if (name === "files:generateUploadUrl") return "http://127.0.0.1:5187/fixture-upload";
-      if (name === "files:registerUpload") return {storageId:args.storageId,name:args.name,size:100,mimeType:"image/png"};
-      if (name === "premium:badgeVisibility") window.setFixtureData("premium:status", {...data["premium:status"],hidePremiumBadge:args.hidden});
+      if (name === "files:generateUploadUrl")
+        return "http://127.0.0.1:5187/fixture-upload";
+      if (name === "files:registerUpload")
+        return {
+          storageId: args.storageId,
+          name: args.name,
+          size: 100,
+          mimeType: "image/png",
+        };
+      if (name === "premium:badgeVisibility")
+        window.setFixtureData("premium:status", {
+          ...data["premium:status"],
+          hidePremiumBadge: args.hidden,
+        });
+      if (
+        name === "premiumCodes:generate" ||
+        name === "premiumCodes:generateBatch"
+      ) {
+        const codes = Array.from({ length: args.count ?? 1 }, (_, i) =>
+          i === 0
+            ? "KYRO-ABCD-EFGH-ABCD"
+            : `KYRO-ABCD-EFGH-ABC${"EFGHJKLMNPQRSTUVWXYZ23456789"[i - 1]}`,
+        );
+        const expiresAt = args.expiresInDays
+          ? Date.now() + args.expiresInDays * 86400000
+          : null;
+        const rows = codes.map((code, index) => ({
+          _id: `fixture-code-${Date.now()}-${index}`,
+          suffix: code.slice(-4),
+          days: args.days,
+          createdAt: Date.now(),
+          ...(expiresAt ? { expiresAt } : {}),
+        }));
+        window.setFixtureData("premiumCodes:list", [
+          ...rows,
+          ...data["premiumCodes:list"],
+        ]);
+        return name === "premiumCodes:generate"
+          ? { code: codes[0], days: args.days, expiresAt }
+          : { codes, days: args.days, expiresAt };
+      }
+      if (name === "premiumCodes:revoke")
+        window.setFixtureData(
+          "premiumCodes:list",
+          data["premiumCodes:list"].map((row) =>
+            row._id === args.id ? { ...row, revokedAt: Date.now() } : row,
+          ),
+        );
+      if (name === "premiumCodes:redeem") {
+        if (!args.recipientId)
+          window.setFixtureData("premium:status", {
+            ...data["premium:status"],
+            premiumUntil: Date.now() + 30 * 86400000,
+            premiumSince: Date.now(),
+            premiumStreakSince: Date.now(),
+          });
+        return { ok: true, days: 30, premiumUntil: Date.now() + 30 * 86400000 };
+      }
+      if (name === "lobby:save") {
+        window.setFixtureData("lobby:get", {
+          ...data["lobby:get"],
+          config: args.config,
+        });
+        window.setFixtureData("lobby:status", { enabled: args.config.enabled });
+      }
+      if (name === "lobby:rotateFeedToken")
+        return {
+          token: "KyroLobby_" + "a".repeat(64),
+          endpoint: "https://example.convex.site/api/lobby-feed",
+        };
       if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;

@@ -148,6 +148,7 @@ export function AutoModSettings({
 
   return (
     <AutoModForm
+      key={serverId}
       serverId={serverId}
       channels={channels}
       roles={roles}
@@ -180,6 +181,13 @@ function AutoModForm({
     exemptChannelIds: initial.exemptChannelIds,
   }));
   const [words, setWords] = useState(initial.blockedWords.join("\n"));
+  const [saved, setSaved] = useState({
+    values: initial,
+    words: initial.blockedWords.join("\n"),
+  });
+  const dirty =
+    JSON.stringify(form) !== JSON.stringify(saved.values) ||
+    words !== saved.words;
   const [busy, setBusy] = useState(false);
 
   const toggleList = (
@@ -213,6 +221,7 @@ function AutoModForm({
         exemptRoleIds: form.exemptRoleIds as Id<"serverRoles">[],
         exemptChannelIds: form.exemptChannelIds as Id<"channels">[],
       });
+      setSaved({ values: { ...form }, words });
       toast.success("AutoMod settings saved.");
     } catch (error) {
       toast.error(
@@ -244,6 +253,54 @@ function AutoModForm({
         />
       </div>
 
+      <div className="mt-4 rounded-xl border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold">AutoMod presets</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Choose a starting point, review the rules, then save. Your blocked
+          words and exemptions are preserved.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {[
+            {
+              name: "Relaxed",
+              blockInvites: false,
+              blockLinks: false,
+              maxMentions: 15,
+              blockCaps: false,
+              blockSpam: true,
+            },
+            {
+              name: "Balanced",
+              blockInvites: true,
+              blockLinks: false,
+              maxMentions: 10,
+              blockCaps: true,
+              blockSpam: true,
+            },
+            {
+              name: "Strict",
+              blockInvites: true,
+              blockLinks: true,
+              maxMentions: 3,
+              blockCaps: true,
+              blockSpam: true,
+            },
+          ].map(({ name, ...rules }) => (
+            <Button
+              key={name}
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              aria-label={`Apply ${name} AutoMod preset`}
+              onClick={() =>
+                setForm((current) => ({ ...current, ...rules, enabled: true }))
+              }
+            >
+              {name}
+            </Button>
+          ))}
+        </div>
+      </div>
       {form.enabled && (
         <>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -364,8 +421,22 @@ function AutoModForm({
         </>
       )}
 
-      <div className="mt-4 flex justify-end">
-        <Button size="sm" disabled={busy} onClick={() => void save()}>
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
+        <span className="text-xs text-muted-foreground">
+          {dirty ? "Unsaved AutoMod changes" : "All rules saved."}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={busy || !dirty}
+          onClick={() => {
+            setForm(saved.values);
+            setWords(saved.words);
+          }}
+        >
+          Discard AutoMod changes
+        </Button>
+        <Button size="sm" disabled={busy || !dirty} onClick={() => void save()}>
           {busy ? (
             <Loader2 className="mr-1.5 size-3.5 animate-spin" />
           ) : (

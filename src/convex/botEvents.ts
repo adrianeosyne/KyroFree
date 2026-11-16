@@ -1,3 +1,4 @@
+import { recordMessage, memberActivity } from "./activityLib";
 import { Triggers } from "convex-helpers/server/triggers";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -113,6 +114,7 @@ botTriggers.register("servers", async (ctx, change) => {
   );
 });
 botTriggers.register("messages", async (ctx, change) => {
+  if (change.operation === "insert") await recordMessage(ctx, change.newDoc);
   await syncMetricEntry(
     ctx,
     `messages:${change.id}`,
@@ -120,6 +122,18 @@ botTriggers.register("messages", async (ctx, change) => {
   );
 });
 botTriggers.register("serverMembers", async (ctx, change) => {
+  const member = change.newDoc ?? change.oldDoc;
+  const activity = await memberActivity(ctx, member.serverId, member.userId);
+  await ctx.db.patch(activity._id, { active: change.operation !== "delete" });
+  const server = await ctx.db.get(member.serverId);
+  if (server?.isPlatformHome) {
+    const roles = await Promise.all(
+      (change.newDoc?.roleIds ?? []).map((id) => ctx.db.get(id)),
+    );
+    const user = await ctx.db.get(member.userId);
+    const og = roles.some((r) => r?.name.trim().toLowerCase() === "og");
+    if (user && user.hqOg !== og) await ctx.db.patch(user._id, { hqOg: og });
+  }
   await syncMemberMetrics(ctx, change.newDoc, change.id);
 });
 botTriggers.register("messages", async (ctx, change) => {
@@ -242,4 +256,25 @@ botTriggers.register("serverRoles", async (ctx, change) => {
       position: role.position,
     },
   );
+});
+
+botTriggers.register("serverRoles", async (ctx, change) => {
+  const role = change.newDoc ?? change.oldDoc;
+  if (
+    change.operation === "insert" ||
+    change.oldDoc?.name === change.newDoc?.name
+  )
+    return;
+  const server = await ctx.db.get(role.serverId);
+  if (!server?.isPlatformHome) return;
+  const members = await ctx.db
+    .query("serverMembers")
+    .withIndex("by_server", (q) => q.eq("serverId", server._id))
+    .collect();
+  for (const member of members.filter((m) => m.roleIds.includes(role._id))) {
+    const roles = await Promise.all(member.roleIds.map((id) => ctx.db.get(id))),
+      user = await ctx.db.get(member.userId);
+    const og = roles.some((r) => r?.name.trim().toLowerCase() === "og");
+    if (user && user.hqOg !== og) await ctx.db.patch(user._id, { hqOg: og });
+  }
 });

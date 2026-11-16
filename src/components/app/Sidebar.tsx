@@ -114,6 +114,10 @@ function ServerSection({ serverId }: { serverId: string }) {
     api.channels.list,
     canEnter ? { serverId: serverId as Id<"servers"> } : "skip",
   );
+  const lobby = useQuery(
+    api.lobby.status,
+    canEnter ? { serverId: serverId as Id<"servers"> } : "skip",
+  );
   const createCategory = useMutation(api.channels.createCategory);
   const leave = useMutation(api.servers.leave);
   const setMuted = useMutation(api.servers.setMuted);
@@ -196,6 +200,14 @@ function ServerSection({ serverId }: { serverId: string }) {
 
   return (
     <>
+      {lobby?.enabled && (
+        <NavLink
+          to={`/dashboard/s/${serverId}/lobby`}
+          className="m-3 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm font-semibold text-primary"
+        >
+          ✦ Lobby
+        </NavLink>
+      )}
       <div
         className={cn(
           "sticky top-0 z-10 overflow-hidden border-b border-border/70 bg-sidebar",
@@ -285,7 +297,7 @@ function ServerSection({ serverId }: { serverId: string }) {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHubSection("events")}>
                 <Users className="size-4" />
-                Events & supercharge
+                Events
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHubSection("tickets")}>
                 <MessageCircle className="size-4" />
@@ -846,6 +858,12 @@ function HomeSection() {
         <Compass className="size-4" />
         Discover
       </Link>
+      <NavLink
+        to="/dashboard/shards"
+        className="mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-sidebar-accent/60"
+      >
+        ✦ Shards level board
+      </NavLink>
       <NavLink
         to="/dashboard/bots"
         className={({ isActive }) =>

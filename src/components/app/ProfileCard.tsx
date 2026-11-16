@@ -243,6 +243,7 @@ export function ProfileCard() {
                       <UserAvatar user={user} size="2xl" />
                     </span>
                     <BadgeTray
+                      user={user}
                       badges={user.badges}
                       primaryBadge={user.primaryBadge}
                       official={user.official}

@@ -2,26 +2,13 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { isPlatformStaff, requireServerAccess, type Ctx } from "./lib";
 import { hasPremium, uploadLimit } from "../lib/entitlements";
 
-/** A contribution benefits one community only while its supporter is active. */
-export async function serverBenefits(ctx: Ctx, serverId: Id<"servers">) {
-  const contributions = await ctx.db
-    .query("serverSupercharges")
-    .withIndex("by_server", (q) => q.eq("serverId", serverId))
-    .collect();
-  let active = false;
-  for (const contribution of contributions) {
-    if (contribution.until <= Date.now()) continue;
-    const user = await ctx.db.get(contribution.userId);
-    if (user && !user.deletedAt && hasPremium(user)) {
-      active = true;
-      break;
-    }
-  }
+/** Base server limits. Premium remains a per-account entitlement. */
+export async function serverBenefits() {
   return {
-    active,
-    emojiSlots: active ? 200 : 100,
-    uploadBytes: (active ? 50 : 10) * 1024 * 1024,
-    audioBitrate: active ? 128000 : 64000,
+    active: false,
+    emojiSlots: 100,
+    uploadBytes: 10 * 1024 * 1024,
+    audioBitrate: 64000,
   };
 }
 
@@ -35,10 +22,7 @@ export async function contextualUploadLimit(
   if (!channel) throw new Error("That channel no longer exists.");
   await requireServerAccess(ctx, channel.serverId, user._id);
   await requirePremiumChannel(ctx, channel, user._id);
-  return Math.max(
-    uploadLimit(user),
-    (await serverBenefits(ctx, channel.serverId)).uploadBytes,
-  );
+  return Math.max(uploadLimit(user), (await serverBenefits()).uploadBytes);
 }
 
 export async function canUsePremiumLounge(ctx: Ctx, userId: Id<"users">) {

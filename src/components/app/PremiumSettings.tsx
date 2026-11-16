@@ -1,6 +1,8 @@
+import { PREMIUM_TIERS, PREMIUM_DURATIONS } from "@/lib/premiumProgress";
+import { PremiumBadge, GifterBadge } from "./PremiumBadge";
 import { CreatorVerification } from "./TrustReviews";
 import { useNavigate } from "react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, usePaginatedQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -8,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasPremium } from "@/lib/entitlements";
 import { toast } from "sonner";
+import { useNow } from "@/hooks/use-now";
 
 const perks = [
   [
@@ -34,11 +37,6 @@ const perks = [
     "10 bot applications",
     "More room to build",
     "Create up to ten bot identities. Your directory submissions receive priority staff review.",
-  ],
-  [
-    "One community",
-    "Supercharge",
-    "Give one community 200 emoji slots, 50 MB member uploads and 128 kbps voice audio while your Premium is active.",
   ],
   [
     "1440p · 60 fps",
@@ -76,8 +74,8 @@ export function PremiumSettings() {
   const visibility = useMutation(api.premium.badgeVisibility);
   const lounge = useMutation(api.premium.enterLounge);
   const navigate = useNavigate();
-  const request = useMutation(api.premium.request);
-  const [reference, setReference] = useState("");
+  const redeem = useMutation(api.premiumCodes.redeem);
+  const [code, setCode] = useState("");
   const [recipient, setRecipient] = useState("");
   const [gift, setGift] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -101,7 +99,7 @@ export function PremiumSettings() {
           </span>
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          Manual payment · founder approval · no automatic billing
+          Redeem a Premium code · no application · no automatic billing
         </p>
         {hasPremium(data) && (
           <p className="mt-4 rounded-xl bg-fuchsia-500/15 p-3 text-sm text-fuchsia-200">
@@ -196,11 +194,6 @@ export function PremiumSettings() {
               ["Full workspace studio", "—", "Included"],
               ["Community artwork", "Included", "Included"],
               ["Bot applications", "2", "10"],
-              [
-                "Server supercharge",
-                "—",
-                "One community: 200 emojis, 50 MB, 128 kbps",
-              ],
               ["Premium badge", "—", "Show or hide any time"],
               ["HQ lounge", "—", "Pink role + #premium-chat"],
               ["Media in HQ", "#media", "Across HQ"],
@@ -218,22 +211,25 @@ export function PremiumSettings() {
           </tbody>
         </table>
       </div>
-      <section className="space-y-3 rounded-2xl border border-border bg-panel p-5">
-        <h3 className="font-semibold">Activate or gift a month</h3>
-        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-          {data.instructions}
+      <section className="space-y-4 rounded-2xl border border-fuchsia-400/25 bg-gradient-to-br from-fuchsia-500/10 to-panel p-5">
+        <h3 className="text-lg font-semibold">Redeem Premium</h3>
+        <p className="text-sm text-muted-foreground">
+          Get a code from adrianeosyne after manual payment. Redeem it here for
+          immediate access. Available for 1, 3 or 6 months, or 1 year. Active
+          time stacks with your current membership.
         </p>
-        <p className="text-xs text-muted-foreground">
-          After paying $1.99, send the transaction reference. Only adrianeosyne
-          can verify payment and activate one month. Renewals extend your active
-          time by 30 days.
-        </p>
+        {data.instructions && (
+          <p className="rounded-xl bg-surface p-3 text-sm text-muted-foreground">
+            {data.instructions}
+          </p>
+        )}
         <Input
-          aria-label="Payment reference"
-          placeholder="Transaction or payment reference"
-          maxLength={300}
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
+          aria-label="Premium redeem code"
+          placeholder="KYRO-XXXX-XXXX-XXXX"
+          value={code}
+          maxLength={19}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          className="font-mono tracking-widest"
         />
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -243,35 +239,77 @@ export function PremiumSettings() {
               setGift(e.target.checked);
               setRecipient("");
             }}
-          />
-          Gift a month to another member
+          />{" "}
+          Gift this code to another member
         </label>
         {gift && (
           <PremiumMemberPicker label="Gift recipient" onSelect={setRecipient} />
         )}
         <Button
-          disabled={busy || reference.trim().length < 4 || (gift && !recipient)}
+          disabled={busy || code.trim().length !== 19 || (gift && !recipient)}
           onClick={async () => {
             setBusy(true);
             try {
-              await request({
-                reference,
-                recipientId:
-                  gift && recipient.trim()
-                    ? (recipient.trim() as Id<"users">)
-                    : undefined,
+              const result = await redeem({
+                code,
+                recipientId: gift ? (recipient as Id<"users">) : undefined,
               });
-              setReference("");
-              toast.success("Payment request sent to the founder.");
+              if (!result.ok) throw new Error(result.error);
+              setCode("");
+              toast.success(
+                gift
+                  ? "Premium gifted! Your Gifter badge has been updated."
+                  : "Premium activated!",
+              );
             } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Request failed.");
+              toast.error(
+                e instanceof Error ? e.message : "Could not redeem code.",
+              );
             } finally {
               setBusy(false);
             }
           }}
         >
-          {busy ? "Submitting…" : "Request founder approval"}
+          {busy ? "Redeeming…" : gift ? "Redeem and gift" : "Redeem code"}
         </Button>
+      </section>
+      <section className="space-y-4 rounded-2xl border border-border bg-panel p-5">
+        <h3 className="text-xl font-bold">Your Premium badge levels up</h3>
+        <p className="text-sm text-muted-foreground">
+          Keep Premium active and your badge evolves with your days in a row.
+          Prepaid time extends access; badge tiers reflect time already spent as
+          a member. A lapse resets the streak and preserves your original
+          Premium since date.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {PREMIUM_TIERS.map((tier) => (
+            <div
+              key={tier.name}
+              className="rounded-xl border border-border bg-surface p-4"
+            >
+              <span
+                className={`inline-flex rounded-md bg-gradient-to-br ${tier.colors} px-3 py-1 font-sans text-xs font-black text-slate-950`}
+              >
+                {tier.symbol} PREMIUM
+              </span>
+              <h4 className="mt-3 font-bold">{tier.name}</h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {tier.label} {tier.days > 0 ? "in a row" : ""}
+              </p>
+            </div>
+          ))}
+        </div>
+        {hasPremium(data) && (
+          <PremiumBadge user={{ ...data, badges: ["premium"] }} />
+        )}
+        <h3 className="pt-3 font-semibold">
+          Give a month. Make someone's day.
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Gifter after your first gift · Big Gifter at 10 · Super Gifter at 25 ·
+          Legendary Gifter at 50. Only completed code gifts count.
+        </p>
+        <GifterBadge count={data.premiumGiftCount ?? 0} />
       </section>
       <CreatorVerification />
       {data.requests.length > 0 && (
@@ -315,6 +353,7 @@ export function PremiumAdmin() {
   };
   return (
     <div className="space-y-4">
+      <PremiumCodeAdmin />
       <section className="rounded-2xl border border-border bg-surface p-5">
         <h2 className="font-semibold">Founder Premium controls</h2>
         <p className="my-2 text-xs text-muted-foreground">
@@ -448,5 +487,287 @@ function PremiumMemberPicker({
         </div>
       )}
     </div>
+  );
+}
+
+function PremiumCodeAdmin() {
+  const now = useNow();
+  const generate = useMutation(api.premiumCodes.generate),
+    generateBatch = useMutation(api.premiumCodes.generateBatch),
+    revoke = useMutation(api.premiumCodes.revoke);
+  const [days, setDays] = useState(30),
+    [count, setCount] = useState(1),
+    [expiresInDays, setExpiresInDays] = useState(0),
+    [generated, setGenerated] = useState<string[]>([]),
+    [generatedExpiry, setGeneratedExpiry] = useState<number | null>(null),
+    [busy, setBusy] = useState(false),
+    [filter, setFilter] = useState<
+      "all" | "available" | "redeemed" | "revoked" | "expired"
+    >("all"),
+    [suffix, setSuffix] = useState("");
+  const {
+    results: list,
+    status,
+    loadMore,
+  } = usePaginatedQuery(
+    api.premiumCodes.history,
+    { status: filter, suffix },
+    { initialNumItems: 25 },
+  );
+  return (
+    <section className="space-y-4 rounded-2xl border border-fuchsia-400/25 bg-panel p-5">
+      <h2 className="text-xl font-bold">Premium codes</h2>
+      <p className="text-sm text-muted-foreground">
+        Only adrianeosyne can create or revoke codes. Each code can be redeemed
+        once. Copy codes now; full codes are shown only when generated.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <label className="block text-sm">
+          Duration
+          <select
+            aria-label="Premium code duration"
+            value={days}
+            disabled={busy}
+            onChange={(e) => setDays(Number(e.target.value))}
+            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+          >
+            {PREMIUM_DURATIONS.map((d) => (
+              <option key={d.days} value={d.days}>
+                {d.label} · {d.days} days
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          Number of codes
+          <select
+            aria-label="Number of Premium codes"
+            value={count}
+            disabled={busy}
+            onChange={(e) => setCount(Number(e.target.value))}
+            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+          >
+            {[1, 5, 10, 20].map((n) => (
+              <option key={n} value={n}>
+                {n} {n === 1 ? "code" : "codes"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          Redeem within
+          <select
+            aria-label="Premium code redemption window"
+            value={expiresInDays}
+            disabled={busy}
+            onChange={(e) => setExpiresInDays(Number(e.target.value))}
+            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+          >
+            <option value={0}>No expiry</option>
+            {[7, 30, 90].map((n) => (
+              <option key={n} value={n}>
+                {n} days
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The redemption window limits when a code can be used. Membership
+        duration starts when it is redeemed.
+      </p>
+      <Button
+        disabled={busy || generated.length > 0}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            const args = { days, ...(expiresInDays ? { expiresInDays } : {}) };
+            if (count === 1) {
+              const result = await generate(args);
+              setGenerated([result.code]);
+              setGeneratedExpiry(result.expiresAt);
+            } else {
+              const result = await generateBatch({ ...args, count });
+              setGenerated(result.codes);
+              setGeneratedExpiry(result.expiresAt);
+            }
+            toast.success(
+              count === 1
+                ? "Premium code created."
+                : `${count} Premium codes created.`,
+            );
+          } catch (e) {
+            toast.error(
+              e instanceof Error ? e.message : "Could not generate codes.",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy
+          ? "Generating…"
+          : count === 1
+            ? "Generate Premium code"
+            : `Generate ${count} Premium codes`}
+      </Button>
+      {generated.length > 0 && (
+        <div className="space-y-3 rounded-xl border border-fuchsia-300/30 bg-fuchsia-500/10 p-4">
+          {generatedExpiry && (
+            <p className="text-xs">
+              Redeem before {new Date(generatedExpiry).toLocaleString()}.
+            </p>
+          )}
+          <div className="max-h-72 space-y-2 overflow-y-auto">
+            {generated.map((code) => (
+              <output
+                key={code}
+                aria-label={
+                  generated.length === 1
+                    ? "Generated Premium code"
+                    : "Generated Premium codes"
+                }
+                className="block break-all font-mono text-lg font-bold"
+              >
+                {code}
+              </output>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(generated.join("\n"));
+                  toast.success("Codes copied.");
+                } catch {
+                  toast.error("Select the codes and copy them manually.");
+                }
+              }}
+            >
+              {generated.length === 1 ? "Copy code" : "Copy all codes"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setGenerated([]);
+                setGeneratedExpiry(null);
+              }}
+            >
+              Clear displayed codes
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Copy your codes before clearing this display. They cannot be shown
+            again.
+          </p>
+        </div>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          Code status
+          <select
+            aria-label="Filter Premium code status"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as typeof filter)}
+            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+          >
+            {(
+              ["all", "available", "redeemed", "revoked", "expired"] as const
+            ).map((value) => (
+              <option key={value} value={value}>
+                {value[0].toUpperCase() + value.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          Search code ending
+          <Input
+            aria-label="Search Premium code ending"
+            placeholder="ABCD"
+            value={suffix}
+            maxLength={4}
+            onChange={(e) =>
+              setSuffix(e.target.value.toUpperCase().replace(/[^A-Z2-9]/g, ""))
+            }
+            className="mt-2 font-mono"
+          />
+        </label>
+      </div>
+      <div className="space-y-2">
+        {list.map((row) => {
+          const state =
+            row.redeemedAt !== undefined
+              ? "Redeemed"
+              : row.revokedAt !== undefined
+                ? "Revoked"
+                : row.expiresAt !== undefined && row.expiresAt <= now
+                  ? "Expired"
+                  : "Available";
+          return (
+            <div
+              key={row._id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3 text-xs"
+            >
+              <span className="font-mono">KYRO-••••-••••-{row.suffix}</span>
+              <span>
+                {row.days} days · {state}
+              </span>
+              <span className="text-muted-foreground">
+                Created {new Date(row.createdAt).toLocaleDateString()}
+                {row.expiresAt !== undefined
+                  ? ` · Redeem by ${new Date(row.expiresAt).toLocaleString()}`
+                  : " · No code expiry"}
+              </span>
+              {state === "Available" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await revoke({ id: row._id });
+                      toast.success("Code revoked.");
+                    } catch (e) {
+                      toast.error(
+                        e instanceof Error
+                          ? e.message
+                          : "Could not revoke code.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Revoke code
+                </Button>
+              )}
+            </div>
+          );
+        })}
+        {status === "LoadingFirstPage" ? (
+          <p role="status" className="text-sm">
+            Loading codes…
+          </p>
+        ) : (
+          list.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No codes match these filters.
+            </p>
+          )
+        )}
+        {(status === "CanLoadMore" || status === "LoadingMore") && (
+          <Button
+            variant="outline"
+            disabled={status === "LoadingMore"}
+            onClick={() => loadMore(25)}
+          >
+            {status === "LoadingMore" ? "Loading…" : "Load more codes"}
+          </Button>
+        )}
+      </div>
+    </section>
   );
 }

@@ -43,6 +43,9 @@ const schema = defineSchema(
       isAnonymous: v.optional(v.boolean()), // is the user is anonymous. do not remove
 
       premiumUntil: v.optional(v.number()),
+      premiumSince: v.optional(v.number()),
+      premiumStreakSince: v.optional(v.number()),
+      premiumGiftCount: v.optional(v.number()),
       notificationSoundStorageId: v.optional(v.id("_storage")),
       role: v.optional(roleValidator), // role of the user. do not remove
 
@@ -67,6 +70,8 @@ const schema = defineSchema(
       vip: v.optional(v.boolean()),
       /** Site-wide OG badge — granted to early Kyro members. */
       og: v.optional(v.boolean()),
+      hqOg: v.optional(v.boolean()),
+      premiumHistoryMigrated: v.optional(v.boolean()),
       /** Site-wide Supporter badge — granted to members who back Kyro. */
       supporter: v.optional(v.boolean()),
       /** Site-wide Donator badge — granted to members who donated. */
@@ -237,6 +242,25 @@ const schema = defineSchema(
       cursorStorageId: v.optional(v.id("_storage")),
       cursorHotspotX: v.optional(v.number()),
       cursorHotspotY: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
+    premiumCodes: defineTable({
+      hash: v.string(),
+      suffix: v.string(),
+      days: v.number(),
+      creatorId: v.id("users"),
+      createdAt: v.number(),
+      expiresAt: v.optional(v.number()),
+      redeemedBy: v.optional(v.id("users")),
+      recipientId: v.optional(v.id("users")),
+      redeemedAt: v.optional(v.number()),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_hash", ["hash"])
+      .index("by_created", ["createdAt"]),
+    premiumCodeAttempts: defineTable({
+      userId: v.id("users"),
+      windowStart: v.number(),
+      count: v.number(),
     }).index("by_user", ["userId"]),
     premiumRequests: defineTable({
       requesterId: v.id("users"),
@@ -426,6 +450,81 @@ const schema = defineSchema(
         filterFields: ["isPublic"],
       }),
 
+    serverLobbies: defineTable({
+      serverId: v.id("servers"),
+      enabled: v.boolean(),
+      title: v.string(),
+      intro: v.string(),
+      layout: v.string(),
+      background: v.string(),
+      panel: v.string(),
+      accent: v.string(),
+      sections: v.array(
+        v.object({
+          id: v.string(),
+          type: v.string(),
+          title: v.string(),
+          text: v.optional(v.string()),
+        }),
+      ),
+      buttons: v.array(
+        v.object({ id: v.string(), label: v.string(), url: v.string() }),
+      ),
+      feedTokenHash: v.optional(v.string()),
+      updatedAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_feed_token", ["feedTokenHash"]),
+    lobbyFeed: defineTable({
+      serverId: v.id("servers"),
+      title: v.string(),
+      text: v.string(),
+      url: v.optional(v.string()),
+      source: v.string(),
+      clientId: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_server_created", ["serverId", "createdAt"])
+      .index("by_server_client", ["serverId", "clientId"]),
+    serverActivity: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      active: v.boolean(),
+      xp: v.number(),
+      totalMessages: v.number(),
+      weeklyMessages: v.number(),
+      weekStart: v.number(),
+      invites: v.number(),
+      lastXpAt: v.number(),
+    })
+      .index("by_server_user", ["serverId", "userId"])
+      .index("by_user", ["userId"])
+      .index("by_server", ["serverId"])
+      .index("by_server_xp", ["serverId", "active", "xp"])
+      .index("by_server_week", [
+        "serverId",
+        "active",
+        "weekStart",
+        "weeklyMessages",
+      ])
+      .index("by_server_invites", ["serverId", "active", "invites"]),
+    playerLevels: defineTable({
+      userId: v.id("users"),
+      active: v.boolean(),
+      xp: v.number(),
+      lastXpAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_xp", ["active", "xp"]),
+    serverInviteCredits: defineTable({
+      serverId: v.id("servers"),
+      inviteeId: v.id("users"),
+      inviterId: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_server_invitee", ["serverId", "inviteeId"])
+      .index("by_server", ["serverId"]),
     serverMembers: defineTable({
       serverId: v.id("servers"),
       userId: v.id("users"),
@@ -851,7 +950,8 @@ const schema = defineSchema(
       createdAt: v.number(),
     })
       .index("by_created", ["createdAt"])
-      .index("by_actor", ["actorId"]),
+      .index("by_actor", ["actorId"])
+      .index("by_target", ["targetId", "createdAt"]),
 
     notifications: defineTable({
       userId: v.id("users"),
@@ -888,6 +988,7 @@ const schema = defineSchema(
       template: v.union(
         v.literal("password_reset"),
         v.literal("email_verification"),
+        v.literal("two_factor_recovery"),
         v.literal("temporary_ban"),
         v.literal("permanent_ban"),
         v.literal("warning"),
@@ -1071,6 +1172,24 @@ const schema = defineSchema(
       .index("by_expiry", ["expiresAt"]),
 
     /** Separate request history keeps resend throttles after code replacement. */
+    accountRecoveryTokens: defineTable({
+      userId: v.id("users"),
+      email: v.string(),
+      securityId: v.id("accountSecurity"),
+      tokenHash: v.string(),
+      createdAt: v.number(),
+      expiresAt: v.number(),
+      consumedAt: v.optional(v.number()),
+    })
+      .index("by_token", ["tokenHash"])
+      .index("by_user", ["userId"])
+      .index("by_expiry", ["expiresAt"]),
+    accountRecoveryRequests: defineTable({
+      userId: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_created", ["createdAt"]),
     emailVerificationRequests: defineTable({
       email: v.string(),
       createdAt: v.number(),

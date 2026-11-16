@@ -1,3 +1,5 @@
+import { PremiumBadge, GifterBadge } from "./PremiumBadge";
+import type { PremiumHistory } from "@/lib/premiumProgress";
 import { CrownBadge } from "@/components/app/CrownBadge";
 import {
   Tooltip,
@@ -302,11 +304,13 @@ export function InlineBadge({
  */
 export function BadgeTray({
   badges,
+  user,
   primaryBadge,
   official = false,
   className,
 }: {
   badges: readonly string[];
+  user?: PremiumHistory;
   /** Chosen badge that leads the tray; every other held badge still shows. */
   primaryBadge?: string | null;
   official?: boolean;
@@ -323,7 +327,7 @@ export function BadgeTray({
   const display = lead
     ? [lead, ...ordered.filter((badge) => badge !== lead)]
     : ordered;
-  if (!official && display.length === 0) return null;
+  if (!official && display.length === 0 && !user?.premiumGiftCount) return null;
 
   return (
     <div
@@ -344,26 +348,23 @@ export function BadgeTray({
         </BadgeTip>
       ) : null}
       {display.map((badge) => {
+        if (badge === "premium")
+          return <PremiumBadge key={badge} user={user ?? { badges }} />;
         const meta = GLOBAL_BADGE_META[badge];
         return (
           <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
             <span
               className={cn(
                 "flex items-center justify-center rounded-lg transition-colors",
-                badge === "premium"
-                  ? "gap-1 border border-fuchsia-300/30 bg-gradient-to-r from-fuchsia-600/30 to-violet-600/30 px-2 py-1 text-[10px] font-bold text-fuchsia-100"
-                  : "size-7 hover:bg-indigo-300/10",
+                "size-7 hover:bg-indigo-300/10",
               )}
             >
-              <GlobalBadgeIcon
-                badge={badge}
-                className={badge === "premium" ? "size-4" : "size-5"}
-              />
-              {badge === "premium" && "Premium"}
+              <GlobalBadgeIcon badge={badge} className="size-5" />
             </span>
           </BadgeTip>
         );
       })}
+      <GifterBadge count={user?.premiumGiftCount ?? 0} />
     </div>
   );
 }

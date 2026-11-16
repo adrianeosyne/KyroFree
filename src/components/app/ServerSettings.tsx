@@ -1,3 +1,4 @@
+import { ServerLobby } from "./ServerLobby";
 import { CommunityEvents, CommunityTickets } from "./CommunityHub";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { useEffect, useState } from "react";
@@ -80,6 +81,7 @@ import { inviteUrl, siteOrigin } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 type TabId =
+  | "lobby"
   | "safety"
   | "events"
   | "tickets"
@@ -98,6 +100,7 @@ type TabId =
   | "danger";
 
 const SETTINGS_TABS: readonly TabId[] = [
+  "lobby",
   "safety",
   "events",
   "tickets",
@@ -232,6 +235,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     show: boolean;
     icon: typeof Settings;
   }[] = [
+    { id: "lobby", label: "Lobby", show: server.isOwner, icon: Palette },
     {
       id: "overview",
       label: "Server Profile",
@@ -246,7 +250,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
     },
     {
       id: "events",
-      label: "Events & supercharge",
+      label: "Events",
       show: canManage,
       icon: Users,
     },
@@ -295,7 +299,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
   const tabGroup = (id: TabId) =>
     ["overview", "theme", "emojis"].includes(id)
       ? "Identity & expression"
-      : ["events", "channels", "bots", "invites"].includes(id)
+      : ["lobby", "events", "channels", "bots", "invites"].includes(id)
         ? "Community"
         : ["safety", "tickets", "reports", "bans"].includes(id)
           ? "Safety & support"
@@ -1348,6 +1352,9 @@ export function ServerSettings({ serverId }: { serverId: string }) {
               />
             </section>
           )}
+          {activeTab === "lobby" && server.isOwner && (
+            <ServerLobby key={serverId} serverId={serverId} studio />
+          )}
           {activeTab === "events" && canManage && (
             <CommunityEvents serverId={serverId} manage />
           )}
@@ -2363,8 +2370,7 @@ function EmojisTab({
         <p className="mt-1 text-sm text-muted-foreground">
           Upload PNG, WebP, APNG, or animated GIF emoji up to 1 MB. Members can
           use them in any Kyro conversation. This server has{" "}
-          {data?.emojiLimit ?? 100} slots; an active supercharge raises the
-          limit to 200.
+          {data?.emojiLimit ?? 100} custom emoji slots.
         </p>
       </div>
 

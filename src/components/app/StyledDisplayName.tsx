@@ -1,3 +1,5 @@
+import { PremiumBadge } from "./PremiumBadge";
+import type { PremiumHistory } from "@/lib/premiumProgress";
 import type { CSSProperties, ReactNode } from "react";
 import {
   displayNameStyle,
@@ -13,7 +15,8 @@ export function StyledDisplayName({
   style,
   children,
 }: {
-  user: DisplayNameStyledUser & { botApplicationId?: string | null };
+  user: DisplayNameStyledUser &
+    PremiumHistory & { botApplicationId?: string | null };
   name?: string;
   roleColor?: string | null;
   className?: string;
@@ -26,6 +29,7 @@ export function StyledDisplayName({
       style={{ ...displayNameStyle(user, roleColor), ...style }}
     >
       {children ?? name ?? user.name}
+      <PremiumBadge user={user} compact />
       {user.botApplicationId && (
         <span
           className="ml-1.5 rounded bg-primary/15 px-1 py-0.5 align-middle font-sans text-[9px] font-semibold text-primary"

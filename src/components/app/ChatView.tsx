@@ -126,8 +126,8 @@ function ChatSurface({
   const typers = (typing ?? []).map((user) => user.name);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border/70 bg-background px-4 sm:px-6">
+    <div className="kyro-chat-surface relative isolate flex h-full min-h-0 flex-col bg-background">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 bg-background px-3 sm:h-16 sm:gap-2.5 sm:px-6">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           {icon}
         </span>
@@ -144,7 +144,7 @@ function ChatSurface({
           )}
         </div>
         {participants && participants.length > 0 && (
-          <div className="flex -space-x-2">
+          <div className="hidden -space-x-2 sm:flex">
             {participants.slice(0, 5).map((user) => (
               <button
                 key={user.id}

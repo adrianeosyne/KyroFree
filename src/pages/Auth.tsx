@@ -71,6 +71,8 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   // Convex Auth can create the credential account itself, then we reserve the
   // handle with the long-standing claimProfile mutation.
   const claimProfile = useMutation(api.users.claimProfile);
+  const requestPhoneRecovery = useAction(api.accountRecovery.request);
+  const [showEmailHint, setShowEmailHint] = React.useState(false);
   const requestCodeAction = useAction(api.passwordReset.requestCode);
   const resetPasswordAction = useAction(api.passwordReset.resetPassword);
   const requestVerificationAction = useAction(
@@ -653,9 +655,70 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                         Open your authenticator app, or use one unused recovery
                         code.
                       </p>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        className="mt-2 text-xs text-primary underline"
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await requestPhoneRecovery({ email, password });
+                            toast.success(
+                              "If your credentials match an account with 2FA, a recovery link has been emailed. Check your inbox.",
+                            );
+                          } catch {
+                            toast.error(
+                              "Could not request recovery. Try again later.",
+                            );
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                      >
+                        Lost your phone?
+                      </button>
                     </div>
                   )}
 
+                  <button
+                    type="button"
+                    className="text-xs text-primary underline"
+                    onClick={() => setShowEmailHint(!showEmailHint)}
+                  >
+                    Forgot which email?
+                  </button>
+                  {showEmailHint && (
+                    <div className="space-y-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+                      {accounts.length ? (
+                        accounts.map((account) => (
+                          <button
+                            type="button"
+                            key={account.email}
+                            className="block w-full rounded-lg p-2 text-left hover:bg-primary/10"
+                            onClick={() => {
+                              setEmail(account.email);
+                              setShowEmailHint(false);
+                            }}
+                          >
+                            {account.username ??
+                              account.name ??
+                              "Saved account"}{" "}
+                            ·{" "}
+                            {account.email.replace(
+                              /^(.)([^@]*)@(.)(.*)$/,
+                              "$1•••@$3•••",
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <p>
+                          Check the inbox where Kyro sent your verification
+                          email. Email hints are available for accounts saved on
+                          this device.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-end">
                     <button
                       type="button"

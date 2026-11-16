@@ -34,7 +34,7 @@ export const consume = mutation({
       const channel = channelId ? await ctx.db.get(channelId) : null;
       if (!channel) throw new Error("Voice channel unavailable.");
       await requirePremiumChannel(ctx, channel, row.userId);
-      audioBitrate = (await serverBenefits(ctx, channel.serverId)).audioBitrate;
+      audioBitrate = (await serverBenefits()).audioBitrate;
     }
     return {
       audioBitrate,

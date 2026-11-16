@@ -1,7 +1,7 @@
-const CACHE = "kyro-shell-v1";
+const CACHE = "kyro-shell-v2";
 const SHELL = [
   "/",
-  "/dashboard",
+  "/offline.html",
   "/manifest.webmanifest",
   "/logo-192.png",
   "/logo-512.png",
@@ -42,7 +42,11 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(
           async () =>
-            (await caches.match(request)) || caches.match("/dashboard"),
+            (await caches.match("/offline.html")) ||
+            new Response("Kyro is offline. Reconnect and reload.", {
+              status: 503,
+              headers: { "Content-Type": "text/plain" },
+            }),
         ),
     );
     return;

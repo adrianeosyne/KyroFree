@@ -154,6 +154,9 @@ export function visiblePresence(
 
 export interface PublicUser {
   premiumUntil: number | null;
+  premiumSince: number | null;
+  premiumStreakSince: number | null;
+  premiumGiftCount: number;
   notificationSoundUrl: string | null;
   avatarDecorationUrl: string | null;
   profileDecorationUrl: string | null;
@@ -370,7 +373,7 @@ export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   if (user.supporter === true) badges.push("supporter");
   if (user.vip === true) badges.push("vip");
   if (user.bugHunter === true) badges.push("bughunter");
-  if (user.og === true) badges.push("og");
+  if (user.og === true || user.hqOg === true) badges.push("og");
   return badges;
 }
 
@@ -414,6 +417,9 @@ export async function hydrateUser(
   const badges = globalBadgesFor(user);
   return {
     premiumUntil: user.premiumUntil ?? null,
+    premiumSince: user.premiumSince ?? null,
+    premiumStreakSince: user.premiumStreakSince ?? null,
+    premiumGiftCount: user.premiumGiftCount ?? 0,
     notificationSoundUrl:
       user._id === viewerId && user.notificationSoundStorageId
         ? await ctx.storage.getUrl(user.notificationSoundStorageId)

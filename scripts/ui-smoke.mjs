@@ -1,3 +1,4 @@
+import { checkCommunity, checkOffline } from "../tests/ui/community-checks.mjs";
 import { checkFeatures } from "../tests/ui/feature-checks.mjs";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
@@ -35,7 +36,12 @@ const server = await createServer({
       { find: "@", replacement: path.resolve("src") },
     ],
   },
-  server: { host: "127.0.0.1", port: 5187, strictPort: true },
+  server: {
+    host: "127.0.0.1",
+    port: 5187,
+    strictPort: true,
+    preTransformRequests: false,
+  },
   optimizeDeps: {
     entries: ["tests/ui/index.html"],
     include: ["react", "react-dom/client", "react/jsx-runtime", "react-router"],
@@ -71,6 +77,7 @@ try {
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
   await checkSettings(page, context);
   await checkFeatures(page);
+  await checkCommunity(page);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();
@@ -281,6 +288,7 @@ try {
     ),
     "Voice preview fits phone",
   );
+  await checkOffline(browser);
   assert.deepEqual(errors, []);
   console.log(
     "PASS: favorites persistence, keyboard switcher, appearance controls, friend and unread filters, isolated replies and drafts, reconnect banner, responsive layouts, discovery filters, communities and voice preview",

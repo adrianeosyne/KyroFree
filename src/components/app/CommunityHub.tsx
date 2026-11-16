@@ -13,7 +13,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { hasPremium } from "@/lib/entitlements";
 import { toast } from "sonner";
 
 export function CommunityHubDialog({
@@ -62,12 +61,9 @@ export function CommunityEvents({
   const now = useNow();
   const args = { serverId: serverId as Id<"servers"> };
   const events = useQuery(api.communityHub.events, args);
-  const supporters = useQuery(api.communityHub.supporters, args);
-  const me = useQuery(api.users.me);
   const create = useMutation(api.communityHub.createEvent);
   const cancel = useMutation(api.communityHub.cancelEvent);
   const rsvp = useMutation(api.communityHub.rsvp);
-  const charge = useMutation(api.communityHub.supercharge);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
@@ -92,32 +88,6 @@ export function CommunityEvents({
         <h2 className="text-xl font-bold">Find your next party.</h2>
         <p className="mt-2 text-xs text-muted-foreground">
           Community events, game nights and creative sessions.
-        </p>
-        {!!supporters?.length && (
-          <p className="mt-3 text-xs text-fuchsia-300">
-            Supercharged by {supporters.map((p) => p.name).join(", ")}
-          </p>
-        )}
-        {hasPremium(me) && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            disabled={busy}
-            onClick={() =>
-              void perform(async () => {
-                await charge(args);
-                toast.success("Community supercharge activated.");
-              })
-            }
-          >
-            Supercharge this community
-          </Button>
-        )}
-        <p className="mt-2 text-[10px] text-muted-foreground">
-          One included supercharge gives a community 200 emoji slots, 50 MB
-          uploads and 128 kbps voice audio for all members. Moving it transfers
-          those benefits; they last while Premium is active.
         </p>
       </section>
       {manage && (

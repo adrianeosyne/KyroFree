@@ -1024,6 +1024,17 @@ export const exportData = mutation({
         .collect(),
       hidePremiumBadge: user.hidePremiumBadge === true,
       premiumUntil: user.premiumUntil ?? null,
+      premiumSince: user.premiumSince ?? null,
+      premiumStreakSince: user.premiumStreakSince ?? null,
+      premiumGiftCount: user.premiumGiftCount ?? 0,
+      activity: await ctx.db
+        .query("serverActivity")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      level: await ctx.db
+        .query("playerLevels")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .unique(),
       workspace: await ctx.db
         .query("workspaces")
         .withIndex("by_user", (q) => q.eq("userId", id))
@@ -1314,6 +1325,19 @@ export const deleteAccount = mutation({
         row._id,
       );
       await ctx.db.delete(row._id);
+    }
+    for (const table of [
+      "playerLevels",
+      "serverActivity",
+      "premiumCodeAttempts",
+      "accountRecoveryTokens",
+      "accountRecoveryRequests",
+    ] as const) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect();
+      for (const row of rows) await ctx.db.delete(row._id);
     }
     const decorations = await ctx.db
       .query("communityDecorations")

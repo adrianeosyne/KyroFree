@@ -19,6 +19,7 @@ startDesktopWebUpdates();
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const DownloadPage = lazy(() => import("./pages/Download.tsx"));
 const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
+const AccountRecoveryPage = lazy(() => import("./pages/AccountRecovery.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -163,6 +164,10 @@ createRoot(document.getElementById("root")!).render(
                       <Dashboard />
                     </RequireAuth>
                   }
+                />
+                <Route
+                  path="/account-recovery"
+                  element={<AccountRecoveryPage />}
                 />
                 <Route path="/terms" element={<TermsPage />} />
                 <Route path="/privacy" element={<PrivacyPage />} />

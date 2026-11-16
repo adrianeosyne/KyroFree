@@ -111,6 +111,28 @@ export function renderEmailTemplate(
       text: `${title}\n\n${intro}\n\n${detail}`,
     };
   }
+  if (template === "two_factor_recovery") {
+    const token = field(payload, "token");
+    if (!/^[0-9a-f]{64}$/.test(token))
+      throw new Error("Invalid two-factor recovery token.");
+    const url = `${SITE_URL}/account-recovery#token=${token}`;
+    const title = "Recover your Kyro account";
+    const intro =
+      "You requested help with a lost authenticator. Use this link within 15 minutes to turn off two-factor authentication, then sign in with your password and set up a new authenticator.";
+    return {
+      subject: title,
+      html: layout({
+        preheader: "Your one-time account recovery link",
+        eyebrow: "Account security",
+        title,
+        intro,
+        body:
+          button("Review account recovery", url) +
+          "<p style='color:#A0A6B5;font-size:13px'>If you did not request this, ignore this email. Your two-factor protection stays enabled.</p>",
+      }),
+      text: `${title}\n\n${intro}\n\n${url}\n\nIf you did not request this, ignore this email.`,
+    };
+  }
   const member = identity(payload);
   if (template === "password_reset" || template === "email_verification") {
     const code = field(payload, "code");
