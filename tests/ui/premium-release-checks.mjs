@@ -31,6 +31,33 @@ export async function checkReleasePromotion(browser) {
     await expect(timer.locator("div").nth(0)).toHaveText(/13\s*days/);
     await page.reload();
     await expect(timer.locator("div").nth(0)).toHaveText(/13\s*days/);
+    await page.evaluate(() =>
+      window.setFixtureData("premium:status", {
+        premiumUntil: new Date("2026-12-17T00:00:00Z").getTime(),
+        hidePremiumBadge: false,
+        instructions: "Contact adrianeosyne for manual payment instructions.",
+        requests: [],
+      }),
+    );
+    await expect(
+      settings.getByText("Premium active through", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(currentPrice).toHaveText("$0.99");
+    await expect(offer).toBeVisible();
+    await expect(timer).toBeVisible();
+    const hero = offer.locator("..");
+    await expect(
+      hero.getByRole("heading", {
+        name: "Play. Create. Make it yours.",
+      }),
+    ).toBeVisible();
+    await expect(
+      hero.getByText("Premium active through", {
+        exact: false,
+      }),
+    ).toBeVisible();
     await settings.screenshot({
       path: "test-results/kyro-premium-release-desktop.png",
       animations: "disabled",
@@ -65,7 +92,7 @@ export async function checkReleasePromotion(browser) {
     await expect(currentPrice).toHaveText("$1.99");
     await expect(offer).toHaveCount(0);
     console.log(
-      "PASS: release price, regular price, reason, fixed countdown, refresh persistence, mobile layout and automatic expiration",
+      "PASS: release price, regular price, reason and countdown inside the active Premium card, refresh persistence, mobile layout and automatic expiration",
     );
   } finally {
     await context.close();
