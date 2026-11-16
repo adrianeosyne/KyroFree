@@ -13,6 +13,7 @@ async function createCodes(
   days: number,
   count: number,
   expiresInDays?: number,
+  giftSenderId?: Id<"users"> | null,
 ) {
   const { id, user } = await requireActiveUser(ctx);
   if (!isFounderUser(user))
@@ -25,6 +26,15 @@ async function createCodes(
     throw new Error(
       "Choose no expiry or a redemption window of 7, 30 or 90 days.",
     );
+  const giftSender = giftSenderId ? await ctx.db.get(giftSenderId) : null;
+  if (
+    giftSenderId &&
+    (!giftSender ||
+      giftSender.deletedAt ||
+      giftSender.botApplicationId ||
+      giftSender.isAnonymous)
+  )
+    throw new Error("Choose an active Kyro member as the gift sender.");
   const now = Date.now();
   const expiresAt =
     expiresInDays === undefined ? undefined : now + expiresInDays * DAY_MS;
@@ -49,6 +59,13 @@ async function createCodes(
         suffix: value.slice(-4),
         days,
         creatorId: id,
+        ...(giftSenderId === undefined
+          ? {}
+          : {
+              giftSenderId,
+              giftSenderName: giftSender?.name ?? giftSender?.username,
+              giftSenderUsername: giftSender?.username,
+            }),
         createdAt: now,
         ...(expiresAt === undefined ? {} : { expiresAt }),
       });
@@ -58,7 +75,7 @@ async function createCodes(
         action: "premium_code_created",
         targetType: "premium_code",
         targetId: codeId,
-        details: `${days} days · ending ${value.slice(-4)}${expiresAt ? ` · redeem by ${new Date(expiresAt).toISOString()}` : ""}`,
+        details: `${days} days · ending ${value.slice(-4)}${expiresAt ? ` · redeem by ${new Date(expiresAt).toISOString()}` : ""} · ${giftSenderId === null ? "no gift attribution" : `gift sender ${giftSender?._id ?? id}`}`,
       });
       codes.push(code);
       created = true;
@@ -69,9 +86,13 @@ async function createCodes(
   return { codes, days, expiresAt: expiresAt ?? null };
 }
 export const generate = mutation({
-  args: { days: v.number(), expiresInDays: v.optional(v.number()) },
-  handler: async (ctx, { days, expiresInDays }) => {
-    const result = await createCodes(ctx, days, 1, expiresInDays);
+  args: {
+    days: v.number(),
+    expiresInDays: v.optional(v.number()),
+    giftSenderId: v.optional(v.union(v.id("users"), v.null())),
+  },
+  handler: async (ctx, { days, expiresInDays, giftSenderId }) => {
+    const result = await createCodes(ctx, days, 1, expiresInDays, giftSenderId);
     return { code: result.codes[0], days, expiresAt: result.expiresAt };
   },
 });
@@ -80,9 +101,10 @@ export const generateBatch = mutation({
     days: v.number(),
     count: v.number(),
     expiresInDays: v.optional(v.number()),
+    giftSenderId: v.optional(v.union(v.id("users"), v.null())),
   },
-  handler: (ctx, { days, count, expiresInDays }) =>
-    createCodes(ctx, days, count, expiresInDays),
+  handler: (ctx, { days, count, expiresInDays, giftSenderId }) =>
+    createCodes(ctx, days, count, expiresInDays, giftSenderId),
 });
 function publicCode(row: Doc<"premiumCodes">) {
   const {
@@ -91,6 +113,9 @@ function publicCode(row: Doc<"premiumCodes">) {
     suffix,
     days,
     creatorId,
+    giftSenderId,
+    giftSenderName,
+    giftSenderUsername,
     createdAt,
     expiresAt,
     redeemedBy,
@@ -104,6 +129,9 @@ function publicCode(row: Doc<"premiumCodes">) {
     suffix,
     days,
     creatorId,
+    giftSenderId,
+    giftSenderName,
+    giftSenderUsername,
     createdAt,
     expiresAt,
     redeemedBy,
@@ -283,13 +311,13 @@ export const shareGift = mutation({
     const result = await availableCode(ctx, args.code);
     if (!result.ok) return result;
     const { row, code } = result;
-    if (row.giftSenderId && row.giftSenderId !== id)
+    if (row.giftSenderId && row.giftSenderId !== id && row.creatorId !== id)
       return {
         ok: false as const,
         error:
           "This gift link already has a sender. You can claim it for yourself.",
       };
-    if (!row.giftSenderId)
+    if (row.giftSenderId === undefined)
       await ctx.db.patch(row._id, {
         giftSenderId: id,
         giftSenderName: user.name,
@@ -306,14 +334,23 @@ export const giftPreview = query({
     await requireActiveUser(ctx);
     const result = await availableCode(ctx, args.code);
     if (!result.ok) return { valid: false as const, reason: result.error };
-    const sender = await ctx.db.get(
-      result.row.giftSenderId ?? result.row.creatorId,
-    );
+    const senderId =
+      result.row.giftSenderId === null
+        ? null
+        : (result.row.giftSenderId ?? result.row.creatorId);
+    const sender = senderId ? await ctx.db.get(senderId) : null;
     return {
       valid: true as const,
       days: result.row.days,
-      senderName: result.row.giftSenderName ?? sender?.name ?? "A Kyro member",
-      senderUsername: result.row.giftSenderUsername ?? sender?.username ?? null,
+      senderName: senderId
+        ? (result.row.giftSenderName ??
+          sender?.name ??
+          sender?.username ??
+          "A Kyro member")
+        : null,
+      senderUsername: senderId
+        ? (result.row.giftSenderUsername ?? sender?.username ?? null)
+        : null,
     };
   },
 });
@@ -336,7 +373,12 @@ export const redeem = mutation({
     if (!result.ok) return result;
     const { row } = result;
     const recipientId = args.recipientId ?? id;
-    if (row.giftSenderId && row.giftSenderId !== id && recipientId !== id)
+    if (
+      row.giftSenderId &&
+      row.giftSenderId !== id &&
+      row.creatorId !== id &&
+      recipientId !== id
+    )
       return {
         ok: false as const,
         error: "Claim this gift for your own account.",
@@ -353,8 +395,10 @@ export const redeem = mutation({
     const premiumUntil =
       Math.max(now, recipient.premiumUntil ?? 0) + row.days * DAY_MS;
     const senderId =
-      row.giftSenderId ??
-      (args.fromGiftLink ? row.creatorId : recipientId !== id ? id : null);
+      row.giftSenderId === null
+        ? null
+        : (row.giftSenderId ??
+          (args.fromGiftLink ? row.creatorId : recipientId !== id ? id : null));
     if (senderId)
       await recordPremiumGift(
         ctx,

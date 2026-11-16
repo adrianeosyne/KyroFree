@@ -119,6 +119,13 @@ remain pending while offline or using another dialog, until acknowledged.
 The sender's gift count increases only after a successful claim. Code generation
 remains founder-only, and full codes are not stored in the database.
 
+In Admin Portal → Premium, **Gift attribution** lets the founder create single
+codes or batches in another member's name, or choose **No sender · no gift badge**.
+Attributed codes credit the selected member only when another account redeems
+them. Codes created with no sender stay unattributed when shared or redeemed,
+show no sender on the claim page, and never increase anyone's gift count.
+The founder remains the code creator in the staff audit history.
+
 Profiles display one Premium tier beside the name. Premium is excluded from
 the general badge tray, and tier tooltips show membership history without
 assignment attribution.

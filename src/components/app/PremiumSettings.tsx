@@ -658,6 +658,10 @@ function PremiumCodeAdmin() {
   const [days, setDays] = useState(30),
     [count, setCount] = useState(1),
     [expiresInDays, setExpiresInDays] = useState(0),
+    [senderMode, setSenderMode] = useState<"creator" | "member" | "none">(
+      "creator",
+    ),
+    [senderId, setSenderId] = useState(""),
     [generated, setGenerated] = useState<string[]>([]),
     [generatedExpiry, setGeneratedExpiry] = useState<number | null>(null),
     [busy, setBusy] = useState(false),
@@ -736,12 +740,55 @@ function PremiumCodeAdmin() {
         The redemption window limits when a code can be used. Membership
         duration starts when it is redeemed.
       </p>
+      <div className="space-y-3">
+        <label className="block text-sm">
+          Gift attribution
+          <select
+            aria-label="Premium code gift attribution"
+            value={senderMode}
+            disabled={busy}
+            onChange={(e) => {
+              setSenderMode(e.target.value as typeof senderMode);
+              setSenderId("");
+            }}
+            className="mt-2 block w-full rounded-lg border border-input bg-background p-2"
+          >
+            <option value="creator">adrianeosyne (default)</option>
+            <option value="member">Another member</option>
+            <option value="none">No sender · no gift badge</option>
+          </select>
+        </label>
+        {senderMode === "member" && (
+          <PremiumMemberPicker
+            label="Premium code gift sender"
+            onSelect={setSenderId}
+            disabled={busy}
+          />
+        )}
+        <p className="text-xs text-muted-foreground">
+          {senderMode === "none"
+            ? "These codes show no sender and never count toward anyone's gift badge, even when shared."
+            : senderMode === "member"
+              ? "The selected member's name appears on the gift. Their gift badge advances when someone else redeems it."
+              : "Gift links use adrianeosyne unless a member creates a gift link from the code in Premium settings."}
+        </p>
+      </div>
       <Button
-        disabled={busy || generated.length > 0}
+        disabled={
+          busy || generated.length > 0 || (senderMode === "member" && !senderId)
+        }
         onClick={async () => {
           setBusy(true);
           try {
-            const args = { days, ...(expiresInDays ? { expiresInDays } : {}) };
+            const args = {
+              days,
+              ...(expiresInDays ? { expiresInDays } : {}),
+              ...(senderMode === "none"
+                ? { giftSenderId: null }
+                : senderMode === "member"
+                  ? { giftSenderId: senderId as Id<"users"> }
+                  : {}),
+            };
             if (count === 1) {
               const result = await generate(args);
               setGenerated([result.code]);
@@ -873,6 +920,11 @@ function PremiumCodeAdmin() {
               <span className="font-mono">KYRO-••••-••••-{row.suffix}</span>
               <span>
                 {row.days} days · {state}
+              </span>
+              <span>
+                {row.giftSenderId === null
+                  ? "No sender · no gift badge"
+                  : `Gifted by ${row.giftSenderName ?? row.giftSenderUsername ?? "adrianeosyne"}${row.giftSenderUsername ? ` (@${row.giftSenderUsername})` : ""}`}
               </span>
               <span className="text-muted-foreground">
                 Created {new Date(row.createdAt).toLocaleDateString()}

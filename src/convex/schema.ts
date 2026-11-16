@@ -257,7 +257,8 @@ const schema = defineSchema(
       creatorId: v.id("users"),
       createdAt: v.number(),
       expiresAt: v.optional(v.number()),
-      giftSenderId: v.optional(v.id("users")),
+      /** null locks the code to no attribution; missing preserves legacy sharing. */
+      giftSenderId: v.optional(v.union(v.id("users"), v.null())),
       giftSenderName: v.optional(v.string()),
       giftSenderUsername: v.optional(v.string()),
       redeemedBy: v.optional(v.id("users")),

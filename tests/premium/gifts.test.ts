@@ -42,6 +42,274 @@ async function setup() {
 }
 
 describe("Premium gift links and delivery", () => {
+  it.each([1, 3])(
+    "creates %i codes in another member's name while retaining the founder in the audit",
+    async (count) => {
+      const f = await setup();
+      const args = { days: 90, giftSenderId: f.ids.sender };
+      const codes =
+        count === 1
+          ? [(await f.founder.mutation(api.premiumCodes.generate, args)).code]
+          : (
+              await f.founder.mutation(api.premiumCodes.generateBatch, {
+                ...args,
+                count,
+              })
+            ).codes;
+      const history = await f.founder.query(api.premiumCodes.history, {
+        paginationOpts: { numItems: 25, cursor: null },
+      });
+      expect(history.page).toHaveLength(count);
+      for (const row of history.page) {
+        expect(row).toMatchObject({
+          creatorId: f.ids.founder,
+          giftSenderId: f.ids.sender,
+          giftSenderName: "Gift Sender",
+          giftSenderUsername: "sender",
+        });
+        expect(row).not.toHaveProperty("hash");
+      }
+      expect((await f.sender.query(api.premium.status)).premiumGiftCount).toBe(
+        0,
+      );
+      expect((await f.founder.query(api.premium.status)).premiumGiftCount).toBe(
+        0,
+      );
+      await f.t.run((ctx) =>
+        ctx.db.patch(f.ids.sender, {
+          name: "Renamed Sender",
+          username: "renamed",
+        }),
+      );
+      for (const code of codes) {
+        expect(
+          await f.recipient.query(api.premiumCodes.giftPreview, { code }),
+        ).toMatchObject({
+          valid: true,
+          senderName: "Gift Sender",
+          senderUsername: "sender",
+        });
+        expect(
+          await f.other.mutation(api.premiumCodes.shareGift, { code }),
+        ).toMatchObject({ ok: false });
+        expect(
+          await f.recipient.mutation(api.premiumCodes.redeem, { code }),
+        ).toMatchObject({ ok: true, giftReceived: true });
+      }
+      expect((await f.sender.query(api.premium.status)).premiumGiftCount).toBe(
+        count,
+      );
+      expect((await f.founder.query(api.premium.status)).premiumGiftCount).toBe(
+        0,
+      );
+      const gifts = await f.recipient.query(
+        api.notifications.pendingPremiumGifts,
+      );
+      expect(gifts).toHaveLength(count);
+      expect(
+        gifts.every(
+          (gift) =>
+            gift.senderName === "Gift Sender" &&
+            gift.senderUsername === "sender",
+        ),
+      ).toBe(true);
+      expect(
+        await f.recipient.mutation(api.premiumCodes.redeem, { code: codes[0] }),
+      ).toMatchObject({ ok: false });
+      const actions = await f.t.run((ctx) =>
+        ctx.db.query("adminActions").collect(),
+      );
+      const creation = actions.filter(
+        (action) => action.action === "premium_code_created",
+      );
+      expect(creation).toHaveLength(count);
+      expect(
+        creation.every(
+          (action) =>
+            action.actorId === f.ids.founder &&
+            action.details?.includes(f.ids.sender),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it("allows the founder to share and deliver attributed codes without taking the selected member's credit", async () => {
+    const f = await setup();
+    const { code } = await f.founder.mutation(api.premiumCodes.generate, {
+      days: 30,
+      giftSenderId: f.ids.sender,
+    });
+    expect(
+      await f.founder.mutation(api.premiumCodes.shareGift, { code }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await f.founder.mutation(api.premiumCodes.redeem, {
+        code,
+        recipientId: f.ids.recipient,
+      }),
+    ).toMatchObject({ ok: true, giftReceived: true });
+    expect((await f.sender.query(api.premium.status)).premiumGiftCount).toBe(1);
+    expect((await f.founder.query(api.premium.status)).premiumGiftCount).toBe(
+      0,
+    );
+    expect(
+      (await f.recipient.query(api.notifications.pendingPremiumGifts))[0],
+    ).toMatchObject({ senderName: "Gift Sender", senderUsername: "sender" });
+  });
+
+  it.each(["self", "link", "direct", "shared"] as const)(
+    "keeps anonymous codes unattributed during %s redemption",
+    async (mode) => {
+      const f = await setup();
+      await f.t.run(async (ctx) => {
+        await ctx.db.patch(f.ids.sender, { premiumGiftCount: 9 });
+        await ctx.db.patch(f.ids.founder, { premiumGiftCount: 10 });
+        await ctx.db.patch(f.ids.recipient, {
+          premiumUntil: Date.now() + 12 * DAY_MS,
+        });
+      });
+      const { code } = await f.founder.mutation(api.premiumCodes.generate, {
+        days: 30,
+        giftSenderId: null,
+      });
+      if (mode === "shared") {
+        expect(
+          await f.sender.mutation(api.premiumCodes.shareGift, { code }),
+        ).toMatchObject({ ok: true });
+        expect(
+          await f.other.mutation(api.premiumCodes.shareGift, { code }),
+        ).toMatchObject({ ok: true });
+      }
+      expect(
+        await f.recipient.query(api.premiumCodes.giftPreview, { code }),
+      ).toEqual({
+        valid: true,
+        days: 30,
+        senderName: null,
+        senderUsername: null,
+      });
+      const result =
+        mode === "direct"
+          ? await f.sender.mutation(api.premiumCodes.redeem, {
+              code,
+              recipientId: f.ids.recipient,
+            })
+          : await f.recipient.mutation(api.premiumCodes.redeem, {
+              code,
+              fromGiftLink: mode !== "self",
+            });
+      expect(result).toMatchObject({ ok: true, giftReceived: false });
+      expect((await f.recipient.query(api.premium.status)).premiumUntil).toBe(
+        Date.now() + 42 * DAY_MS,
+      );
+      expect(
+        await f.recipient.query(api.notifications.pendingPremiumGifts),
+      ).toEqual([]);
+      expect((await f.sender.query(api.premium.status)).premiumGiftCount).toBe(
+        9,
+      );
+      expect((await f.founder.query(api.premium.status)).premiumGiftCount).toBe(
+        10,
+      );
+      expect((await f.other.query(api.premium.status)).premiumGiftCount).toBe(
+        0,
+      );
+      const [row] = await f.founder.query(api.premiumCodes.list);
+      expect(row).toMatchObject({
+        creatorId: f.ids.founder,
+        giftSenderId: null,
+        recipientId: f.ids.recipient,
+      });
+      expect(row.giftSenderName).toBeUndefined();
+    },
+  );
+
+  it("preserves anonymous attribution for every code in a batch and excludes attributed self-claims from gift counts", async () => {
+    const f = await setup();
+    const { codes } = await f.founder.mutation(api.premiumCodes.generateBatch, {
+      days: 30,
+      count: 3,
+      giftSenderId: null,
+    });
+    for (const code of codes) {
+      await f.sender.mutation(api.premiumCodes.redeem, {
+        code,
+        fromGiftLink: true,
+      });
+    }
+    expect(
+      (await f.founder.query(api.premiumCodes.list)).every(
+        (row) => row.giftSenderId === null,
+      ),
+    ).toBe(true);
+    const self = await f.founder.mutation(api.premiumCodes.generate, {
+      days: 30,
+      giftSenderId: f.ids.sender,
+    });
+    expect(
+      await f.sender.mutation(api.premiumCodes.redeem, {
+        code: self.code,
+        fromGiftLink: true,
+      }),
+    ).toMatchObject({ ok: true, giftReceived: false });
+    expect((await f.sender.query(api.premium.status)).premiumGiftCount).toBe(0);
+    expect((await f.founder.query(api.premium.status)).premiumGiftCount).toBe(
+      0,
+    );
+    expect(await f.sender.query(api.notifications.pendingPremiumGifts)).toEqual(
+      [],
+    );
+  });
+
+  it("checks founder authorization and validates senders before creating any codes", async () => {
+    const f = await setup();
+    await f.t.run((ctx) =>
+      ctx.db.patch(f.ids.other, { role: "admin", founderBadge: true }),
+    );
+    for (const giftSenderId of [f.ids.sender, null]) {
+      for (const actor of [f.sender, f.other]) {
+        await expect(
+          actor.mutation(api.premiumCodes.generate, { days: 30, giftSenderId }),
+        ).rejects.toThrow("Only adrianeosyne");
+        await expect(
+          actor.mutation(api.premiumCodes.generateBatch, {
+            days: 30,
+            count: 3,
+            giftSenderId,
+          }),
+        ).rejects.toThrow("Only adrianeosyne");
+      }
+    }
+    const unavailable = await f.t.run(async (ctx) => {
+      const missing = await ctx.db.insert("users", { name: "Missing" });
+      await ctx.db.delete(missing);
+      return [
+        missing,
+        await ctx.db.insert("users", {
+          name: "Deleted",
+          deletedAt: Date.now(),
+        }),
+        await ctx.db.insert("users", { isAnonymous: true }),
+      ];
+    });
+    for (const giftSenderId of unavailable) {
+      await expect(
+        f.founder.mutation(api.premiumCodes.generate, {
+          days: 30,
+          giftSenderId,
+        }),
+      ).rejects.toThrow("active Kyro member");
+      await expect(
+        f.founder.mutation(api.premiumCodes.generateBatch, {
+          days: 30,
+          count: 3,
+          giftSenderId,
+        }),
+      ).rejects.toThrow("active Kyro member");
+    }
+    expect(await f.founder.query(api.premiumCodes.list)).toEqual([]);
+  });
+
   it("reserves an unused code for its sender, previews without spending, and credits claims in settings", async () => {
     const f = await setup();
     const { code } = await f.founder.mutation(api.premiumCodes.generate, {

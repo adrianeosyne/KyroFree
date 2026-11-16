@@ -76,10 +76,12 @@ function GiftPage() {
               <p className="text-3xl font-bold text-fuchsia-300">
                 {premiumDuration(preview.days)} of Premium
               </p>
-              <p className="break-words text-sm">
-                From <strong>{preview.senderName}</strong>
-                {preview.senderUsername && ` (@${preview.senderUsername})`}
-              </p>
+              {preview.senderName && (
+                <p className="break-words text-sm">
+                  From <strong>{preview.senderName}</strong>
+                  {preview.senderUsername && ` (@${preview.senderUsername})`}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground">
                 Your Premium starts when you claim. Any time you already have is
                 kept.

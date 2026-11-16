@@ -147,16 +147,35 @@ export async function checkGiftExperience(page) {
     .getByRole("button", { name: "Close settings", exact: true })
     .filter({ visible: true })
     .click();
-  const queued = page
-    .getByRole("dialog")
-    .filter({
-      has: page.getByRole("heading", { name: "You received Premium!" }),
-    });
+  const queued = page.getByRole("dialog").filter({
+    has: page.getByRole("heading", { name: "You received Premium!" }),
+  });
   await expect(queued).toContainText("Leo Parker");
   await queued
     .getByRole("button", { name: "Open Premium settings", exact: true })
     .click();
   await expect(queued).toHaveCount(0);
+
+  await page.evaluate(() =>
+    window.setFixtureData("premiumCodes:giftPreview", {
+      valid: true,
+      days: 30,
+      senderName: null,
+      senderUsername: null,
+    }),
+  );
+  await go(page, "/gift/KYRO-ABCD-EFGH-ABCD");
+  await expect(
+    page.getByText("1 month of Premium", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/^From /)).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Claim Premium gift", exact: true })
+    .click();
+  await expect(page).toHaveURL(/dashboard\?settings=premium$/);
+  await expect(
+    page.getByRole("heading", { name: "You received Premium!" }),
+  ).toHaveCount(0);
 
   await page.evaluate(() =>
     window.setFixtureData("premiumCodes:giftPreview", {

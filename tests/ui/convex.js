@@ -373,6 +373,13 @@ export function useMutation(reference) {
           _id: `fixture-code-${Date.now()}-${index}`,
           suffix: code.slice(-4),
           days: args.days,
+          giftSenderId: args.giftSenderId,
+          giftSenderName: args.giftSenderId
+            ? friends.find((user) => user.id === args.giftSenderId)?.name
+            : undefined,
+          giftSenderUsername: args.giftSenderId
+            ? friends.find((user) => user.id === args.giftSenderId)?.username
+            : undefined,
           createdAt: Date.now(),
           ...(expiresAt ? { expiresAt } : {}),
         }));
@@ -392,7 +399,10 @@ export function useMutation(reference) {
           ),
         );
       if (name === "premiumCodes:redeem") {
-        if (args.fromGiftLink)
+        const giftReceived =
+          args.fromGiftLink === true &&
+          data["premiumCodes:giftPreview"].senderName !== null;
+        if (giftReceived)
           window.setFixtureData("notifications:pendingPremiumGifts", [
             {
               id: "gift-note",
@@ -413,7 +423,7 @@ export function useMutation(reference) {
           ok: true,
           days: 30,
           premiumUntil: Date.now() + 30 * 86400000,
-          giftReceived: args.fromGiftLink === true,
+          giftReceived,
         };
       }
       if (name === "premiumCodes:shareGift")

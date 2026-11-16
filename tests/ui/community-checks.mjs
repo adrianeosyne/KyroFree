@@ -275,6 +275,33 @@ export async function checkCommunity(page) {
   await page
     .getByRole("button", { name: "Clear displayed codes", exact: true })
     .click();
+  await page.getByLabel("Premium code gift attribution").selectOption("member");
+  await expect(
+    page.getByRole("button", { name: "Generate Premium code", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Premium code gift sender", { exact: true })
+    .fill("Maya");
+  await page.getByRole("button", { name: /Maya Chen.*maya_chen/ }).click();
+  await page
+    .getByRole("button", { name: "Generate Premium code", exact: true })
+    .click();
+  assert.equal(
+    await page.evaluate(
+      () =>
+        window.fixtureMutations.findLast(
+          (c) => c.name === "premiumCodes:generate",
+        ).args.giftSenderId,
+    ),
+    "maya",
+  );
+  await expect(
+    page.getByText("Gifted by Maya Chen (@maya_chen)", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Clear displayed codes", exact: true })
+    .click();
+  await page.getByLabel("Premium code gift attribution").selectOption("none");
   await page.getByLabel("Number of Premium codes").selectOption("5");
   await page.getByLabel("Premium code redemption window").selectOption("7");
   await page
@@ -289,7 +316,17 @@ export async function checkCommunity(page) {
         (c) => c.name === "premiumCodes:generateBatch",
       ).args,
   );
-  assert.deepEqual(batch, { days: 365, count: 5, expiresInDays: 7 });
+  assert.deepEqual(batch, {
+    days: 365,
+    count: 5,
+    expiresInDays: 7,
+    giftSenderId: null,
+  });
+  await expect(
+    page
+      .getByText("No sender · no gift badge", { exact: true })
+      .filter({ visible: true }),
+  ).toHaveCount(5);
   await expect(
     page.getByRole("button", { name: "Copy all codes", exact: true }),
   ).toBeVisible();
