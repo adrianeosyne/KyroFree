@@ -5,7 +5,11 @@ import {
   LEGAL_POLICY_UPDATED,
   type LegalPolicy,
 } from "@/lib/legalContent";
-import { COPYRIGHT_OWNER, LEGAL_POLICY_VERSIONS } from "@/lib/legalPolicies";
+import {
+  COPYRIGHT_OWNER,
+  LEGAL_POLICY_VERSIONS,
+  type RegistrationPolicies,
+} from "@/lib/legalPolicies";
 import { PremiumPrice } from "@/components/PremiumPrice";
 
 function LegalPage({ policy }: { policy: LegalPolicy }) {
@@ -173,17 +177,22 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
 /** Signup reviews use the same content and versions as the public policy pages. */
 export function LegalPolicyContent({
   policy,
+  snapshot,
 }: {
   policy: LegalPolicy["slug"];
+  snapshot?: RegistrationPolicies;
 }) {
-  const document = LEGAL_POLICIES.find((item) => item.slug === policy)!;
-  const updated = LEGAL_POLICY_UPDATED[policy];
+  const document = (snapshot?.policies ?? LEGAL_POLICIES).find(
+    (item) => item.slug === policy,
+  )!;
+  const updated = (snapshot?.updated ?? LEGAL_POLICY_UPDATED)[policy];
+  const version = (snapshot?.versions ?? LEGAL_POLICY_VERSIONS)[policy];
   return (
     <article className="space-y-6 text-sm leading-6">
       <div>
         <h2 className="text-xl font-bold">{document.title}</h2>
         <p className="mt-1 text-muted-foreground">
-          Last updated {updated.label} · Version {LEGAL_POLICY_VERSIONS[policy]}
+          Last updated {updated.label} · Version {version}
         </p>
         <p className="mt-3 text-muted-foreground">{document.intro}</p>
       </div>

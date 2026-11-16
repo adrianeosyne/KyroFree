@@ -6,6 +6,7 @@ import type { FunctionArgs } from "convex/server";
 import schema from "../../src/convex/schema";
 import { api } from "../../src/convex/_generated/api";
 import { LEGAL_POLICY_VERSIONS } from "../../src/lib/legalPolicies";
+import { LEGAL_POLICIES } from "../../src/lib/legalContent";
 
 const modules = import.meta.glob("../../src/convex/**/*.{ts,tsx}");
 const accepted = {
@@ -43,6 +44,8 @@ describe("registration legal acceptance", () => {
     { ...accepted, termsAccepted: false },
     { ...accepted, privacyAccepted: false },
     { ...accepted, copyrightAccepted: false },
+    { ...accepted, termsVersion: "old-version" },
+    { ...accepted, privacyVersion: "old-version" },
     { ...accepted, copyrightVersion: "old-version" },
   ])(
     "rejects incomplete or outdated acceptance before account creation: %j",
@@ -62,6 +65,30 @@ describe("registration legal acceptance", () => {
       ).toHaveLength(0);
     },
   );
+
+  it("lets an anonymous client review server policies and create an account with their versions", async () => {
+    const t = convexTest(schema, modules);
+    const snapshot = await t.query(api.legalAcceptance.currentPolicies, {});
+    expect(snapshot.policies).toEqual(LEGAL_POLICIES);
+    const result = await t.action(api.users.createAccount.createAccount, {
+      ...account,
+      legalAcceptance: {
+        termsAccepted: true,
+        privacyAccepted: true,
+        copyrightAccepted: true,
+        termsVersion: snapshot.versions.terms,
+        privacyVersion: snapshot.versions.privacy,
+        copyrightVersion: snapshot.versions.copyright,
+      },
+    });
+    const user = await t.run((ctx) => ctx.db.get(result.userId));
+    expect(user?.legalAcceptance).toEqual({
+      acceptedAt: Date.now(),
+      termsVersion: snapshot.versions.terms,
+      privacyVersion: snapshot.versions.privacy,
+      copyrightVersion: snapshot.versions.copyright,
+    });
+  });
 
   it.each([
     undefined,

@@ -1,5 +1,20 @@
 import { v } from "convex/values";
-import { LEGAL_POLICY_VERSIONS } from "../lib/legalPolicies";
+import { query } from "./functions";
+import { LEGAL_POLICIES } from "../lib/legalContent";
+import {
+  LEGAL_POLICY_UPDATED,
+  LEGAL_POLICY_VERSIONS,
+} from "../lib/legalPolicies";
+
+/** Content and versions travel together so cached clients review what they accept. */
+export const currentPolicies = query({
+  args: {},
+  handler: async () => ({
+    policies: LEGAL_POLICIES,
+    versions: LEGAL_POLICY_VERSIONS,
+    updated: LEGAL_POLICY_UPDATED,
+  }),
+});
 
 export const legalAcceptanceInput = v.object({
   termsAccepted: v.boolean(),

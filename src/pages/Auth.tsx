@@ -25,8 +25,7 @@ import {
   Mail,
 } from "@/components/icons";
 import { Link } from "react-router";
-import { useAction, useMutation } from "convex/react";
-import { LEGAL_POLICY_VERSIONS } from "@/lib/legalPolicies";
+import { useAction, useMutation, useQuery } from "convex/react";
 import {
   Dialog,
   DialogContent,
@@ -100,12 +99,30 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [showNewPassword, setShowNewPassword] = React.useState(false);
   const [verificationCode, setVerificationCode] = React.useState("");
-  const [acceptedPolicies, setAcceptedPolicies] = React.useState({
-    terms: false,
-    privacy: false,
-    copyright: false,
+  const registrationPolicies = useQuery(
+    api.legalAcceptance.currentPolicies,
+    step === "register" ? {} : "skip",
+  );
+  const [acceptedPolicies, setAcceptedPolicies] = React.useState<
+    Record<"terms" | "privacy" | "copyright", string | null>
+  >({
+    terms: null,
+    privacy: null,
+    copyright: null,
   });
-  const allPoliciesAccepted = Object.values(acceptedPolicies).every(Boolean);
+  const policyKeys = ["terms", "privacy", "copyright"] as const;
+  const allPoliciesAccepted =
+    registrationPolicies !== undefined &&
+    policyKeys.every(
+      (key) => acceptedPolicies[key] === registrationPolicies.versions[key],
+    );
+  const policiesChanged =
+    registrationPolicies !== undefined &&
+    policyKeys.some(
+      (key) =>
+        acceptedPolicies[key] !== null &&
+        acceptedPolicies[key] !== registrationPolicies.versions[key],
+    );
   const [reviewPolicy, setReviewPolicy] = React.useState<
     "terms" | "privacy" | "copyright" | null
   >(null);
@@ -168,6 +185,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   ) => {
     event.preventDefault();
     if (isLoading) return;
+    if (!registrationPolicies) {
+      setError("Please wait for the current policies to load.");
+      return;
+    }
     if (!allPoliciesAccepted) {
       setError(
         "Accept the Terms of Service, Privacy Policy and Copyright Policy before creating an account.",
@@ -180,12 +201,15 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
     const handle = username.trim().toLowerCase();
     const displayNameValue = displayName.trim() || handle;
     const legalAcceptance = {
-      termsAccepted: acceptedPolicies.terms,
-      privacyAccepted: acceptedPolicies.privacy,
-      copyrightAccepted: acceptedPolicies.copyright,
-      termsVersion: LEGAL_POLICY_VERSIONS.terms,
-      privacyVersion: LEGAL_POLICY_VERSIONS.privacy,
-      copyrightVersion: LEGAL_POLICY_VERSIONS.copyright,
+      termsAccepted:
+        acceptedPolicies.terms === registrationPolicies.versions.terms,
+      privacyAccepted:
+        acceptedPolicies.privacy === registrationPolicies.versions.privacy,
+      copyrightAccepted:
+        acceptedPolicies.copyright === registrationPolicies.versions.copyright,
+      termsVersion: registrationPolicies.versions.terms,
+      privacyVersion: registrationPolicies.versions.privacy,
+      copyrightVersion: registrationPolicies.versions.copyright,
     };
     try {
       if (!USERNAME_PATTERN.test(handle)) {
@@ -271,6 +295,14 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         return;
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("LEGAL_POLICY_UPDATED")) {
+        setAcceptedPolicies({ terms: null, privacy: null, copyright: null });
+        setError(
+          "The policies have changed. Review and accept the updated policies below, then create your account again.",
+        );
+        return;
+      }
       setError(
         err instanceof Error
           ? err.message
@@ -282,7 +314,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   };
 
   const startRegister = () => {
-    setAcceptedPolicies({ terms: false, privacy: false, copyright: false });
+    setAcceptedPolicies({ terms: null, privacy: null, copyright: null });
     setStep("register");
     setError(null);
     setTwoFactorRequired(false);
@@ -900,12 +932,18 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                           id={`accept-${key}`}
                           type="checkbox"
                           required
-                          disabled={isLoading}
-                          checked={acceptedPolicies[key]}
+                          disabled={isLoading || !registrationPolicies}
+                          checked={
+                            registrationPolicies !== undefined &&
+                            acceptedPolicies[key] ===
+                              registrationPolicies.versions[key]
+                          }
                           onChange={(event) =>
                             setAcceptedPolicies((current) => ({
                               ...current,
-                              [key]: event.target.checked,
+                              [key]: event.target.checked
+                                ? registrationPolicies!.versions[key]
+                                : null,
                             }))
                           }
                           className="mt-1 size-4 shrink-0 accent-primary"
@@ -938,6 +976,23 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                       details. Privacy acceptance does not opt you into optional
                       advertising or marketing.
                     </p>
+                    {!registrationPolicies && (
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Loading current policies…
+                      </p>
+                    )}
+                    {policiesChanged && (
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
+                        The policies have changed. Review and accept the updated
+                        policies to continue.
+                      </p>
+                    )}
                   </fieldset>
                 </CardContent>
                 <div className="space-y-3">
@@ -988,9 +1043,15 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                     </DialogDescription>
                   </DialogHeader>
                   <React.Suspense fallback={<p>Loading policy…</p>}>
-                    {reviewPolicy && (
-                      <LegalPolicyContent policy={reviewPolicy} />
-                    )}
+                    {reviewPolicy &&
+                      (registrationPolicies ? (
+                        <LegalPolicyContent
+                          policy={reviewPolicy}
+                          snapshot={registrationPolicies}
+                        />
+                      ) : (
+                        <p>Loading current policies…</p>
+                      ))}
                   </React.Suspense>
                 </DialogContent>
               </Dialog>

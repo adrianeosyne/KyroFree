@@ -1,3 +1,11 @@
+import type { LegalPolicy } from "./legalContent";
+
+export type RegistrationPolicies = {
+  policies: LegalPolicy[];
+  versions: Record<LegalPolicy["slug"], string>;
+  updated: Record<LegalPolicy["slug"], { date: string; label: string }>;
+};
+
 // These versions are stored with registration acceptance. Bump when policies change.
 export const LEGAL_POLICY_VERSIONS = {
   terms: "2026-11-16-r2",
