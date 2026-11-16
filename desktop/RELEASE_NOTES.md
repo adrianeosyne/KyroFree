@@ -1,5 +1,14 @@
 # Kyro 1.1.0 for Windows
 
+## Next release
+
+- Update availability automatically opens a prompt with the version, changes and
+  installer size. Download now or defer until later.
+- Downloaded updates offer a restart prompt with the same details. Active calls
+  end only when you choose to restart or quit the app.
+
+## 1.1.0
+
 Download **Kyro-Setup-1.1.0-x64.exe** and install over your previous version.
 Windows 10 or 11 (64-bit) is required. Your existing account profile is retained.
 If you use 1.0.0, this one-time manual upgrade enables future automatic updates.

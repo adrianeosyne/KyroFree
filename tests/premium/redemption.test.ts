@@ -103,7 +103,7 @@ describe("Premium redeem codes", () => {
     expect(status.premiumStreakSince).toBe(start);
     expect(premiumTier(status).name).toBe("Premium");
     vi.setSystemTime(start + 31 * DAY_MS);
-    expect(premiumTier(status).name).toBe("Bronze");
+    expect(premiumTier(status).name).toBe("Ember");
     vi.setSystemTime(start + 121 * DAY_MS);
     const year = await f.founder.mutation(api.premiumCodes.generate, {
       days: 365,
@@ -305,13 +305,13 @@ describe("Premium redeem codes", () => {
     const start = Date.UTC(2020, 0, 1);
     for (const [days, name] of [
       [0, "Premium"],
-      [30, "Bronze"],
-      [90, "Silver"],
-      [180, "Gold"],
-      [365, "Frost"],
-      [730, "Ruby"],
-      [1095, "Emerald"],
-      [1825, "Amethyst"],
+      [30, "Ember"],
+      [90, "Iron"],
+      [180, "Radiant"],
+      [365, "Glacier"],
+      [730, "Crimson"],
+      [1095, "Verdant"],
+      [1825, "Celestial"],
     ] as const)
       expect(
         premiumTier(

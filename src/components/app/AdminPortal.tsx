@@ -60,7 +60,7 @@ type AdminTab =
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
   { id: "creatorReviews", label: "Creator & bot reviews", icon: Check },
-  { id: "premium", label: "Premium codes", icon: ShieldCheck },
+  { id: "premium", label: "Premium", icon: ShieldCheck },
   { id: "decorations", label: "Decorations", icon: Check },
   { id: "overview", label: "Overview", icon: ShieldCheck },
   { id: "ips", label: "IP detector", icon: Globe },

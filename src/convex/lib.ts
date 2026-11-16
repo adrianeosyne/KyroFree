@@ -1,4 +1,5 @@
 import { hasPremium } from "../lib/entitlements";
+import type { PremiumBadgeTier } from "../lib/premiumProgress";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   ALL_PERMISSIONS,
@@ -156,6 +157,7 @@ export interface PublicUser {
   premiumUntil: number | null;
   premiumSince: number | null;
   premiumStreakSince: number | null;
+  premiumBadgeTier: PremiumBadgeTier | null;
   premiumGiftCount: number;
   notificationSoundUrl: string | null;
   avatarDecorationUrl: string | null;
@@ -419,6 +421,7 @@ export async function hydrateUser(
     premiumUntil: user.premiumUntil ?? null,
     premiumSince: user.premiumSince ?? null,
     premiumStreakSince: user.premiumStreakSince ?? null,
+    premiumBadgeTier: user.premiumBadgeTier ?? null,
     premiumGiftCount: user.premiumGiftCount ?? 0,
     notificationSoundUrl:
       user._id === viewerId && user.notificationSoundStorageId

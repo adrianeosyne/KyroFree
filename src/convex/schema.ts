@@ -3,6 +3,11 @@ import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
 import { botTables } from "./botSchema";
+import { PREMIUM_TIERS } from "../lib/premiumProgress";
+
+export const premiumBadgeTierValidator = v.union(
+  ...PREMIUM_TIERS.map((tier) => v.literal(tier.name)),
+);
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -45,6 +50,8 @@ const schema = defineSchema(
       premiumUntil: v.optional(v.number()),
       premiumSince: v.optional(v.number()),
       premiumStreakSince: v.optional(v.number()),
+      /** Founder-assigned badge tier, independent of the real Premium streak. */
+      premiumBadgeTier: v.optional(premiumBadgeTierValidator),
       premiumGiftCount: v.optional(v.number()),
       notificationSoundStorageId: v.optional(v.id("_storage")),
       role: v.optional(roleValidator), // role of the user. do not remove

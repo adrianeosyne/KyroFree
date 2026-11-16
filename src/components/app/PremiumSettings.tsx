@@ -1,4 +1,9 @@
-import { PREMIUM_TIERS, PREMIUM_DURATIONS } from "@/lib/premiumProgress";
+import {
+  PREMIUM_TIERS,
+  PREMIUM_DURATIONS,
+  premiumTier,
+  type PremiumBadgeTier,
+} from "@/lib/premiumProgress";
 import { PremiumBadge, GifterBadge } from "./PremiumBadge";
 import { CreatorVerification } from "./TrustReviews";
 import { useNavigate } from "react-router";
@@ -338,9 +343,16 @@ export function PremiumAdmin() {
   const queue = useQuery(api.premium.queue);
   const review = useMutation(api.premium.review);
   const grant = useMutation(api.premium.grant);
+  const setBadgeTier = useMutation(api.premium.setBadgeTier);
   const [userId, setUserId] = useState("");
+  const [tier, setTier] = useState<PremiumBadgeTier | "automatic">("Premium");
+  const member = useQuery(
+    api.premium.memberStatus,
+    userId ? { userId: userId as Id<"users"> } : "skip",
+  );
   const [busy, setBusy] = useState(false);
   const perform = async (action: () => Promise<unknown>) => {
+    if (busy) return;
     setBusy(true);
     try {
       await action();
@@ -357,10 +369,25 @@ export function PremiumAdmin() {
       <section className="rounded-2xl border border-border bg-surface p-5">
         <h2 className="font-semibold">Founder Premium controls</h2>
         <p className="my-2 text-xs text-muted-foreground">
-          Confirm manual payment before granting. Each approval adds 30 days.
+          Grant or remove Premium for any member, including yourself. Assign any
+          badge tier immediately, without waiting for a streak.
         </p>
-        <PremiumMemberPicker label="Premium recipient" onSelect={setUserId} />
-        <div className="mt-3 flex gap-2">
+        <PremiumMemberPicker
+          label="Premium recipient"
+          onSelect={setUserId}
+          includeSelf
+          disabled={busy}
+        />
+        {userId && (
+          <p className="mt-3 text-sm" role="status">
+            {member === undefined
+              ? "Loading member's Premium…"
+              : hasPremium(member)
+                ? `Current badge tier: ${premiumTier(member).name}. Premium ends ${new Date(member.premiumUntil!).toLocaleDateString()}.`
+                : "This member has no active Premium."}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
           <Button
             disabled={busy || !userId}
             onClick={() =>
@@ -380,7 +407,51 @@ export function PremiumAdmin() {
               )
             }
           >
-            Revoke Premium
+            Remove Premium
+          </Button>
+        </div>
+        <div className="mt-5 border-t border-border pt-4">
+          <label
+            htmlFor="admin-premium-badge-tier"
+            className="text-sm font-semibold"
+          >
+            Premium badge tier
+          </label>
+          <select
+            id="admin-premium-badge-tier"
+            value={tier}
+            disabled={busy}
+            onChange={(event) =>
+              setTier(event.target.value as PremiumBadgeTier | "automatic")
+            }
+            className="mt-2 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          >
+            {PREMIUM_TIERS.map((entry) => (
+              <option key={entry.name} value={entry.name}>
+                {entry.name}
+              </option>
+            ))}
+            <option value="automatic">Automatic (based on streak)</option>
+          </select>
+          <p className="my-2 text-xs text-muted-foreground">
+            Assigning a tier activates one month of Premium if the member has
+            none. Active members keep their current expiry date. Removing
+            Premium also clears the assigned tier.
+          </p>
+          <Button
+            disabled={busy || !userId || member === undefined}
+            onClick={() =>
+              void perform(() =>
+                setBadgeTier({
+                  userId: userId as Id<"users">,
+                  tier: tier === "automatic" ? null : tier,
+                }),
+              )
+            }
+          >
+            {tier === "automatic"
+              ? "Use automatic badge tier"
+              : "Assign badge tier"}
           </Button>
         </div>
       </section>
@@ -433,10 +504,15 @@ export function PremiumAdmin() {
 function PremiumMemberPicker({
   label,
   onSelect,
+  includeSelf = false,
+  disabled = false,
 }: {
   label: string;
   onSelect: (id: string) => void;
+  includeSelf?: boolean;
+  disabled?: boolean;
 }) {
+  const me = useQuery(api.users.me);
   const [term, setTerm] = useState("");
   const [selected, setSelected] = useState(false);
   const results = useQuery(
@@ -449,12 +525,29 @@ function PremiumMemberPicker({
         aria-label={label}
         placeholder="Search a member's name or username"
         value={term}
+        disabled={disabled}
         onChange={(e) => {
           setTerm(e.target.value);
           setSelected(false);
           onSelect("");
         }}
       />
+      {includeSelf && me && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="mt-2"
+          disabled={disabled}
+          onClick={() => {
+            setTerm(`${me.name} (@${me.username ?? "member"})`);
+            setSelected(true);
+            onSelect(me.id);
+          }}
+        >
+          Select my account
+        </Button>
+      )}
       {!selected && term.trim().length >= 2 && (
         <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-border bg-surface">
           {results === undefined ? (
@@ -470,6 +563,7 @@ function PremiumMemberPicker({
               <button
                 key={user.id}
                 type="button"
+                disabled={disabled}
                 onClick={() => {
                   setTerm(`${user.name} (@${user.username ?? "member"})`);
                   setSelected(true);

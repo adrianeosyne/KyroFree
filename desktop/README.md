@@ -31,8 +31,11 @@ are clear. Drafts in other conversations also delay updates. Failed version chec
 leave the running page alone. The regular browser experience is unchanged.
 
 Native desktop updates are checked at launch and every four hours using the public
-GitHub release feed. Downloads run in the background; installation happens when
-the user actually quits. Closing to the tray does not install or interrupt a call.
+GitHub release feed. An automatic prompt shows the new version, release notes and
+installer size, with **Download update** and **Later** choices. Accepted downloads
+run in the background. Once downloaded, a second prompt offers to restart and
+install, with the same release details. Choosing Later installs when the user
+actually quits. Closing to the tray does not install or interrupt a call.
 Use **Kyro > Check for updates** or **Restart to update** for manual control.
 The remote website has no native IPC bridge and cannot choose the update feed.
 

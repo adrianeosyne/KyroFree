@@ -542,6 +542,7 @@ else {
     createTray();
     updates = new DesktopUpdates({
       enabled: app.isPackaged && !testMode,
+      beforePrompt: showWindow,
       beforeInstall: () => {
         quitting = true;
       },
@@ -549,7 +550,7 @@ else {
         if (!Notification.isSupported()) return;
         const notification = new Notification({
           title: "Kyro update ready",
-          body: "The update installs when you quit Kyro. Use Kyro > Restart to update to install now.",
+          body: "The update is downloaded. Restart now from the update prompt, or quit Kyro to install later.",
           icon: path.join(resources, "icon.png"),
         });
         notification.on("click", showWindow);

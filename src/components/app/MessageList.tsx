@@ -80,6 +80,7 @@ export interface MessageAuthor {
   premiumUntil?: number | null;
   premiumSince?: number | null;
   premiumStreakSince?: number | null;
+  premiumBadgeTier?: import("@/lib/premiumProgress").PremiumBadgeTier | null;
   premiumGiftCount?: number;
   botApplicationId?: string | null;
   id: string;

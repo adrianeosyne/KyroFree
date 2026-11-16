@@ -10,6 +10,8 @@ import {
   isPlatformStaff,
 } from "./lib";
 import { DAY_MS } from "../lib/premiumProgress";
+import { hasPremium } from "../lib/entitlements";
+import { premiumBadgeTierValidator } from "./schema";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./functions";
 export async function extendPremium(
@@ -23,6 +25,7 @@ export async function extendPremium(
     premiumUntil: Math.max(now, user.premiumUntil ?? 0) + days * DAY_MS,
     premiumSince: user.premiumSince ?? now,
     premiumStreakSince: active ? (user.premiumStreakSince ?? now) : now,
+    premiumBadgeTier: active ? user.premiumBadgeTier : undefined,
   });
 }
 import { joinKyroHq } from "./servers";
@@ -106,6 +109,7 @@ export const status = query({
       premiumUntil: user.premiumUntil ?? null,
       premiumSince: user.premiumSince ?? null,
       premiumStreakSince: user.premiumStreakSince ?? null,
+      premiumBadgeTier: user.premiumBadgeTier ?? null,
       premiumGiftCount: user.premiumGiftCount ?? 0,
       hidePremiumBadge: user.hidePremiumBadge === true,
       instructions:
@@ -214,11 +218,11 @@ export const grant = mutation({
     const target = await ctx.db.get(args.userId);
     if (!target || target.deletedAt || target.botApplicationId)
       throw new Error("Choose an active member.");
-    if (target._id === user._id) throw new Error("Choose another member.");
     if (args.revoke)
       await ctx.db.patch(target._id, {
         premiumUntil: undefined,
         premiumStreakSince: undefined,
+        premiumBadgeTier: undefined,
       });
     else await extendPremium(ctx, target, 30);
     await syncPremiumAccess(ctx, target._id);
@@ -229,6 +233,58 @@ export const grant = mutation({
       targetType: "user",
       targetId: target._id,
       details: args.revoke ? "Premium revoked." : "30 days of Premium granted.",
+    });
+  },
+});
+
+export const memberStatus = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const { user } = await requireActiveUser(ctx);
+    if (!isFounderUser(user))
+      throw new Error("Only adrianeosyne can manage Premium.");
+    const target = await ctx.db.get(userId);
+    if (!target || target.deletedAt || target.botApplicationId)
+      throw new Error("Choose an active member.");
+    return {
+      premiumUntil: target.premiumUntil ?? null,
+      premiumSince: target.premiumSince ?? null,
+      premiumStreakSince: target.premiumStreakSince ?? null,
+      premiumBadgeTier: target.premiumBadgeTier ?? null,
+    };
+  },
+});
+
+/** Assign a cosmetic tier without changing the member's real streak. */
+export const setBadgeTier = mutation({
+  args: {
+    userId: v.id("users"),
+    tier: v.union(premiumBadgeTierValidator, v.null()),
+  },
+  handler: async (ctx, { userId, tier }) => {
+    const { id, user } = await requireActiveUser(ctx);
+    if (!isFounderUser(user))
+      throw new Error("Only adrianeosyne can manage Premium badge tiers.");
+    const target = await ctx.db.get(userId);
+    if (!target || target.deletedAt || target.botApplicationId)
+      throw new Error("Choose an active member.");
+    if (tier !== null && !hasPremium(target)) {
+      await extendPremium(ctx, target, 30);
+      await syncPremiumAccess(ctx, target._id);
+    }
+    await ctx.db.patch(userId, {
+      premiumBadgeTier: tier ?? undefined,
+      ...(tier !== null ? { hidePremiumBadge: false } : {}),
+    });
+    await ctx.db.insert("adminActions", {
+      createdAt: Date.now(),
+      actorId: id,
+      action: "premium_badge_tier_set",
+      targetType: "user",
+      targetId: userId,
+      details: tier
+        ? `${tier} badge tier assigned.`
+        : "Time-based badge tier restored.",
     });
   },
 });
@@ -247,6 +303,7 @@ export const expire = internalMutation({
     await ctx.db.patch(userId, {
       premiumUntil: undefined,
       premiumStreakSince: undefined,
+      premiumBadgeTier: undefined,
     });
     await syncPremiumAccess(ctx, userId);
   },

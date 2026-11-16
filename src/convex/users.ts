@@ -1026,6 +1026,7 @@ export const exportData = mutation({
       premiumUntil: user.premiumUntil ?? null,
       premiumSince: user.premiumSince ?? null,
       premiumStreakSince: user.premiumStreakSince ?? null,
+      premiumBadgeTier: user.premiumBadgeTier ?? null,
       premiumGiftCount: user.premiumGiftCount ?? 0,
       activity: await ctx.db
         .query("serverActivity")
