@@ -28,12 +28,16 @@ public class LaunchTest {
 
     @Test public void backClosesAnOpenDialogBeforeLeavingTheApp() throws Throwable {
         CountDownLatch loaded = new CountDownLatch(1);
+        String testPage = "https://kyro-chat.cyou/native-back-test";
         activity.runOnUiThread(() -> {
             WebView web = webView();
+            web.stopLoading();
             web.setWebViewClient(new android.webkit.WebViewClient() {
-                @Override public void onPageFinished(WebView view, String url) { loaded.countDown(); }
+                @Override public void onPageFinished(WebView view, String url) {
+                    if (testPage.equals(url)) loaded.countDown();
+                }
             });
-            web.loadDataWithBaseURL(NavigationPolicy.HOME,
+            web.loadDataWithBaseURL(testPage,
                 "<html><body><div role='dialog'>Open dialog</div><script>"
                     + "document.addEventListener('keydown', event => { if (event.key === 'Escape') {"
                     + "event.preventDefault(); document.querySelector('[role=dialog]').remove(); } });"
