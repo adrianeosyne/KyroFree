@@ -9,7 +9,7 @@ are required. Accounts and browser storage persist between upgrades.
 
 ## Upgrade from 1.0.0
 
-Install `Kyro-Setup-1.1.0-x64.exe` over the old app once. Version 1.0.0 has no
+Install `Kyro-Setup-1.1.1-x64.exe` over the old app once. Version 1.0.0 has no
 native updater and blocks the website's redirect from the apex domain to `www`,
 causing its connection screen. Version 1.1.0 trusts both exact official HTTPS
 origins and opens the canonical `www` address. No deployment-specific Vercel

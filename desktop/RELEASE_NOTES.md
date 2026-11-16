@@ -1,11 +1,20 @@
-# Kyro 1.1.0 for Windows
+# Kyro 1.1.1 for Windows
 
-## Next release
+Download **Kyro-Setup-1.1.1-x64.exe** and install over your previous version.
+Windows 10 or 11 (64-bit) is required. Your existing account profile is retained.
+Version 1.1.0 also receives this release through its automatic updater.
+
+## 1.1.1
 
 - Update availability automatically opens a prompt with the version, changes and
   installer size. Download now or defer until later.
 - Downloaded updates offer a restart prompt with the same details. Active calls
   end only when you choose to restart or quit the app.
+- Premium badge labels remain visible beside gradient display names.
+- Founder controls support removing Premium and assigning any badge tier,
+  including on the founder's own account. Premium tiers use their new names.
+- Gift badges show an icon, with the number of gifts on hover or keyboard focus.
+  Different icons appear at 1, 10, 25 and 50 gifts.
 
 ## 1.1.0
 

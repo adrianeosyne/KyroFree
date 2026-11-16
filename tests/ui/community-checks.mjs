@@ -60,7 +60,7 @@ export async function checkCommunity(page) {
       })),
     });
   });
-  const badge = page.getByLabel(/^Frost Premium:/).first();
+  const badge = page.getByLabel(/^Glacier Premium:/).first();
   await expect(badge).toBeVisible();
   await badge.hover();
   await expect(page.getByRole("tooltip")).toContainText("400 days in a row");

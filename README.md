@@ -25,7 +25,8 @@ For the replacement Vercel project, follow [email setup](docs/email-notification
 Password-reset and warning delivery require production SMTP configuration;
 creating a new Vercel project does not copy the old project's environment.
 
-Desktop 1.1.0 fixes startup redirects, stays in the system tray, and updates automatically.
+Desktop 1.1.1 stays in the system tray and prompts for available updates with
+the version, release notes and download size.
 Run `npm run build:desktop` to generate its installer. Deploy the root web build
 to ship the refreshed app interface; existing clients load it from the live site.
 Run `npm run test:ui` for isolated browser checks of the friends hub, chat drafts,
@@ -92,6 +93,19 @@ features are needed:
    Data → users, or `npx convex run`).
 2. Set it on the deployment: `npx convex env set KYRO_FOUNDER_USER_ID <id>`.
    Until it is set, founder-only features are simply unavailable (fail-closed).
+
+The founder can grant or remove Premium and assign any badge tier from the
+admin portal, including for their own account. To remove Premium from the
+configured adrianeosyne account using an authenticated Convex CLI:
+
+```powershell
+node scripts/remove-founder-premium.mjs <deployment>
+node scripts/remove-founder-premium.mjs <deployment> --apply
+```
+
+The first command previews the account. The second uses the deployed founder
+controls and verifies that Premium, its badge and the Premium HQ role are gone.
+It checks the configured account's username and active status before changing it.
 
 ## Password reset
 
