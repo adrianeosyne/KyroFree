@@ -17,6 +17,10 @@ certificate or App Store Connect key.
 [Download the iOS source project](https://github.com/adrianeosyne/KyroFree/releases/download/ios-v1.0.0/Kyro-iOS-1.0.0-source.zip)
 or [browse the complete source](https://github.com/adrianeosyne/KyroFree/tree/main/mobile/ios).
 
+The ZIP contains the native iOS project. Clone the
+[full repository](https://github.com/adrianeosyne/KyroFree/tree/main) for the
+shared web interface, backend source and browser tests.
+
 The GitHub release contains the native source ZIP with its license, a simulator
 app, an unsigned device archive and SHA-256 checksums. The source ZIP must be
 built and signed with your own free Personal Team in Xcode before it can run on
@@ -50,7 +54,8 @@ Tests cover navigation trust boundaries and the native launch and recovery
 interface without a live account or network connection. Debug-only fixtures are
 excluded from Release builds. Test results and build artifacts are retained.
 
-Shared mobile detection tests run from the repository root with Node 24:
+Shared mobile detection tests require the full repository checkout and run from
+its root with Node 24:
 
 ```sh
 node --test tests/mobile/platform.test.ts
