@@ -46,7 +46,6 @@ final class LaunchTests: XCTestCase {
         app.buttons["kyro.downloads"].tap()
         XCTAssertTrue(app.buttons["Kyro-test.txt"].waitForExistence(timeout: 10))
         capture(app, name: "Kyro native download")
-        app.buttons["Cancel"].tap()
     }
 
     func testIPadAndIPhoneRotationKeepsControlsAvailable() {
