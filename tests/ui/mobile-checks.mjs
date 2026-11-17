@@ -126,6 +126,8 @@ export async function checkMobile(browser) {
   const iphone = await browser.newContext({ ...devices["iPhone 13"] });
   try {
     const page = await iphone.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
     await page.goto(`${base}/auth`);
     await expect(
       page.getByRole("complementary", {
@@ -134,13 +136,18 @@ export async function checkMobile(browser) {
       }),
     ).toBeVisible();
     await page.getByRole("link", { name: "Install", exact: true }).click();
-    await expect(page).toHaveURL(/\/download#web-app$/);
+    await expect(page).toHaveURL(/\/install\/ios$/);
     await expect(
-      page.getByText(
-        "In Safari, tap Share, then Add to Home Screen. Kyro opens in its own window.",
-        { exact: true },
-      ),
+      page.getByRole("heading", { name: /Install Kyro on your iPhone/ }),
     ).toBeVisible();
+    await expect(
+      page.getByText("1. Tap Safari’s Share button", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("2. Choose Add to Home Screen", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByText("3. Tap Add", { exact: true })).toBeVisible();
+    await page.goto(`${base}/download#ios`);
     await expect(
       page.getByRole("heading", { name: "Kyro for iOS", exact: true }),
     ).toBeVisible();
@@ -151,27 +158,120 @@ export async function checkMobile(browser) {
       "https://github.com/adrianeosyne/KyroFree/tree/main/mobile/ios",
     );
     await expect(
-      page.getByRole("link", { name: "Install with Xcode", exact: true }),
+      page.getByRole("link", {
+        name: "Native developer build guide",
+        exact: true,
+      }),
     ).toHaveAttribute("href", /mobile\/ios#build-and-test$/);
-    for (const download of await page
-      .getByRole("link", { name: "Download iOS project", exact: true })
-      .all()) {
-      await expect(download).toHaveAttribute(
-        "href",
-        "https://github.com/adrianeosyne/KyroFree/releases/download/ios-v1.0.0/Kyro-iOS-1.0.0-source.zip",
-      );
-    }
+    await expect(
+      page.getByRole("link", {
+        name: "Install on iPhone or iPad",
+        exact: true,
+      }),
+    ).toHaveAttribute("href", "/install/ios");
+    await expect(
+      page.getByRole("link", { name: "Install Kyro on iPhone", exact: true }),
+    ).toHaveAttribute("href", "/install/ios");
+    await page
+      .getByRole("button", { name: "Show install steps", exact: true })
+      .click();
+    const guide = page.getByRole("dialog", {
+      name: "Install Kyro on your iPhone",
+      exact: true,
+    });
+    await expect(guide).toBeVisible();
+    await expect(
+      guide.getByText("2. Choose Add to Home Screen", { exact: true }),
+    ).toBeVisible();
+    await guide
+      .getByRole("link", { name: "Open the installation page", exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/install\/ios$/);
+    await expect(page.locator('[data-slot="dialog-overlay"]')).toHaveCount(0);
+    await expect(page.locator(".kyro-page-enter")).toHaveCSS("opacity", "1");
     for (const width of [320, 390, 430, 768]) {
       await page.setViewportSize({ width, height: 844 });
       assert(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
-        `iOS download page fits ${width}px`,
+        `iPhone installation page fits ${width}px`,
       );
     }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page
+      .getByRole("link", { name: "Show install steps", exact: true })
+      .click();
+    assert(
+      await page.evaluate(() => scrollY > 0),
+      "Install button scrolls to the Safari steps",
+    );
+    assert(
+      await page.evaluate(() => {
+        const footerBottom =
+          document.querySelector("footer").getBoundingClientRect().bottom +
+          scrollY;
+        return document.documentElement.scrollHeight <= footerBottom + 2;
+      }),
+      "Installation page has no empty tail after its footer",
+    );
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({
+      path: "test-results/iphone-only-install.png",
+      fullPage: true,
+      animations: "disabled",
+      scale: "css",
+    });
+    assert.deepEqual(errors, []);
   } finally {
     await iphone.close();
+  }
+
+  const installedIOS = await browser.newContext({ ...devices["iPhone 13"] });
+  try {
+    await installedIOS.addInitScript(() =>
+      Object.defineProperty(navigator, "standalone", {
+        value: true,
+        configurable: true,
+      }),
+    );
+    const page = await installedIOS.newPage();
+    await page.goto(`${base}/install/ios`);
+    await expect(
+      page.getByText("Kyro is installed", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Show install steps", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Show install steps", exact: true }),
+    ).toHaveCount(0);
+    await page.goto(`${base}/download`);
+    await expect(
+      page
+        .locator("main > div")
+        .first()
+        .getByRole("link", { name: "Open Kyro", exact: true }),
+    ).toHaveAttribute("href", "/dashboard");
+    await page.goto(`${base}/dashboard/chats`);
+    await expect(
+      page.getByRole("complementary", {
+        name: "Install Kyro on your phone",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Messages." }),
+    ).toBeVisible();
+    await page.goto(`${base}/auth`);
+    await expect(
+      page.getByRole("complementary", {
+        name: "Install Kyro on your phone",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+  } finally {
+    await installedIOS.close();
   }
 
   const nativeIOS = await browser.newContext({
@@ -204,6 +304,6 @@ export async function checkMobile(browser) {
     await nativeIOS.close();
   }
   console.log(
-    "PASS: Android browser prompt, source and APK links, native Android/iOS suppression, mobile messages/search/unread/back, phone layouts and iPhone web installation and iOS source links",
+    "PASS: Android regression checks, iPhone-only Safari installation, guide dialog, 320–768px layouts, native and home-screen install suppression",
   );
 }

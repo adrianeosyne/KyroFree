@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router";
 import Dashboard from "@/pages/Dashboard";
 import GiftRoute from "@/pages/Gift";
 import DownloadPage from "@/pages/Download";
+import IOSInstallPage from "@/pages/IOSInstall";
 import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUiStore } from "@/lib/store";
@@ -24,6 +25,7 @@ createRoot(document.getElementById("root")).render(
         <Routes>
           <Route path="/auth" element={<p>Sign in fixture</p>} />
           <Route path="/download" element={<DownloadPage />} />
+          <Route path="/install/ios" element={<IOSInstallPage />} />
           <Route path="/gift/:code" element={<GiftRoute />} />
           <Route
             path="/dashboard/badge-preview"

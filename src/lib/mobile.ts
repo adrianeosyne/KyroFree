@@ -5,6 +5,7 @@ export const ANDROID_SOURCE_URL =
   "https://github.com/adrianeosyne/KyroFree/tree/main/mobile/android";
 
 export const IOS_VERSION = "1.0.0";
+export const IOS_INSTALL_URL = "/install/ios";
 export const IOS_DOWNLOAD_URL =
   "https://github.com/adrianeosyne/KyroFree/releases/download/ios-v1.0.0/Kyro-iOS-1.0.0-source.zip";
 export const IOS_SOURCE_URL =

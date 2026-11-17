@@ -41,6 +41,11 @@ const capture =
 
 function update(snapshot: InstallSnapshot) {
   if (!capture) return;
+  if (
+    capture.snapshot.installed === snapshot.installed &&
+    capture.snapshot.prompt === snapshot.prompt
+  )
+    return;
   capture.snapshot = snapshot;
   capture.listeners.forEach((listener) => listener());
 }
@@ -57,6 +62,15 @@ if (capture && !capture.initialized) {
   window.addEventListener("appinstalled", () => {
     update({ installed: true, prompt: null });
   });
+  const refreshDisplayMode = () => {
+    const installed = capture.snapshot.installed || isStandalone();
+    update({ installed, prompt: installed ? null : capture.snapshot.prompt });
+  };
+  window
+    .matchMedia("(display-mode: standalone)")
+    .addEventListener("change", refreshDisplayMode);
+  window.addEventListener("pageshow", refreshDisplayMode);
+  document.addEventListener("visibilitychange", refreshDisplayMode);
 }
 
 export function subscribeInstallState(listener: () => void) {

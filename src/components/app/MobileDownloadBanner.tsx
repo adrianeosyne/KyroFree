@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router";
 import { Download as ArrowDownToLine, X } from "@/components/icons";
 import { KyroMark } from "@/components/KyroMark";
-import { isNativeMobileApp, mobilePlatform } from "@/lib/mobile";
+import {
+  IOS_INSTALL_URL,
+  isNativeMobileApp,
+  mobilePlatform,
+} from "@/lib/mobile";
+import { getInstallState, subscribeInstallState } from "@/lib/installApp";
 
 const DISMISS_KEY = "kyro.mobileDownload.dismissedUntil";
 
@@ -13,6 +18,11 @@ export function MobileDownloadBanner({
 }) {
   const { pathname } = useLocation();
   const platform = mobilePlatform();
+  const { installed } = useSyncExternalStore(
+    subscribeInstallState,
+    getInstallState,
+    getInstallState,
+  );
   const [dismissed, setDismissed] = useState(() => {
     try {
       return Number(localStorage.getItem(DISMISS_KEY)) > Date.now();
@@ -23,8 +33,10 @@ export function MobileDownloadBanner({
   if (
     !platform ||
     isNativeMobileApp() ||
+    installed ||
     dismissed ||
     pathname === "/download" ||
+    pathname === IOS_INSTALL_URL ||
     floating === pathname.startsWith("/dashboard")
   )
     return null;
@@ -52,7 +64,7 @@ export function MobileDownloadBanner({
         </p>
       </div>
       <Link
-        to={platform === "android" ? "/download#android" : "/download#web-app"}
+        to={platform === "android" ? "/download#android" : IOS_INSTALL_URL}
         className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground"
       >
         <ArrowDownToLine className="size-4" />

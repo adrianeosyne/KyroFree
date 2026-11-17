@@ -124,6 +124,18 @@ the web app to their home screen, or build the native iOS app with Xcode.
 
 ## iOS app
 
+Install Kyro using only your iPhone or iPad: open the
+[iPhone installation page](https://kyro-chat.cyou/install/ios) in Safari, then
+choose **Share → Add to Home Screen → Add**. Keep **Open as Web App** enabled if
+Safari offers it. Kyro opens from its own home-screen icon and uses the existing
+Kyro service. This web app installation needs no computer, Android device,
+Apple Developer account or seven-day signing renewal. Chats and calls need an
+internet connection.
+
+The website and Settings provide these steps and recognize an existing
+home-screen installation. The Swift native project remains available below for
+developers who want to build with Xcode.
+
 The native iPhone and iPad project for iOS 16 and newer is in
 [mobile/ios](mobile/ios/README.md). It uses the same Kyro accounts, web interface
 and backend as Android and Windows, with native navigation, file sharing,

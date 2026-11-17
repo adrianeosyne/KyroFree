@@ -10,6 +10,7 @@ import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import { checkSettings } from "../tests/ui/settings-checks.mjs";
 import { checkMobile } from "../tests/ui/mobile-checks.mjs";
+import { checkAvatarDecorations } from "../tests/ui/avatar-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -25,7 +26,8 @@ const server = await createServer({
             req.url?.startsWith("/dashboard") ||
             req.url?.startsWith("/gift/") ||
             req.url?.startsWith("/auth") ||
-            req.url?.startsWith("/download")
+            req.url?.startsWith("/download") ||
+            req.url?.startsWith("/install/ios")
           )
             req.url = "/tests/ui/index.html";
           next();
@@ -74,6 +76,7 @@ const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 try {
+  await checkAvatarDecorations(browser);
   await page.goto("http://127.0.0.1:5187/dashboard", {
     waitUntil: "domcontentloaded",
     timeout: 120000,
