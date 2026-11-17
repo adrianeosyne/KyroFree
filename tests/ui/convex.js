@@ -29,6 +29,8 @@ Object.assign(me, {
   showPresence: true,
   suggestible: true,
 });
+const fixtureProfile = localStorage.getItem("kyro.fixture.profile");
+if (fixtureProfile) Object.assign(me, JSON.parse(fixtureProfile));
 const friends = [
   person("maya", "Maya Chen", "online", "Sketching new ideas"),
   person("leo", "Leo Parker", "online", "Anyone up for a game?"),

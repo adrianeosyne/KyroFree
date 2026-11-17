@@ -72,6 +72,7 @@ import { PROFILE_THEMES } from "@/lib/profileThemes";
 import { APP_TINTS } from "@/lib/tints";
 import { findAvatarDecoration, findProfileDecoration } from "@/lib/decorations";
 import {
+  BADGE_PRIORITY,
   BadgeTray,
   GLOBAL_BADGE_META,
   GlobalBadgeIcon,
@@ -1722,6 +1723,15 @@ function ProfileTab() {
   } | null>(null);
 
   if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>;
+  // Older backends can return badge ids that this client no longer renders.
+  const profileBadges = BADGE_PRIORITY.filter((badge) =>
+    me.badges.includes(badge),
+  );
+  const selectedBadge =
+    badgeSel === undefined
+      ? (profileBadges.find((badge) => badge === me.primaryBadge) ??
+        profileBadges[0])
+      : badgeSel;
   const avatarDecoration = findAvatarDecoration(me.avatarDecoration);
   const profileDecoration = findProfileDecoration(me.profileDecoration);
 
@@ -2152,17 +2162,13 @@ function ProfileTab() {
             still shows in the tray.
           </p>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {me.badges.map((badge) => {
-              const active =
-                (badgeSel === undefined
-                  ? me.primaryBadge && me.primaryBadge !== "none"
-                    ? me.primaryBadge
-                    : me.badges[0]
-                  : badgeSel) === badge;
+            {profileBadges.map((badge) => {
+              const active = selectedBadge === badge;
               return (
                 <button
                   key={badge}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => {
                     setBadgeSel(badge);
                     void update({ primaryBadge: badge }).catch((error) => {

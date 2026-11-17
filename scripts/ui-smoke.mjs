@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import { checkSettings } from "../tests/ui/settings-checks.mjs";
 import { checkMediaAndMobile } from "../tests/ui/media-mobile-checks.mjs";
+import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -70,6 +71,16 @@ await context.route(/^https?:\/\/(?!127\.0\.0\.1:5187)/, (route) =>
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+if (process.argv.includes("--profile-badges")) {
+  try {
+    await page.goto("http://127.0.0.1:5187/dashboard");
+    await checkProfileBadges(page);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
 try {
   await page.goto("http://127.0.0.1:5187/dashboard", {
     waitUntil: "domcontentloaded",
@@ -80,6 +91,7 @@ try {
   ).toBeVisible({ timeout: 120000 });
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
   await checkSettings(page, context);
+  await checkProfileBadges(page);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();
