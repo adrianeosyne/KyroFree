@@ -1649,14 +1649,13 @@ function ProfilePreviewCard({
             </select>
           </label>
         </div>
-        {me.badges.length > 0 && (
-          <BadgeTray
-            badges={me.badges}
-            primaryBadge={me.primaryBadge}
-            official={me.official}
-            className="mt-4"
-          />
-        )}
+        <BadgeTray
+          user={me}
+          badges={me.badges}
+          primaryBadge={me.primaryBadge}
+          official={me.official}
+          className="mt-4"
+        />
         <button
           type="button"
           className="mt-3 text-xs font-medium text-primary hover:underline"
@@ -1723,7 +1722,7 @@ function ProfileTab() {
   } | null>(null);
 
   if (!me) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  // Older backends can return badge ids that this client no longer renders.
+  // Ignore unknown future ids while retaining every supported earned badge.
   const profileBadges = BADGE_PRIORITY.filter((badge) =>
     me.badges.includes(badge),
   );
@@ -2672,6 +2671,7 @@ function ProfilePreviewPane({
               <UserAvatar user={{ ...me, avatarFrame: frameValue }} size="lg" />
             </span>
             <BadgeTray
+              user={me}
               badges={me.badges}
               primaryBadge={badgeId}
               official={me.official}

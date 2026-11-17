@@ -159,6 +159,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
               <StyledDisplayName user={me} className="truncate text-xl" />
               <BadgeTray
+                user={me}
                 badges={me.badges}
                 primaryBadge={me.primaryBadge}
                 official={me.official}

@@ -6,6 +6,11 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useId, type ReactNode } from "react";
+import {
+  getGifterBadgeTier,
+  getPremiumBadgeTier,
+  type PremiumBadgeUser,
+} from "@/lib/premium-badges";
 
 /**
  * Hover/focus tooltip explaining a badge. Rendered through a portal with
@@ -115,7 +120,9 @@ export type GlobalBadgeKey =
   | "moderator"
   | "staff"
   | "trialstaff"
+  | "premium"
   | "verified"
+  | "verifiedserverowner"
   | "partner"
   | "donator"
   | "supporter"
@@ -162,10 +169,20 @@ export const GLOBAL_BADGE_META: Record<
     blurb: "Trying out for the Kyro staff team.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
   },
+  premium: {
+    label: "Premium",
+    blurb: "A Premium member of Kyro.",
+    chip: "border-fuchsia-300/30 bg-[#25152e] text-fuchsia-100",
+  },
   verified: {
     label: "Verified",
     blurb: "Verified by the Kyro team.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  verifiedserverowner: {
+    label: "Verified Server Owner",
+    blurb: "Owns a server verified by the Kyro team.",
+    chip: "border-sky-300/30 bg-[#151d32] text-sky-100",
   },
   partner: {
     label: "Partner",
@@ -224,6 +241,7 @@ export type GrantableBadge = (typeof GRANTABLE_BADGES)[number];
  */
 export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "founder",
+  "premium",
   "cofounder",
   "manager",
   "admin",
@@ -231,6 +249,7 @@ export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "staff",
   "trialstaff",
   "verified",
+  "verifiedserverowner",
   "partner",
   "donator",
   "supporter",
@@ -241,7 +260,7 @@ export const BADGE_PRIORITY: GlobalBadgeKey[] = [
 
 const GLOBAL_BADGE_SET = new Set<string>(BADGE_PRIORITY);
 
-function isGlobalBadgeKey(value: string): value is GlobalBadgeKey {
+export function isGlobalBadgeKey(value: string): value is GlobalBadgeKey {
   return GLOBAL_BADGE_SET.has(value);
 }
 
@@ -250,6 +269,95 @@ export function topGlobalBadge(
   badges: readonly string[],
 ): GlobalBadgeKey | null {
   return BADGE_PRIORITY.find((badge) => badges.includes(badge)) ?? null;
+}
+
+/** Resolve a supported primary badge without trusting an arbitrary server id. */
+export function getPrimaryGlobalBadge(
+  badges: readonly string[],
+  primaryBadge?: string | null,
+): GlobalBadgeKey | null {
+  return primaryBadge &&
+    isGlobalBadgeKey(primaryBadge) &&
+    badges.includes(primaryBadge)
+    ? primaryBadge
+    : topGlobalBadge(badges);
+}
+
+/** Premium remains visible on names even when another held badge is selected. */
+export function PremiumBadge({
+  user,
+  compact = false,
+}: {
+  user: PremiumBadgeUser;
+  compact?: boolean;
+}) {
+  if (!user.badges?.includes("premium")) return null;
+  const tier = getPremiumBadgeTier(user);
+  const label = tier.name === "Premium" ? "Premium" : `Premium · ${tier.name}`;
+  return (
+    <BadgeTip label={label} blurb="Premium membership badge">
+      <span
+        className={cn(
+          "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/25 bg-gradient-to-br px-2 py-1 align-middle font-sans text-[10px] font-black leading-none tracking-wide text-slate-950",
+          tier.colors,
+          compact && "px-1.5 py-0.5 text-[9px]",
+        )}
+        style={{ WebkitTextFillColor: "currentColor" }}
+      >
+        <span aria-hidden="true">{tier.symbol}</span>
+        {tier.name.toUpperCase()}
+      </span>
+    </BadgeTip>
+  );
+}
+
+/** Earned from Premium gifts, including when the giver has no subscription. */
+export function GifterBadge({ count }: { count: number }) {
+  const gradientId = `kyroGift${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const tier = getGifterBadgeTier(count);
+  if (!tier) return null;
+  const fill = `url(#${gradientId})`;
+  return (
+    <BadgeTip
+      label={tier.name}
+      blurb={`${count} Premium ${count === 1 ? "gift" : "gifts"} given`}
+    >
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg hover:bg-indigo-300/10">
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          focusable="false"
+          className={cn(
+            "size-5",
+            count >= 50 && "drop-shadow-[0_0_5px_rgba(251,191,36,0.65)]",
+          )}
+        >
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={tier.colors[0]} />
+              <stop offset="100%" stopColor={tier.colors[1]} />
+            </linearGradient>
+          </defs>
+          <rect x="4" y="11" width="16" height="10" rx="2" fill={fill} />
+          <rect x="2.5" y="7.5" width="19" height="5" rx="1.5" fill={fill} />
+          <path
+            d="M12 7.5C9 7.5 5.5 6.8 5.5 4.6c0-2.8 5.5-1.5 6.5 2.9Zm0 0c3 0 6.5-.7 6.5-2.9 0-2.8-5.5-1.5-6.5 2.9Z"
+            fill="none"
+            stroke={fill}
+            strokeWidth="2.4"
+            strokeLinejoin="round"
+          />
+          <path d="M10.8 7.5h2.4V21h-2.4Z" fill="#fff5eb" />
+          {count >= 25 && (
+            <path
+              d="m21 1 .8 2.2L24 4l-2.2.8L21 7l-.8-2.2L18 4l2.2-.8Z"
+              fill={tier.colors[1]}
+            />
+          )}
+        </svg>
+      </span>
+    </BadgeTip>
+  );
 }
 
 /**
@@ -263,21 +371,19 @@ export function InlineBadge({
   badges,
   primaryBadge,
   size = "size-4",
+  user,
 }: {
   badges: readonly string[];
   /** This user's chosen inline badge: a held badge id, "none", or unset. */
   primaryBadge?: string | null;
   /** Matches CrownBadge's default inline size. */
   size?: string;
+  user?: PremiumBadgeUser;
 }) {
-  const chosen =
-    primaryBadge &&
-    primaryBadge !== "none" &&
-    isGlobalBadgeKey(primaryBadge) &&
-    badges.includes(primaryBadge)
-      ? primaryBadge
-      : topGlobalBadge(badges);
+  const chosen = getPrimaryGlobalBadge(badges, primaryBadge);
   if (!chosen) return null;
+  if (chosen === "premium")
+    return <PremiumBadge user={{ ...user, badges }} compact />;
   const meta = GLOBAL_BADGE_META[chosen];
   return (
     <BadgeTip label={meta.label} blurb={meta.blurb}>
@@ -298,12 +404,14 @@ export function BadgeTray({
   primaryBadge,
   official = false,
   className,
+  user,
 }: {
   badges: readonly string[];
   /** Chosen badge that leads the tray; every other held badge still shows. */
   primaryBadge?: string | null;
   official?: boolean;
   className?: string;
+  user?: PremiumBadgeUser;
 }) {
   const ordered = BADGE_PRIORITY.filter((badge) => badges.includes(badge));
   const lead =
@@ -316,7 +424,9 @@ export function BadgeTray({
   const display = lead
     ? [lead, ...ordered.filter((badge) => badge !== lead)]
     : ordered;
-  if (!official && display.length === 0) return null;
+  const giftCount = user?.premiumGiftCount ?? 0;
+  if (!official && display.length === 0 && !getGifterBadgeTier(giftCount))
+    return null;
 
   return (
     <div
@@ -338,14 +448,21 @@ export function BadgeTray({
       ) : null}
       {display.map((badge) => {
         const meta = GLOBAL_BADGE_META[badge];
+        const tier =
+          badge === "premium" && user ? getPremiumBadgeTier(user) : null;
+        const label =
+          tier && tier.name !== "Premium"
+            ? `${meta.label} · ${tier.name}`
+            : meta.label;
         return (
-          <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
+          <BadgeTip key={badge} label={label} blurb={meta.blurb}>
             <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
-              <GlobalBadgeIcon badge={badge} className="size-5" />
+              <GlobalBadgeIcon badge={badge} className="size-5" user={user} />
             </span>
           </BadgeTip>
         );
       })}
+      <GifterBadge count={giftCount} />
     </div>
   );
 }
@@ -421,6 +538,14 @@ const BADGE_ART: Record<
     stops: ["#67e8f9", "#3b82f6", "#4f46e5"],
     edge: "#3730a3",
   },
+  verifiedserverowner: {
+    stops: ["#bae6fd", "#38bdf8", "#2563eb"],
+    edge: "#075985",
+  },
+  premium: {
+    stops: ["#f0abfc", "#d946ef", "#7c3aed"],
+    edge: "#86198f",
+  },
   bughunter: {
     stops: ["#c4b5fd", "#8b5cf6", "#4f46e5"],
     edge: "#3730a3",
@@ -453,11 +578,14 @@ const BADGE_ART: Record<
 export function GlobalBadgeIcon({
   badge,
   className,
+  user,
 }: {
   badge: GlobalBadgeKey;
   className?: string;
+  user?: PremiumBadgeUser;
 }) {
   const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  if (!isGlobalBadgeKey(badge)) return null;
 
   if (badge === "founder") {
     return (
@@ -469,7 +597,10 @@ export function GlobalBadgeIcon({
     );
   }
 
-  const art = BADGE_ART[badge];
+  const art =
+    badge === "premium" && user
+      ? { ...BADGE_ART.premium, stops: getPremiumBadgeTier(user).art }
+      : BADGE_ART[badge];
   const gradientId = `kyroBadge_${badge}_${instanceId}`;
   const fill = `url(#${gradientId})`;
   const white = "#ffffff";
@@ -792,6 +923,25 @@ export function GlobalBadgeIcon({
         </>
       )}
 
+      {badge === "verifiedserverowner" && (
+        <>
+          <path d="m6.7 11.2 5.3-4.1 5.3 4.1v5.4H6.7Z" fill={white} />
+          <path
+            d="m9.2 13.3 1.9 1.8 3.7-3.8"
+            fill="none"
+            stroke={art.edge}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
+      {badge === "premium" && (
+        <path
+          d="m12 6.3 1.7 3.9 4.3 1.8-4.3 1.8-1.7 3.9-1.7-3.9L6 12l4.3-1.8Z"
+          fill={white}
+        />
+      )}
       {/* Shared gloss: one highlight arc so all shields catch the same
           light and read as a single icon family. */}
       <path
@@ -814,6 +964,7 @@ export function GlobalBadgeChip({
   badge: GlobalBadgeKey;
   className?: string;
 }) {
+  if (!isGlobalBadgeKey(badge)) return null;
   const meta = GLOBAL_BADGE_META[badge];
   return (
     <BadgeTip label={meta.label} blurb={meta.blurb}>
@@ -843,7 +994,8 @@ export function GlobalBadges({
   badges: GlobalBadgeKey[];
   className?: string;
 }) {
-  if (badges.length === 0) {
+  const display = BADGE_PRIORITY.filter((badge) => badges.includes(badge));
+  if (display.length === 0) {
     return (
       <p className={cn("text-xs text-muted-foreground", className)}>
         No global badges yet.
@@ -852,7 +1004,7 @@ export function GlobalBadges({
   }
   return (
     <div className={cn("flex flex-wrap gap-2", className)}>
-      {badges.map((badge) => (
+      {display.map((badge) => (
         <GlobalBadgeChip key={badge} badge={badge} />
       ))}
     </div>

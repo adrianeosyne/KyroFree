@@ -117,6 +117,7 @@ export function UserPreviewPanel() {
                   <UserAvatar user={user} size="xl" />
                 </span>
                 <BadgeTray
+                  user={user}
                   badges={user.badges}
                   primaryBadge={user.primaryBadge}
                   official={user.official}

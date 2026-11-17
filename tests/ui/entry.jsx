@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUiStore } from "@/lib/store";
 import "@/index.css";
 import { ImageCropDialog } from "@/components/app/ImageCropDialog";
+import { Toaster } from "@/components/ui/sonner";
 
 function CropFixture() {
   const [file, setFile] = useState(null);
@@ -71,6 +72,7 @@ window.setFixtureTheme = (theme) =>
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
     <TooltipProvider>
+      <Toaster />
       <Routes>
         <Route
           path="/dashboard/crop-fixture"

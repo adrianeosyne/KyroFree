@@ -18,6 +18,7 @@ import {
   requireActiveUser,
   requireUser,
   type Ctx,
+  type GlobalBadge,
 } from "./lib";
 import { metricValue } from "./metricsLib";
 import { enqueueUserEmail } from "./emailOutbox";
@@ -95,24 +96,8 @@ async function logAction(
   });
 }
 
-type BadgeFlag =
-  | "founder"
-  | "cofounder"
-  | "manager"
-  | "admin"
-  | "moderator"
-  | "staff"
-  | "trialstaff"
-  | "verified"
-  | "partner"
-  | "donator"
-  | "supporter"
-  | "vip"
-  | "bughunter"
-  | "og";
-
 /** Mirrors hydrateUser's badge derivation so the portal agrees with profiles. */
-function badgeFlags(user: Doc<"users">): BadgeFlag[] {
+function badgeFlags(user: Doc<"users">): GlobalBadge[] {
   return globalBadgesFor(user);
 }
 

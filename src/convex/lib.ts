@@ -152,6 +152,12 @@ export function visiblePresence(
 }
 
 export interface PublicUser {
+  /** Subscription metadata returned by deployments with Premium enabled. */
+  premiumUntil?: number | null;
+  premiumSince?: number | null;
+  premiumStreakSince?: number | null;
+  premiumBadgeTier?: string | null;
+  premiumGiftCount?: number;
   botApplicationId?: string | null;
   id: string;
   username: string | null;
@@ -249,7 +255,9 @@ export type GlobalBadge =
   | "moderator"
   | "staff"
   | "trialstaff"
+  | "premium"
   | "verified"
+  | "verifiedserverowner"
   | "partner"
   | "donator"
   | "supporter"

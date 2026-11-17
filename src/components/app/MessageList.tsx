@@ -908,12 +908,13 @@ function MessageRow({
                     <button
                       type="button"
                       onClick={openProfile}
-                      className="text-sm hover:underline"
+                      className="min-w-0 max-w-full text-left text-sm hover:underline"
                     >
                       {author ? (
                         <StyledDisplayName
                           user={author}
                           roleColor={roleColors?.[author.id]}
+                          className="truncate"
                         />
                       ) : (
                         "Unknown user"
@@ -974,7 +975,7 @@ function MessageRow({
 
               {message.replyTo && (
                 <div className="mb-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <CornerUpLeft className="size-3" />
+                  <CornerUpLeft className="size-3 shrink-0" />
                   {message.replyTo.botName ? (
                     <span className="font-semibold text-primary/90">
                       {message.replyTo.botName}
@@ -982,14 +983,16 @@ function MessageRow({
                   ) : message.replyTo.author ? (
                     <StyledDisplayName
                       user={message.replyTo.author}
-                      className="text-foreground/80"
+                      className="truncate text-foreground/80"
                     />
                   ) : (
                     <span className="font-medium text-foreground/80">
                       a message
                     </span>
                   )}
-                  <span className="truncate">{message.replyTo.excerpt}</span>
+                  <span className="min-w-0 truncate">
+                    {message.replyTo.excerpt}
+                  </span>
                 </div>
               )}
 

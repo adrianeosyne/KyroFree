@@ -31,6 +31,32 @@ Object.assign(me, {
 });
 const fixtureProfile = localStorage.getItem("kyro.fixture.profile");
 if (fixtureProfile) Object.assign(me, JSON.parse(fixtureProfile));
+const queryOverrides = JSON.parse(
+  localStorage.getItem("kyro.fixture.queries") ?? "{}",
+);
+let mutationErrors = JSON.parse(
+  localStorage.getItem("kyro.fixture.mutationErrors") ?? "{}",
+);
+const queryErrors = JSON.parse(
+  localStorage.getItem("kyro.fixture.queryErrors") ?? "{}",
+);
+let queryRevision = 0;
+const queryListeners = new Set();
+window.setFixtureQueries = (overrides) => {
+  Object.assign(queryOverrides, overrides);
+  queryRevision += 1;
+  queryListeners.forEach((listener) => listener());
+};
+window.setFixtureQuery = (name, value) =>
+  window.setFixtureQueries({ [name]: value });
+window.setFixtureMutationErrors = (errors) => {
+  mutationErrors = errors;
+};
+const subscribeQueries = (listener) => {
+  queryListeners.add(listener);
+  return () => queryListeners.delete(listener);
+};
+const querySnapshot = () => queryRevision;
 const friends = [
   person("maya", "Maya Chen", "online", "Sketching new ideas"),
   person("leo", "Leo Parker", "online", "Anyone up for a game?"),
@@ -199,8 +225,11 @@ const data = {
   ],
 };
 export function useQuery(reference, args) {
+  useSyncExternalStore(subscribeQueries, querySnapshot);
   if (args === "skip") return undefined;
   const name = getFunctionName(reference);
+  if (queryErrors[name]) throw new Error(queryErrors[name]);
+  if (Object.hasOwn(queryOverrides, name)) return queryOverrides[name];
   if (
     name === "messages:list" &&
     localStorage.getItem("kyro.fixture.media") === "1"
@@ -252,6 +281,7 @@ export function useMutation(reference) {
     mutations.set(name, async (args) => {
       window.fixtureMutations ??= [];
       window.fixtureMutations.push({ name, args });
+      if (mutationErrors[name]) throw new Error(mutationErrors[name]);
       if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type {
   DefaultFunctionArgs,
   FunctionReference,
@@ -34,7 +34,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import {
   GLOBAL_BADGE_META,
   GlobalBadgeIcon,
-  type GlobalBadgeKey,
+  isGlobalBadgeKey,
 } from "@/components/app/GlobalBadges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,10 +131,11 @@ function timeAgo(timestamp: number): string {
  * platform bans, warnings and a full staff audit trail.
  */
 export function AdminPortal() {
-  const data = useQuery(api.admin.overview);
+  const { isAuthenticated } = useConvexAuth();
+  const data = useQuery(api.admin.overview, isAuthenticated ? {} : "skip");
   // The badge and the Bugs tab read the same query result, so the indicator
   // can never advertise reports the tab refuses to show.
-  const bugs = useQuery(api.bugReports.list);
+  const bugs = useQuery(api.bugReports.list, data?.allowed ? {} : "skip");
   const [tab, setTab] = useState<AdminTab>("overview");
   const navigate = useNavigate();
 
@@ -213,7 +214,10 @@ export function AdminPortal() {
             )}
           </div>
         </div>
-        <nav className="relative flex gap-1 overflow-x-auto px-3 pb-2">
+        <nav
+          aria-label="Admin portal sections"
+          className="relative flex gap-1 overflow-x-auto px-3 pb-2"
+        >
           {visibleTabs.map((entry) => (
             <button
               key={entry.id}
@@ -247,10 +251,18 @@ export function AdminPortal() {
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
         {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (
-          <BadgesTab isAdmin={data.me.isAdmin} isFounder={data.me.isFounder} />
+          <BadgesTab
+            viewerId={data.me.id}
+            isAdmin={data.me.isAdmin}
+            isFounder={data.me.isFounder}
+          />
         )}
         {tab === "reports" && (
-          <ReportsTab isAdmin={data.me.isAdmin} canModerate={data.me.isStaff} />
+          <ReportsTab
+            viewerId={data.me.id}
+            isAdmin={data.me.isAdmin}
+            canModerate={data.me.isStaff}
+          />
         )}
         {tab === "bugs" && (
           <BugsTab
@@ -259,7 +271,15 @@ export function AdminPortal() {
             bugs={bugs}
           />
         )}
-        {tab === "bans" && <BansTab canModerate={data.me.isStaff} />}
+        {tab === "bans" && (
+          <BansTab
+            viewerId={data.me.id}
+            viewerRole={data.me.platformRole}
+            isFounder={data.me.isFounder}
+            isAdmin={data.me.isAdmin}
+            canModerate={data.me.isStaff}
+          />
+        )}
         {tab === "warnings" && <WarningsTab canModerate={data.me.isStaff} />}
         {tab === "email" && <EmailDeliveryTab canModerate={data.me.isStaff} />}
         {tab === "activity" && <ActivityTab />}
@@ -711,11 +731,12 @@ function OverviewTab({
                 key={badge}
                 className="inline-flex items-center gap-2 rounded-lg border border-indigo-300/15 bg-[#11182a]/85 px-2.5 py-1.5 text-xs text-indigo-50 shadow-[inset_0_1px_0_rgba(255,255,255,.05)]"
               >
-                <GlobalBadgeIcon
-                  badge={badge as GlobalBadgeKey}
-                  className="size-4"
-                />
-                {GLOBAL_BADGE_META[badge as GlobalBadgeKey]?.label ?? badge}
+                {isGlobalBadgeKey(badge) && (
+                  <GlobalBadgeIcon badge={badge} className="size-4" />
+                )}
+                {isGlobalBadgeKey(badge)
+                  ? GLOBAL_BADGE_META[badge].label
+                  : badge}
               </span>
             ))}
             {(me?.badges ?? []).length === 0 && (
@@ -806,9 +827,11 @@ function OverviewTab({
 /* ------------------------------------------------------------------ */
 
 function BadgesTab({
+  viewerId,
   isAdmin,
   isFounder,
 }: {
+  viewerId: string;
   isAdmin: boolean;
   /** Only the Kyro founder can grant or revoke the Founder badge. */
   isFounder: boolean;
@@ -823,6 +846,7 @@ function BadgesTab({
     field: (typeof BADGE_FIELDS)[number]["field"],
     next: boolean,
   ) => {
+    if (busyId !== null) return;
     setBusyId(userId);
     try {
       await setBadges({
@@ -868,6 +892,8 @@ function BadgesTab({
           {members.map((member) => (
             <div
               key={member.id}
+              role="group"
+              aria-label={`Badges for ${member.name}`}
               className="rounded-xl border border-border/70 bg-surface p-3"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -892,25 +918,35 @@ function BadgesTab({
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {BADGE_FIELDS.map((badge) => {
                   const held = member.badges.includes(badge.id);
+                  const ownAdmin =
+                    !isFounder &&
+                    member.id === viewerId &&
+                    badge.id === "admin" &&
+                    held;
                   // The Founder badge is the founder's to hand out; nobody else
                   // — including other admins — can grant or strip it. Their own
                   // account badges are theirs to change too.
-                  const locked = isFounder
-                    ? false
-                    : badge.id === "founder" || member.isFounder
-                      ? true
-                      : !isAdmin;
+                  const locked =
+                    ownAdmin ||
+                    (isFounder
+                      ? false
+                      : badge.id === "founder" || member.isFounder
+                        ? true
+                        : !isAdmin);
                   return (
                     <button
                       key={badge.id}
                       type="button"
-                      disabled={locked || busyId === member.id}
+                      disabled={locked || busyId !== null}
+                      aria-pressed={held}
                       onClick={() => void toggle(member.id, badge.field, !held)}
                       title={
                         locked
-                          ? badge.id === "founder" || member.isFounder
-                            ? "Only Kyro's founder can change these badges"
-                            : "Only admins can change badges"
+                          ? ownAdmin
+                            ? "You cannot remove your own Admin badge"
+                            : badge.id === "founder" || member.isFounder
+                              ? "Only Kyro's founder can change these badges"
+                              : "Only admins can change badges"
                           : held
                             ? "Revoke badge"
                             : "Grant badge"
@@ -949,9 +985,11 @@ function BadgesTab({
 /* ------------------------------------------------------------------ */
 
 function ReportsTab({
+  viewerId,
   isAdmin,
   canModerate,
 }: {
+  viewerId: string;
   isAdmin: boolean;
   canModerate: boolean;
 }) {
@@ -1005,6 +1043,8 @@ function ReportsTab({
         reports.map((report) => (
           <div
             key={report.id}
+            role="group"
+            aria-label={`Report: ${report.reason}`}
             className="rounded-xl border border-border/70 bg-surface p-3"
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -1096,7 +1136,7 @@ function ReportsTab({
                     }
                   />
                 ) : null}
-                {report.reportedId ? (
+                {report.reportedId && report.reportedId !== viewerId ? (
                   <ActionButton
                     icon={Ban}
                     label="Ban user"
@@ -1185,19 +1225,30 @@ function BugsTab({
     <div className="space-y-2">
       {bugs.map((bug) => {
         const reporter = bug.reporter;
+        const statusMeta = Object.prototype.hasOwnProperty.call(
+          BUG_STATUS,
+          bug.status,
+        )
+          ? BUG_STATUS[bug.status]
+          : {
+              label: "Unknown status",
+              chip: "border-border/70 bg-panel text-muted-foreground",
+            };
         return (
           <div
             key={bug.id}
+            role="group"
+            aria-label={`Bug report: ${bug.title}`}
             className="rounded-xl border border-border/70 bg-surface p-3"
           >
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className={cn(
                   "rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                  BUG_STATUS[bug.status].chip,
+                  statusMeta.chip,
                 )}
               >
-                {BUG_STATUS[bug.status].label}
+                {statusMeta.label}
               </span>
               <span className="shrink-0 rounded border border-border/70 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
                 {BUG_CATEGORY_LABELS[bug.category] ?? "Other"}
@@ -1290,7 +1341,19 @@ function BugsTab({
 /* Bans                                                                */
 /* ------------------------------------------------------------------ */
 
-function BansTab({ canModerate }: { canModerate: boolean }) {
+function BansTab({
+  viewerId,
+  viewerRole,
+  isFounder,
+  isAdmin,
+  canModerate,
+}: {
+  viewerId: string;
+  viewerRole: OverviewData["me"]["platformRole"];
+  isFounder: boolean;
+  isAdmin: boolean;
+  canModerate: boolean;
+}) {
   const bans = useQuery(api.admin.banList);
   const [term, setTerm] = useState("");
   const [target, setTarget] = useState<{
@@ -1306,9 +1369,34 @@ function BansTab({ canModerate }: { canModerate: boolean }) {
   const banUser = useMutation(api.admin.banUser);
   const unbanUser = useMutation(api.admin.unbanUser);
   const [busy, setBusy] = useState(false);
+  // Search members expose their staff badges rather than a platform role.
+  // Match the backend staff ladder before offering an account to ban.
+  const staffLadder: readonly string[] = [
+    "trialstaff",
+    "staff",
+    "moderator",
+    "admin",
+    "manager",
+    "cofounder",
+    "founder",
+  ];
+  const viewerRank = staffLadder.indexOf(viewerRole);
+  const eligibleResults = results?.filter((member) => {
+    if (member.id === viewerId || member.isFounder || member.ban) return false;
+    const targetRank = member.badges.reduce(
+      (rank, badge) => Math.max(rank, staffLadder.indexOf(badge)),
+      -1,
+    );
+    // Trial Staff are protected by banUser, although searchMembers.isStaff
+    // denotes Staff and higher. Include the badge ladder when checking staff.
+    if (!member.isStaff && targetRank < 0) return true;
+    if (!isAdmin) return false;
+    if (isFounder) return true;
+    return targetRank < viewerRank;
+  });
 
   const submit = async () => {
-    if (!target || reason.trim().length < 3) return;
+    if (busy || !target || reason.trim().length < 3) return;
     setBusy(true);
     try {
       await banUser({
@@ -1360,16 +1448,16 @@ function BansTab({ canModerate }: { canModerate: boolean }) {
 
           {!target && term.length >= 2 && (
             <div className="mt-1 max-h-48 overflow-y-auto rounded-md border border-border/70 bg-panel">
-              {results === undefined ? (
+              {eligibleResults === undefined ? (
                 <p className="px-3 py-2 text-xs text-muted-foreground">
                   Searching…
                 </p>
-              ) : results.length === 0 ? (
+              ) : eligibleResults.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-muted-foreground">
-                  No accounts matched.
+                  No eligible accounts matched.
                 </p>
               ) : (
-                results.slice(0, 8).map((member) => (
+                eligibleResults.slice(0, 8).map((member) => (
                   <button
                     key={member.id}
                     type="button"

@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { checkSettings } from "../tests/ui/settings-checks.mjs";
 import { checkMediaAndMobile } from "../tests/ui/media-mobile-checks.mjs";
 import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
+import { checkAdminPortal } from "../tests/ui/admin-portal-checks.mjs";
+import { checkBadgeVisibility } from "../tests/ui/badge-visibility-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -75,6 +77,19 @@ if (process.argv.includes("--profile-badges")) {
   try {
     await page.goto("http://127.0.0.1:5187/dashboard");
     await checkProfileBadges(page);
+    await checkBadgeVisibility(page);
+    assert.deepEqual(errors, []);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
+if (process.argv.includes("--admin-portal")) {
+  try {
+    await page.goto("http://127.0.0.1:5187/dashboard");
+    await checkAdminPortal(page);
+    assert.deepEqual(errors, []);
   } finally {
     await browser.close();
     await server.close();
@@ -92,6 +107,8 @@ try {
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
   await checkSettings(page, context);
   await checkProfileBadges(page);
+  await checkBadgeVisibility(page);
+  await checkAdminPortal(page);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();

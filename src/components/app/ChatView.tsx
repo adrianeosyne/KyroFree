@@ -134,45 +134,55 @@ function ChatSurface({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border/70 bg-background px-4 sm:px-6">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          {icon}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold tracking-tight text-foreground">
-            {titleUser ? (
-              <StyledDisplayName user={titleUser} name={title} />
-            ) : (
-              title
+      <div className="flex min-h-16 shrink-0 flex-wrap items-center gap-2.5 border-b border-border/70 bg-background px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:px-6 sm:py-0">
+        <div className="flex min-w-0 flex-1 basis-full items-center gap-2.5 sm:basis-auto">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            {icon}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="min-w-0 text-base font-bold tracking-tight text-foreground">
+              {titleUser ? (
+                <StyledDisplayName
+                  user={titleUser}
+                  name={title}
+                  className="block truncate"
+                />
+              ) : (
+                <span className="block truncate">{title}</span>
+              )}
+            </p>
+            {subtitle && (
+              <p className="truncate text-xs text-muted-foreground">
+                {subtitle}
+              </p>
             )}
-          </p>
-          {subtitle && (
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
-          )}
-        </div>
-        {participants && participants.length > 0 && (
-          <div className="flex -space-x-2">
-            {participants.slice(0, 5).map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                title={`View ${user.name}'s profile`}
-                onClick={() => openProfile(user.id)}
-                className="rounded-full transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <UserAvatar user={user} size="xs" />
-              </button>
-            ))}
           </div>
-        )}
-        {containerType === "conversation" && (
-          <DmCallHeader conversationId={containerId} />
-        )}
-        {containerType === "channel" && (
-          <ChannelNotificationControl channelId={containerId} />
-        )}
-        <WorkspaceActions showMemberToggle={containerType === "channel"} />
-        {headerAction}
+        </div>
+        <div className="ml-auto flex max-w-full shrink-0 flex-wrap items-center gap-2.5 sm:flex-nowrap">
+          {participants && participants.length > 0 && (
+            <div className="flex -space-x-2">
+              {participants.slice(0, 5).map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  title={`View ${user.name}'s profile`}
+                  onClick={() => openProfile(user.id)}
+                  className="rounded-full transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <UserAvatar user={user} size="xs" />
+                </button>
+              ))}
+            </div>
+          )}
+          {containerType === "conversation" && (
+            <DmCallHeader conversationId={containerId} />
+          )}
+          {containerType === "channel" && (
+            <ChannelNotificationControl channelId={containerId} />
+          )}
+          <WorkspaceActions showMemberToggle={containerType === "channel"} />
+          {headerAction}
+        </div>
       </div>
 
       {containerType === "conversation" && callActive && dmCall && (

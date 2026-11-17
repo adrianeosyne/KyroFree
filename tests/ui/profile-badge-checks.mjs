@@ -8,11 +8,31 @@ export async function checkProfileBadges(page) {
       {
         badges: ["premium", "founder", "future_badge", "verified"],
         primaryBadge: "premium",
-        labels: ["Kyro Founder", "Verified"],
+        labels: ["Kyro Founder", "Premium", "Verified"],
       },
       {
         badges: ["premium", "future_badge"],
         primaryBadge: "premium",
+        labels: ["Premium"],
+      },
+      {
+        badges: ["premium", "verifiedserverowner", "future_badge"],
+        primaryBadge: "verifiedserverowner",
+        labels: ["Premium", "Verified Server Owner"],
+      },
+      {
+        badges: ["premium", "verifiedserverowner"],
+        primaryBadge: "none",
+        labels: ["Premium", "Verified Server Owner"],
+      },
+      {
+        badges: ["founder", "verified", "future_badge"],
+        primaryBadge: "future_badge",
+        labels: ["Kyro Founder", "Verified"],
+      },
+      {
+        badges: ["future_badge"],
+        primaryBadge: "future_badge",
         labels: [],
       },
       {
@@ -58,12 +78,25 @@ export async function checkProfileBadges(page) {
         await expect(
           badgeSection.getByRole("button", { name: /Verified/ }),
         ).toHaveAttribute("aria-pressed", "true");
-      if (profile.primaryBadge === "premium" && profile.labels.length) {
+      if (profile.primaryBadge === "verifiedserverowner")
         await expect(
-          badgeSection.getByRole("button", { name: /Kyro Founder/ }),
+          badgeSection.getByRole("button", { name: /Verified Server Owner/ }),
         ).toHaveAttribute("aria-pressed", "true");
+      if (profile.primaryBadge === "none" && profile.labels.length)
+        await expect(
+          badgeSection.getByRole("button", { name: /Premium/ }),
+        ).toHaveAttribute("aria-pressed", "true");
+      if (profile.primaryBadge === "premium") {
+        await expect(
+          badgeSection.getByRole("button", { name: /Premium/ }),
+        ).toHaveAttribute("aria-pressed", "true");
+      }
+      if (
+        profile.primaryBadge === "premium" &&
+        profile.labels.includes("Verified")
+      ) {
         await page.screenshot({
-          path: `test-results/kyro-profile-legacy-badges-${width}.png`,
+          path: `test-results/kyro-profile-premium-badges-${width}.png`,
         });
         await badgeSection.getByRole("button", { name: /Verified/ }).click();
         await expect(
@@ -87,6 +120,6 @@ export async function checkProfileBadges(page) {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto("http://127.0.0.1:5187/dashboard");
   console.log(
-    "PASS: My Profile opens with legacy, unknown, valid and empty badge data on desktop and mobile; supported badges remain selectable",
+    "PASS: My Profile opens with Premium, verified-server-owner, unknown and empty badge data on desktop and mobile; earned badges remain selectable",
   );
 }
