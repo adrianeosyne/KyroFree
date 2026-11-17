@@ -23,6 +23,18 @@
     <key>NSPhotoLibraryUsageDescription</key><string>Choose photos and videos to attach to your Kyro conversations.</string>
     <key>NSPhotoLibraryAddUsageDescription</key><string>Save a photo or video from a Kyro conversation to your library.</string>
     <key>UILaunchScreen</key><dict/>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key><false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array><dict>
+                <key>UISceneConfigurationName</key><string>KyroScene</string>
+                <key>UISceneDelegateClassName</key><string>$(PRODUCT_MODULE_NAME).KyroSceneDelegate</string>
+            </dict></array>
+        </dict>
+    </dict>
     <key>UIRequiresFullScreen</key><false/>
     <key>UISupportedInterfaceOrientations</key>
     <array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>

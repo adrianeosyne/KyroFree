@@ -9,6 +9,8 @@
 		C816D40974B12AD1F11A6AFE = { "isa" = "PBXBuildFile"; "fileRef" = B0E480BE31DA9DE238D82DE5; };
 		6049841763EA0A59DB1A869D = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "KyroApp.swift"; "sourceTree" = "<group>"; };
 		23B0E8F7BED184C29AD296EA = { "isa" = "PBXBuildFile"; "fileRef" = 6049841763EA0A59DB1A869D; };
+		3F2C4582842A319FA053F5CC = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "KyroSceneDelegate.swift"; "sourceTree" = "<group>"; };
+		4D43EB705BA979B3F32BE35F = { "isa" = "PBXBuildFile"; "fileRef" = 3F2C4582842A319FA053F5CC; };
 		67920579019334FC7C57B2F1 = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "KyroViewController.swift"; "sourceTree" = "<group>"; };
 		A8BE326112C704FBC31433B3 = { "isa" = "PBXBuildFile"; "fileRef" = 67920579019334FC7C57B2F1; };
 		F39D07E7C782C6015284BB29 = { "isa" = "PBXFileReference"; "lastKnownFileType" = "sourcecode.swift"; "path" = "NavigationPolicy.swift"; "sourceTree" = "<group>"; };
@@ -18,8 +20,8 @@
 		32C0C5C468CB1BC56113BE50 = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.xml"; "path" = "PrivacyInfo.xcprivacy"; "sourceTree" = "<group>"; };
 		DC907D1EB83BD352552B5276 = { "isa" = "PBXBuildFile"; "fileRef" = 32C0C5C468CB1BC56113BE50; };
 		C45A61E15F527C2BBEDD7F64 = { "isa" = "PBXFileReference"; "lastKnownFileType" = "text.plist.xml"; "path" = "Info.plist"; "sourceTree" = "<group>"; };
-		465BB1AC875A5E88BD5C6FBF = { "isa" = "PBXGroup"; "children" = ( B0E480BE31DA9DE238D82DE5, 6049841763EA0A59DB1A869D, 67920579019334FC7C57B2F1, F39D07E7C782C6015284BB29, 3740801A7953791F23884486, 32C0C5C468CB1BC56113BE50, C45A61E15F527C2BBEDD7F64, ); "path" = "Kyro"; "sourceTree" = "<group>"; };
-		BC9611D5BD29940E8DA34505 = { "isa" = "PBXSourcesBuildPhase"; "buildActionMask" = "2147483647"; "files" = ( C816D40974B12AD1F11A6AFE, 23B0E8F7BED184C29AD296EA, A8BE326112C704FBC31433B3, AD7109E16842D5067E024354, ); "runOnlyForDeploymentPostprocessing" = "0"; };
+		465BB1AC875A5E88BD5C6FBF = { "isa" = "PBXGroup"; "children" = ( B0E480BE31DA9DE238D82DE5, 6049841763EA0A59DB1A869D, 3F2C4582842A319FA053F5CC, 67920579019334FC7C57B2F1, F39D07E7C782C6015284BB29, 3740801A7953791F23884486, 32C0C5C468CB1BC56113BE50, C45A61E15F527C2BBEDD7F64, ); "path" = "Kyro"; "sourceTree" = "<group>"; };
+		BC9611D5BD29940E8DA34505 = { "isa" = "PBXSourcesBuildPhase"; "buildActionMask" = "2147483647"; "files" = ( C816D40974B12AD1F11A6AFE, 23B0E8F7BED184C29AD296EA, 4D43EB705BA979B3F32BE35F, A8BE326112C704FBC31433B3, AD7109E16842D5067E024354, ); "runOnlyForDeploymentPostprocessing" = "0"; };
 		73FC169B1C338F9F263C909E = { "isa" = "PBXResourcesBuildPhase"; "buildActionMask" = "2147483647"; "files" = ( A760758670BF85CA1B4BE25B, DC907D1EB83BD352552B5276, ); "runOnlyForDeploymentPostprocessing" = "0"; };
 		136F3020F6E1D2B36C518D66 = { "isa" = "PBXFrameworksBuildPhase"; "buildActionMask" = "2147483647"; "files" = (  ); "runOnlyForDeploymentPostprocessing" = "0"; };
 		6C85E1A6F2DB17047DC6ACBB = { "isa" = "XCBuildConfiguration"; "buildSettings" = { "PRODUCT_NAME" = "$(TARGET_NAME)"; "PRODUCT_BUNDLE_IDENTIFIER" = "cyou.kyro.app"; "SWIFT_VERSION" = "5.0"; "IPHONEOS_DEPLOYMENT_TARGET" = "16.0"; "TARGETED_DEVICE_FAMILY" = "1,2"; "CODE_SIGN_STYLE" = "Automatic"; "MARKETING_VERSION" = "1.0.0"; "CURRENT_PROJECT_VERSION" = "1"; "LD_RUNPATH_SEARCH_PATHS" = ( "$(inherited)", "@executable_path/Frameworks", ); "INFOPLIST_FILE" = "Kyro/Info.plist"; "ASSETCATALOG_COMPILER_APPICON_NAME" = "AppIcon"; "SUPPORTS_MACCATALYST" = "NO"; "ENABLE_PREVIEWS" = "NO"; }; "name" = "Debug"; };

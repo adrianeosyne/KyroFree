@@ -15,6 +15,10 @@ import {
   ANDROID_DOWNLOAD_URL,
   ANDROID_SOURCE_URL,
   ANDROID_VERSION,
+  IOS_BUILD_GUIDE_URL,
+  IOS_DOWNLOAD_URL,
+  IOS_SOURCE_URL,
+  IOS_VERSION,
   mobilePlatform,
 } from "@/lib/mobile";
 import {
@@ -70,7 +74,7 @@ export default function DownloadPage() {
                 platform === "android"
                   ? ANDROID_DOWNLOAD_URL
                   : platform === "ios"
-                    ? "#web-app"
+                    ? IOS_DOWNLOAD_URL
                     : WINDOWS_DOWNLOAD_URL
               }
               className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-violet-400 px-6 font-bold text-[#171320] transition hover:bg-violet-300 sm:w-auto"
@@ -79,7 +83,7 @@ export default function DownloadPage() {
               {platform === "android"
                 ? "Download Kyro for Android"
                 : platform === "ios"
-                  ? "Add Kyro to your phone"
+                  ? "Download iOS project"
                   : "Download for Windows"}
             </a>
             <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-400">
@@ -97,7 +101,7 @@ export default function DownloadPage() {
           </div>
           <div
             className="relative mx-auto w-full max-w-[310px]"
-            aria-label="Preview of Kyro on Android"
+            aria-label="Preview of Kyro on your phone"
           >
             <div className="pointer-events-none absolute -inset-10 rounded-full bg-violet-400/10 blur-3xl" />
             <div className="relative overflow-hidden rounded-[40px] border-[7px] border-[#292933] bg-[#17171f] p-5 shadow-2xl shadow-black/40">
@@ -163,7 +167,7 @@ export default function DownloadPage() {
           </div>
         </div>
         <section
-          className="mt-16 grid gap-4 md:grid-cols-3"
+          className="mt-16 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
           aria-label="Choose your Kyro app"
         >
           <article
@@ -197,6 +201,50 @@ export default function DownloadPage() {
               Open the APK and allow your browser to install Kyro when Android
               asks. Downloaded from our GitHub release.
             </p>
+          </article>
+          <article
+            id="ios"
+            className="scroll-mt-6 rounded-3xl border border-white/10 bg-white/[.025] p-6"
+          >
+            <Smartphone className="mb-5 size-7 text-violet-300" />
+            <h2 className="text-xl font-bold">Kyro for iOS</h2>
+            <p className="mt-2 text-xs text-slate-400">
+              iPhone and iPad · iOS 16+ · Version {IOS_VERSION}
+            </p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              Your existing chats, with native navigation, file sharing and
+              camera and microphone access.
+            </p>
+            <a
+              href={IOS_DOWNLOAD_URL}
+              className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-bold"
+            >
+              <Download className="size-4" />
+              Download iOS project
+            </a>
+            <a
+              href={IOS_SOURCE_URL}
+              className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-violet-300"
+            >
+              <Code className="size-4" />
+              View iOS source
+            </a>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Free Apple ID and Xcode Personal Team. Build on a Mac and install
+              on your own iPhone or iPad. This ZIP contains source code.
+            </p>
+            <a
+              href={IOS_BUILD_GUIDE_URL}
+              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-violet-300"
+            >
+              Install with Xcode
+            </a>
+            <a
+              href="#web-app"
+              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-violet-300"
+            >
+              Add the web app to your home screen
+            </a>
           </article>
           <article className="rounded-3xl border border-white/10 bg-white/[.025] p-6">
             <Monitor className="mb-5 size-7 text-violet-300" />
@@ -266,7 +314,7 @@ export default function DownloadPage() {
               <h2 className="font-semibold">Meet in voice</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 Allow microphone or camera access when you start a call. Keep
-                the Android app open while you're talking.
+                the mobile app open while you're talking.
               </p>
             </div>
           </div>

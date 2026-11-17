@@ -296,6 +296,7 @@ final class KyroViewController: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     private func showError(_ message: String) {
+        view.endEditing(true)
         loading.stopAnimating()
         progress.isHidden = true
         webView.isHidden = true

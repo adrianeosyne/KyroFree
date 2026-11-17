@@ -120,7 +120,34 @@ On Android browsers, Kyro shows a dismissible download prompt. In the native
 app, the prompt is hidden. The mobile interface has a Messages screen with
 search and unread filters, a five-tab dock, larger controls, and a conversation
 layout that leaves more room for chat and the keyboard. iPhone users can add
-the web app to their home screen; there is no native iOS release.
+the web app to their home screen, or build the native iOS app with Xcode.
+
+## iOS app
+
+The native iPhone and iPad project for iOS 16 and newer is in
+[mobile/ios](mobile/ios/README.md). It uses the same Kyro accounts, web interface
+and backend as Android and Windows, with native navigation, file sharing,
+camera/microphone permission prompts and a connection retry screen. Its complete
+Swift source, Xcode project, unit tests and simulator UI tests are published
+alongside the shared application source. The installation prompt is hidden in
+both native mobile apps.
+
+Download the [iOS source project](https://github.com/adrianeosyne/KyroFree/releases/download/ios-v1.0.0/Kyro-iOS-1.0.0-source.zip)
+or open `mobile/ios/Kyro.xcodeproj` on a Mac to build and test. Sign in to Xcode
+with a free Apple ID, select your **Personal Team** and enable automatic signing
+to run it on your own iPhone or iPad. No paid developer membership or third-party
+native dependencies are required. Free device provisioning lasts about seven
+days; run from Xcode again to renew it.
+
+The
+[iOS build workflow](.github/workflows/ios-build.yml) runs simulator tests and
+produces a simulator app and unsigned device archive without Apple credentials.
+The GitHub release includes these artifacts and the complete native source ZIP,
+with checksums. The source ZIP must be built and signed locally before it can
+run on an iPhone; the unsigned archive is not an installation package.
+
+See the [free iOS build guide](mobile/ios/README.md#build-and-test)
+for Personal Team signing, physical-device checks and current platform limits.
 
 ## Premium gifts
 

@@ -6,6 +6,7 @@ tmp_shots
 test-results
 tests
 desktop
+mobile
 dist
 node_modules
 Kyro-Setup-*.exe

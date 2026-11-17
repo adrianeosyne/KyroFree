@@ -79,7 +79,12 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
         let disallowed = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:"))
         let cleaned = suggested.unicodeScalars.map { disallowed.contains($0) ? "_" : String($0) }.joined()
         let trimmed = cleaned.trimmingCharacters(in: .whitespacesAndNewlines.union(CharacterSet(charactersIn: ".")))
-        let filename = String(trimmed.prefix(120))
-        return filename.isEmpty ? "Kyro-download" : filename
+        guard !trimmed.isEmpty else { return "Kyro-download" }
+        let candidateExtension = (trimmed as NSString).pathExtension
+        let suffix = !candidateExtension.isEmpty && candidateExtension.utf8.count <= 20 ? ".\(candidateExtension)" : ""
+        let basename = suffix.isEmpty ? trimmed : String(trimmed.dropLast(suffix.count))
+        var shortened = String(basename.prefix(120))
+        while shortened.utf8.count + suffix.utf8.count > 200 { shortened.removeLast() }
+        return (shortened.isEmpty ? "Kyro-download" : shortened) + suffix
     }
 }

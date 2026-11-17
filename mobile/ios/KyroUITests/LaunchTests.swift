@@ -32,6 +32,23 @@ final class LaunchTests: XCTestCase {
         capture(app, name: "Kyro retry")
     }
 
+    func testBlobDownloadIsSavedAndAvailableFromNativeDownloads() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let button = app.webViews.buttons["Download test file"]
+        XCTAssertTrue(button.waitForExistence(timeout: 15))
+        button.tap()
+        let ready = app.alerts["Download ready"]
+        XCTAssertTrue(ready.waitForExistence(timeout: 20))
+        XCTAssertTrue(ready.staticTexts["Kyro-test.txt"].exists)
+        ready.buttons["Later"].tap()
+        app.buttons["kyro.downloads"].tap()
+        XCTAssertTrue(app.buttons["Kyro-test.txt"].waitForExistence(timeout: 10))
+        capture(app, name: "Kyro native download")
+        app.buttons["Cancel"].tap()
+    }
+
     func testIPadAndIPhoneRotationKeepsControlsAvailable() {
         let app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
@@ -41,6 +58,22 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.buttons["kyro.reload"].isHittable)
         XCUIDevice.shared.orientation = .portrait
         XCTAssertTrue(app.buttons["kyro.share"].isHittable)
+    }
+
+    func testTypingWithKeyboardKeepsNativeControlsAvailable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--ui-testing"]
+        app.launch()
+        let field = app.webViews.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 15))
+        field.tap()
+        field.typeText("Hello from iOS")
+        XCTAssertEqual(field.value as? String, "Hello from iOS")
+        XCTAssertTrue(app.buttons["kyro.reload"].isHittable)
+        XCTAssertTrue(app.buttons["kyro.share"].isHittable)
+        capture(app, name: "Kyro keyboard layout")
+        app.buttons["kyro.reload"].tap()
+        XCTAssertTrue(app.webViews.staticTexts["Kyro test page"].waitForExistence(timeout: 10))
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
