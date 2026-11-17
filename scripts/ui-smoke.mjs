@@ -10,6 +10,7 @@ import { checkMediaAndMobile } from "../tests/ui/media-mobile-checks.mjs";
 import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
 import { checkAdminPortal } from "../tests/ui/admin-portal-checks.mjs";
 import { checkBadgeVisibility } from "../tests/ui/badge-visibility-checks.mjs";
+import { checkAttachments } from "../tests/ui/attachment-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -38,10 +39,22 @@ const server = await createServer({
       { find: "@", replacement: path.resolve("src") },
     ],
   },
+  define: {
+    "import.meta.env.VITE_FILE_API_MODE": JSON.stringify(
+      process.argv.includes("--managed-files") ? "managed" : "legacy",
+    ),
+  },
   server: { host: "127.0.0.1", port: 5187, strictPort: true },
   optimizeDeps: {
     entries: ["tests/ui/index.html"],
-    include: ["react", "react-dom/client", "react/jsx-runtime", "react-router"],
+    include: [
+      "react",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react-router",
+      "next-themes",
+      "@convex-dev/auth/react",
+    ],
   },
 });
 await server.listen();
@@ -73,6 +86,24 @@ await context.route(/^https?:\/\/(?!127\.0\.0\.1:5187)/, (route) =>
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+if (process.argv.includes("--attachments")) {
+  try {
+    await page.goto("http://127.0.0.1:5187/dashboard");
+    await checkAttachments(page, context);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/attachment-failure.png" });
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(0, 1500),
+    );
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
 if (process.argv.includes("--profile-badges")) {
   try {
     await page.goto("http://127.0.0.1:5187/dashboard");
@@ -109,6 +140,7 @@ try {
   await checkProfileBadges(page);
   await checkBadgeVisibility(page);
   await checkAdminPortal(page);
+  await checkAttachments(page, context);
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();

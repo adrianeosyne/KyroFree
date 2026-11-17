@@ -9,6 +9,29 @@ export interface PremiumBadgeUser {
 }
 
 const DAY_MS = 86_400_000;
+
+/** The recorded membership start, never inferred from a tier or a streak. */
+export function getPremiumSinceText(
+  user: PremiumBadgeUser,
+  now = Date.now(),
+): string | null {
+  const since = user.premiumSince;
+  if (
+    typeof since !== "number" ||
+    !Number.isFinite(since) ||
+    since <= 0 ||
+    since > now
+  )
+    return null;
+  const date = new Date(since);
+  if (!Number.isFinite(date.getTime())) return null;
+  return `Premium since ${date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  })}`;
+}
+
 export const PREMIUM_BADGE_TIERS = [
   {
     name: "Premium",

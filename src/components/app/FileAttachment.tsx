@@ -5,6 +5,7 @@ import { useNow } from "@/hooks/use-now";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { formatBytes } from "@/lib/format";
+import { isManagedFileApi } from "@/lib/file-api";
 export function FileAttachment({
   attachment,
   messageId,
@@ -31,17 +32,32 @@ export function FileAttachment({
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
-  const download = useQuery(api.files.download, {
-    storageId: attachment.storageId as Id<"_storage">,
-    messageId: messageId as Id<"messages">,
-    refresh: Math.floor(now / 600000),
-  });
-  const url = download?.url;
+  const download = useQuery(
+    api.files.download,
+    isManagedFileApi
+      ? {
+          storageId: attachment.storageId as Id<"_storage">,
+          messageId: messageId as Id<"messages">,
+          refresh: Math.floor(now / 600000),
+        }
+      : "skip",
+  );
+  // Message URLs are already authorized for the viewer. Legacy deployments
+  // return them directly and do not expose a separate download query.
+  const url =
+    isManagedFileApi && download !== undefined ? download?.url : attachment.url;
+  const sharedDate =
+    typeof createdAt === "number" && Number.isFinite(createdAt)
+      ? new Date(createdAt)
+      : null;
+  const validSharedDate =
+    sharedDate && Number.isFinite(sharedDate.getTime()) ? sharedDate : null;
   return (
-    <div className="min-w-0 max-w-sm rounded-lg border border-border bg-surface p-2">
+    <div className="min-w-0 max-w-full rounded-lg border border-border bg-surface p-2 sm:max-w-sm">
       {url && attachment.mimeType.startsWith("image/") && (
         <button
           type="button"
+          className="block max-w-full"
           aria-label={`Expand ${attachment.name}`}
           onClick={() => onOpenMedia(url, attachment.name)}
         >
@@ -65,8 +81,8 @@ export function FileAttachment({
           className="max-h-72 max-w-full rounded"
         />
       )}
-      <div className="mt-1 flex items-center gap-2 text-xs">
-        <span className="max-w-40 truncate" title={attachment.name}>
+      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+        <span className="min-w-0 max-w-40 truncate" title={attachment.name}>
           {attachment.name}
         </span>
         <span className="text-muted-foreground">
@@ -84,7 +100,9 @@ export function FileAttachment({
           </a>
         ) : (
           <span className="text-muted-foreground">
-            {download === undefined ? "Loading…" : "Unavailable"}
+            {isManagedFileApi && download === undefined
+              ? "Loading…"
+              : "Unavailable"}
           </span>
         )}
       </div>
@@ -167,12 +185,12 @@ export function FileAttachment({
           {attachment.mimeType} · {attachment.size.toLocaleString()} bytes
         </p>
         {ownerName && <p>Shared by {ownerName}</p>}
-        {createdAt && (
-          <time dateTime={new Date(createdAt).toISOString()}>
-            {new Date(createdAt).toLocaleString()}
+        {validSharedDate && (
+          <time dateTime={validSharedDate.toISOString()}>
+            {validSharedDate.toLocaleString()}
           </time>
         )}
-        {canRemove && (
+        {canRemove && isManagedFileApi && (
           <button
             disabled={busy}
             className="mt-2 block text-destructive underline"

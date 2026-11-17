@@ -16,6 +16,7 @@ import { BotPanel, TokenDialog, useBotTask } from "./BotPlatformShared";
 import { ACCEPTED_UPLOAD } from "@/lib/upload";
 import { useUploadQueue } from "@/lib/useUploadQueue";
 import { useNow } from "@/hooks/use-now";
+import { isManagedFileApi } from "@/lib/file-api";
 import { formatBytes } from "@/lib/format";
 import { generateBotCredential, BOT_EVENTS } from "@/lib/botContract";
 import {
@@ -216,6 +217,27 @@ export function ApplicationMetadata({ app }: { app: App }) {
   );
 }
 export function DeveloperAssets({
+  applicationId,
+}: {
+  applicationId?: Id<"botApplications">;
+}) {
+  const navigate = useNavigate();
+  if (!isManagedFileApi) {
+    return (
+      <BotPanel
+        title="Files shared in your conversations"
+        description="Preview and download attachments from the messages where they were shared."
+      >
+        <Button onClick={() => navigate("/dashboard")}>
+          Open conversations
+        </Button>
+      </BotPanel>
+    );
+  }
+  return <ManagedDeveloperAssets applicationId={applicationId} />;
+}
+
+function ManagedDeveloperAssets({
   applicationId,
 }: {
   applicationId?: Id<"botApplications">;

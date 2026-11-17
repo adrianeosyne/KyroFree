@@ -9,6 +9,7 @@ import {
 } from "./upload";
 import { readableError } from "./errors";
 import { toast } from "sonner";
+import { isManagedFileApi, legacyFileApi } from "./file-api";
 
 type UploadJob = {
   id: string;
@@ -43,7 +44,9 @@ export function useUploadQueue(
   retainCompleted = false,
 ) {
   const upload = useUploadFile({ applicationId });
-  const removeFile = useMutation(api.files.remove);
+  const removeManagedFile = useMutation(api.files.remove);
+  const discardLegacyFile = useMutation(legacyFileApi.discard);
+  const removeFile = isManagedFileApi ? removeManagedFile : discardLegacyFile;
   const session = useMemo(() => new UploadSession(scope), [scope]);
   const [snapshot, setSnapshot] = useState<{
     session: typeof session;

@@ -271,7 +271,9 @@ export function useQuery(reference, args) {
     );
   return Object.hasOwn(data, name) ? data[name] : empty;
 }
-export function usePaginatedQuery() {
+export function usePaginatedQuery(reference, args) {
+  const name = getFunctionName(reference);
+  if (args !== "skip" && queryErrors[name]) throw new Error(queryErrors[name]);
   return { results: empty, status: "Exhausted", loadMore: () => {} };
 }
 const mutations = new Map();
@@ -282,6 +284,24 @@ export function useMutation(reference) {
       window.fixtureMutations ??= [];
       window.fixtureMutations.push({ name, args });
       if (mutationErrors[name]) throw new Error(mutationErrors[name]);
+      if (name === "files:generateUploadUrl") {
+        const uploadUrl = "http://127.0.0.1:5187/tests/ui/upload";
+        return Object.keys(args).length
+          ? { uploadUrl, uploadId: "fixture-upload-ticket" }
+          : uploadUrl;
+      }
+      if (name === "files:registerUpload") {
+        if (args.uploadId)
+          return { storageId: args.storageId, status: "pending" };
+        return {
+          storageId: args.storageId,
+          name: args.name,
+          ...(window.fixtureUploadedFiles?.[args.storageId] ?? {
+            size: 1,
+            mimeType: "application/octet-stream",
+          }),
+        };
+      }
       if (name === "messages:send") return { messageId: "fixture-sent" };
       if (name === "conversations:createDirect") return `dm-${args.userId}`;
       return null;
@@ -295,3 +315,5 @@ export const useConvexAuth = () => ({
   isLoading: false,
   isAuthenticated: true,
 });
+// Auth providers are pass-through in the account-free browser fixture.
+export const ConvexProviderWithAuth = ({ children }) => children;

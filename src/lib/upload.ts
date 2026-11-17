@@ -4,6 +4,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 import { ACCEPTED_FILES, allowedFilename } from "./filePolicy";
+import { isManagedFileApi, legacyFileApi } from "./file-api";
 export { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
 export const MAX_ATTACHMENTS = 6;
 export const ACCEPTED_UPLOAD = ACCEPTED_FILES;
@@ -23,6 +24,8 @@ function directUpload(
   file: File,
   options: UploadOptions,
 ): Promise<string> {
+  if (typeof url !== "string" || !url)
+    return Promise.reject(new Error("The upload service is unavailable."));
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const abort = () => xhr.abort();
@@ -56,7 +59,10 @@ function directUpload(
       try {
         if (xhr.status < 200 || xhr.status >= 300)
           throw new Error(`Upload failed (${xhr.status}).`);
-        resolve(JSON.parse(xhr.responseText).storageId);
+        const storageId = JSON.parse(xhr.responseText).storageId;
+        if (typeof storageId !== "string" || !storageId)
+          throw new Error("Upload did not return a file identifier.");
+        resolve(storageId);
       } catch (cause) {
         reject(cause);
       }
@@ -74,12 +80,16 @@ export function useUploadFile(
   options: {
     requireRegistration?: boolean;
     applicationId?: Id<"botApplications">;
+    channelId?: Id<"channels">;
   } = {},
 ) {
   const reserve = useMutation(api.files.generateUploadUrl),
     register = useMutation(api.files.registerUpload),
     verify = useAction(api.files.verifyUpload),
     cancel = useMutation(api.files.cancel);
+  const generateLegacyUploadUrl = useMutation(legacyFileApi.generateUploadUrl);
+  const registerLegacyUpload = useMutation(legacyFileApi.registerUpload);
+  const discardLegacyUpload = useMutation(legacyFileApi.discard);
   return useCallback(
     async (
       file: File,
@@ -91,6 +101,34 @@ export function useUploadFile(
         throw new Error(
           "This file format is not supported. Choose an image, media file, document or ZIP archive.",
         );
+      transfer.signal?.throwIfAborted();
+      if (!isManagedFileApi) {
+        if (options.applicationId)
+          throw new Error("File assets are unavailable for this application.");
+        const uploadUrl = await generateLegacyUploadUrl({});
+        transfer.signal?.throwIfAborted();
+        const storageId = (await directUpload(
+          uploadUrl,
+          file,
+          transfer,
+        )) as Id<"_storage">;
+        try {
+          transfer.onProgress?.(90);
+          // Establish ownership even if cancellation arrived after storage
+          // accepted the file, so discard can safely remove our own upload.
+          const result = await registerLegacyUpload({
+            storageId,
+            name: file.name,
+            ...(options.channelId ? { channelId: options.channelId } : {}),
+          });
+          transfer.signal?.throwIfAborted();
+          transfer.onProgress?.(100);
+          return result;
+        } catch (cause) {
+          await discardLegacyUpload({ storageId }).catch(() => undefined);
+          throw cause;
+        }
+      }
       const bytes = await file.arrayBuffer();
       const sha256 = Array.from(
         new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
@@ -128,6 +166,16 @@ export function useUploadFile(
         throw cause;
       }
     },
-    [reserve, register, verify, cancel, options.applicationId],
+    [
+      reserve,
+      register,
+      verify,
+      cancel,
+      generateLegacyUploadUrl,
+      registerLegacyUpload,
+      discardLegacyUpload,
+      options.applicationId,
+      options.channelId,
+    ],
   );
 }

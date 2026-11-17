@@ -112,6 +112,104 @@ export async function checkBadgeVisibility(page) {
       page.getByText("This page hit an error", { exact: true }),
     ).toHaveCount(0);
   }
+  const membershipSince = Date.UTC(2024, 1, 3, 12);
+  const sinceText = await page.evaluate(
+    (value) =>
+      `Premium since ${new Date(value).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })}`,
+    membershipSince,
+  );
+  const sinceProfile = {
+    badges: ["premium"],
+    primaryBadge: "premium",
+    premiumBadgeTier: "Radiant",
+    premiumSince: membershipSince,
+    premiumStreakSince: Date.UTC(2025, 5, 10, 12),
+  };
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 960 });
+    await page.evaluate(
+      (value) =>
+        localStorage.setItem("kyro.fixture.profile", JSON.stringify(value)),
+      sinceProfile,
+    );
+    await page.goto("http://127.0.0.1:5187/dashboard/dm/dm-maya");
+    const mine = page
+      .locator(".message-row")
+      .filter({
+        has: page.getByRole("button", { name: /Open Alex Morgan's profile/ }),
+      })
+      .first();
+    const inline = mine.getByLabel(`Premium · Radiant: ${sinceText}`, {
+      exact: true,
+    });
+    await expect(inline).toBeVisible();
+    await inline.hover();
+    await expect(page.getByRole("tooltip")).toContainText(sinceText);
+    // Continuous pointer movement leaves Radix's trigger-to-tooltip grace area.
+    await page.mouse.move(0, 0, { steps: 8 });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await inline.focus();
+    await expect(page.getByRole("tooltip")).toContainText(sinceText);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+
+    await page.goto("http://127.0.0.1:5187/dashboard?settings=1");
+    const dialog = page.locator(".settings-dialog");
+    await dialog
+      .getByRole("navigation", { name: "Settings sections" })
+      .getByRole("button", { name: "My Profile", exact: true })
+      .click();
+    const tray = dialog
+      .getByLabel("Profile badges", { exact: true })
+      .getByLabel(`Premium · Radiant: ${sinceText}`, { exact: true });
+    await expect(tray).toBeVisible();
+    await tray.hover();
+    await expect(page.getByRole("tooltip")).toContainText(sinceText);
+    await page.mouse.move(0, 0, { steps: 8 });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    await tray.focus();
+    await expect(page.getByRole("tooltip")).toContainText(sinceText);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  }
+  for (const since of [
+    undefined,
+    null,
+    0,
+    -1,
+    "not-a-date",
+    8640000000000001,
+  ]) {
+    await page.evaluate(
+      (value) =>
+        localStorage.setItem("kyro.fixture.profile", JSON.stringify(value)),
+      { ...sinceProfile, premiumSince: since },
+    );
+    await page.goto("http://127.0.0.1:5187/dashboard/dm/dm-maya");
+    const mine = page
+      .locator(".message-row")
+      .filter({
+        has: page.getByRole("button", { name: /Open Alex Morgan's profile/ }),
+      })
+      .first();
+    const inline = mine.getByLabel(
+      "Premium · Radiant: Premium membership badge",
+      { exact: true },
+    );
+    await expect(inline).toBeVisible();
+    await inline.hover();
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Premium membership badge",
+    );
+    await expect(page.getByRole("tooltip")).not.toContainText("Premium since");
+    await expect(page.getByRole("tooltip")).not.toContainText("Invalid Date");
+    await page.mouse.move(0, 0, { steps: 8 });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+  }
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 960 });
     for (const [count, tier] of [

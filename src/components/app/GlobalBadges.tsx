@@ -9,6 +9,7 @@ import { useId, type ReactNode } from "react";
 import {
   getGifterBadgeTier,
   getPremiumBadgeTier,
+  getPremiumSinceText,
   type PremiumBadgeUser,
 } from "@/lib/premium-badges";
 
@@ -295,7 +296,10 @@ export function PremiumBadge({
   const tier = getPremiumBadgeTier(user);
   const label = tier.name === "Premium" ? "Premium" : `Premium · ${tier.name}`;
   return (
-    <BadgeTip label={label} blurb="Premium membership badge">
+    <BadgeTip
+      label={label}
+      blurb={getPremiumSinceText(user) ?? "Premium membership badge"}
+    >
       <span
         className={cn(
           "inline-flex shrink-0 items-center gap-1 rounded-md border border-white/25 bg-gradient-to-br px-2 py-1 align-middle font-sans text-[10px] font-black leading-none tracking-wide text-slate-950",
@@ -454,8 +458,12 @@ export function BadgeTray({
           tier && tier.name !== "Premium"
             ? `${meta.label} · ${tier.name}`
             : meta.label;
+        const blurb =
+          badge === "premium" && user
+            ? (getPremiumSinceText(user) ?? meta.blurb)
+            : meta.blurb;
         return (
-          <BadgeTip key={badge} label={label} blurb={meta.blurb}>
+          <BadgeTip key={badge} label={label} blurb={blurb}>
             <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
               <GlobalBadgeIcon badge={badge} className="size-5" user={user} />
             </span>
