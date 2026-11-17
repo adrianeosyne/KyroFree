@@ -1,0 +1,37 @@
+name: iOS simulator and archive
+on:
+  push:
+    branches: [main, codex/ios-app]
+    paths: ["mobile/ios/**", ".github/workflows/ios-build.yml"]
+  pull_request:
+    paths: ["mobile/ios/**", ".github/workflows/ios-build.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test-and-archive:
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test on iPhone simulator and archive for iOS
+        run: bash mobile/ios/scripts/ci-build.sh
+      - name: Upload simulator results and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyro-ios-test-results
+          path: |
+            mobile/ios/build/*.xcresult
+            mobile/ios/build/*.log
+          if-no-files-found: ignore
+      - name: Upload unsigned build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyro-ios-unsigned
+          path: |
+            mobile/ios/build/*.zip
+            mobile/ios/build/SHA256SUMS.txt

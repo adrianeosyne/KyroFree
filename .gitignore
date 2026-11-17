@@ -23,3 +23,16 @@ mobile/android/local.properties
 *.keystore
 *.apk
 *.aab
+
+# iOS generated files and Apple signing credentials stay local.
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/ExportOptions.local.plist
+mobile/ios/**/xcuserdata/
+*.xcarchive/
+*.ipa
+*.p12
+*.p8
+*.mobileprovision
+*.cer
+*.keychain-db
