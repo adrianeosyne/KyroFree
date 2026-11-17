@@ -275,6 +275,11 @@ final class KyroViewController: UIViewController, WKNavigationDelegate, WKUIDele
     }
 
     private func offerCompletedDownload() {
+        #if DEBUG
+        if pendingDownload != nil {
+            print("Kyro download completion appState=\(UIApplication.shared.applicationState.rawValue) modal=\(presentedViewController != nil) attached=\(view.window != nil)")
+        }
+        #endif
         guard UIApplication.shared.applicationState == .active,
               presentedViewController == nil, let file = pendingDownload else { return }
         pendingDownload = nil
@@ -324,19 +329,25 @@ final class KyroViewController: UIViewController, WKNavigationDelegate, WKUIDele
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
+        let isBlob = url.scheme?.lowercased() == "blob"
         let topLevel = navigationAction.targetFrame?.isMainFrame ?? true
         let trustedSource = NavigationPolicy.isKyro(webView.url) ||
             NavigationPolicy.isKyro(navigationAction.sourceFrame.request.url)
         #if DEBUG
+        print("Kyro navigation scheme=\(url.scheme ?? "none") downloadFlag=\(navigationAction.shouldPerformDownload) mainFrame=\(topLevel)")
         // Substitute-data HTML can have an opaque security origin. Exercise
         // the platform download handoff in tests independently of origin-policy
         // unit tests; this branch is completely absent from release builds.
-        if usesTestFixture && navigationAction.shouldPerformDownload && url.scheme?.lowercased() == "blob" {
+        if usesTestFixture && topLevel && isBlob {
+            print("Kyro fixture blob navigation handed to WKDownload")
             decisionHandler(.download)
             return
         }
         #endif
-        if navigationAction.shouldPerformDownload && navigationAction.sourceFrame.isMainFrame &&
+        // Treat own-origin blobs as files even when WebKit doesn't set the
+        // download flag. These URLs are never rendered as browser pages.
+        if (navigationAction.shouldPerformDownload || isBlob) && topLevel &&
+            navigationAction.sourceFrame.isMainFrame &&
             NavigationPolicy.isKyro(navigationAction.sourceFrame.request.url) &&
             NavigationPolicy.isKyro(webView.url) && NavigationPolicy.isDownloadURL(url) {
             decisionHandler(.download)
@@ -479,12 +490,14 @@ final class KyroViewController: UIViewController, WKNavigationDelegate, WKUIDele
     #if DEBUG
     private static let testHTML = """
     <!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1">
-    <style>body{font:20px system-ui;padding:24px;color:#17171f;background:#f5f6f9}h1{color:#6b4fe0}</style>
+    <style>body{font:20px system-ui;padding:24px;color:#17171f;background:#f5f6f9}h1{color:#6b4fe0}button,input{min-height:44px}</style>
     </head><body><h1>Kyro test page</h1><p>The native app is ready.</p>
     <label for="message">Message</label><input id="message" placeholder="Write a message">
     <p><button id="download" onclick="downloadFile()">Download test file</button></p>
+    <p id="download-status" aria-live="polite"></p>
     <script>
     function downloadFile() {
+      document.getElementById('download-status').textContent = 'Download requested';
       const url = URL.createObjectURL(new Blob(['Kyro download test'], {type: 'text/plain'}));
       const anchor = document.createElement('a');
       anchor.href = url; anchor.download = 'Kyro-test.txt';

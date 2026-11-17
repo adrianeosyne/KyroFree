@@ -29,12 +29,18 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     }
 
     func receive(_ download: WKDownload) {
+        #if DEBUG
+        print("Kyro WKDownload received")
+        #endif
         pending[ObjectIdentifier(download)] = Pending(download: download)
         download.delegate = self
     }
 
     func download(_ download: WKDownload, decideDestinationUsing response: URLResponse,
                   suggestedFilename: String, completionHandler: @escaping (URL?) -> Void) {
+        #if DEBUG
+        print("Kyro WKDownload destination requested")
+        #endif
         let key = ObjectIdentifier(download)
         guard pending[key] != nil else { completionHandler(nil); return }
         let folder = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -58,6 +64,9 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     }
 
     func downloadDidFinish(_ download: WKDownload) {
+        #if DEBUG
+        print("Kyro WKDownload finished")
+        #endif
         guard let file = pending.removeValue(forKey: ObjectIdentifier(download))?.destination else { return }
         guard FileManager.default.fileExists(atPath: file.path) else {
             onError?("The file could not be saved. Please try again.")
@@ -68,6 +77,10 @@ final class DownloadStore: NSObject, WKDownloadDelegate {
     }
 
     func download(_ download: WKDownload, didFailWithError error: Error, resumeData: Data?) {
+        #if DEBUG
+        let failure = error as NSError
+        print("Kyro WKDownload failed domain=\(failure.domain) code=\(failure.code)")
+        #endif
         if let file = pending.removeValue(forKey: ObjectIdentifier(download))?.destination {
             try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
         }

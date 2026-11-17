@@ -40,6 +40,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(button.waitForExistence(timeout: 15))
         button.tap()
         let ready = app.alerts["Download ready"]
+        // A fast completed download may already cover the web content with its alert.
+        XCTAssertTrue(app.webViews.staticTexts["Download requested"].waitForExistence(timeout: 3) || ready.exists)
         XCTAssertTrue(ready.waitForExistence(timeout: 20))
         XCTAssertTrue(ready.staticTexts["Kyro-test.txt"].exists)
         ready.buttons["Later"].tap()
