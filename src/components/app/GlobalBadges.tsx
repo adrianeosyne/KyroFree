@@ -74,6 +74,7 @@ export type GlobalBadgeKey =
   | "staff"
   | "trialstaff"
   | "verified"
+  | "verifiedserverowner"
   | "partner"
   | "donator"
   | "supporter"
@@ -129,6 +130,11 @@ export const GLOBAL_BADGE_META: Record<
     label: "Verified",
     blurb: "Verified by the Kyro team.",
     chip: "border-indigo-300/20 bg-[#151d32] text-indigo-100",
+  },
+  verifiedserverowner: {
+    label: "Verified Server Owner",
+    blurb: "Owns a server verified by the Kyro team.",
+    chip: "border-sky-300/30 bg-[#151d32] text-sky-100",
   },
   partner: {
     label: "Partner",
@@ -195,6 +201,7 @@ export const BADGE_PRIORITY: GlobalBadgeKey[] = [
   "staff",
   "trialstaff",
   "verified",
+  "verifiedserverowner",
   "partner",
   "donator",
   "supporter",
@@ -395,6 +402,10 @@ const BADGE_ART: Record<
   verified: {
     stops: ["#67e8f9", "#3b82f6", "#4f46e5"],
     edge: "#3730a3",
+  },
+  verifiedserverowner: {
+    stops: ["#7dd3fc", "#2563eb", "#4338ca"],
+    edge: "#1e3a8a",
   },
   bughunter: {
     stops: ["#c4b5fd", "#8b5cf6", "#4f46e5"],
@@ -614,6 +625,19 @@ export function GlobalBadgeIcon({
         </>
       )}
 
+      {badge === "verifiedserverowner" && (
+        <>
+          <path d="m6.7 11.2 5.3-4.1 5.3 4.1v5.4H6.7Z" fill={white} />
+          <path
+            d="m9.2 13.3 1.9 1.8 3.7-3.8"
+            fill="none"
+            stroke={art.edge}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </>
+      )}
       {badge === "verified" && (
         <>
           {/* scalloped seal with a gradient check over the white face */}

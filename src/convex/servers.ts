@@ -13,6 +13,8 @@ import { DEFAULT_EVERYONE_PERMISSIONS, PERMISSIONS } from "../lib/permissions";
 import {
   can,
   configuredFounderId,
+  isNonOwnerFounderRole,
+  isVerifiedServer,
   hydrateUsers,
   logAudit,
   MAX_BADGE_NOTIFICATIONS,
@@ -53,8 +55,13 @@ async function topPosition(
     .query("serverRoles")
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
+  const user = await ctx.db.get(member.userId);
   const positions = roles
-    .filter((role) => member.roleIds.includes(role._id))
+    .filter(
+      (role) =>
+        member.roleIds.includes(role._id) &&
+        (!user || !isNonOwnerFounderRole(server, user, role)),
+    )
     .map((role) => role.position);
   return positions.length > 0 ? Math.max(...positions) : 0;
 }
@@ -156,6 +163,7 @@ export const listMine = query({
           id: server._id as string,
           name: server.name,
           iconUrl,
+          verified: isVerifiedServer(server),
           memberCount,
           muted: membership.muted === true,
           isOwner: server.ownerId === id,
@@ -233,6 +241,7 @@ export const discover = query({
             id: server._id as string,
             name: server.name,
             description: server.description ?? null,
+            verified: isVerifiedServer(server),
             iconUrl,
             bannerUrl,
             tags: server.tags ?? [],
@@ -404,9 +413,7 @@ export const get = query({
       welcomeMessage: access.server.welcomeMessage ?? null,
       isPublic: access.server.isPublic,
       isPlatformHome: access.server.isPlatformHome === true,
-      verified:
-        access.server.isPlatformHome === true ||
-        access.server.verified === true,
+      verified: isVerifiedServer(access.server),
       ownerId: access.server.ownerId as string,
       iconUrl,
       bannerUrl,
@@ -478,7 +485,9 @@ export const members = query({
           .map((roleId) => roleMap.get(roleId))
           .filter(
             (role): role is NonNullable<typeof role> =>
-              Boolean(role) && (!role?.premiumRole || hasPremium(user)),
+              Boolean(role) &&
+              (!role?.premiumRole || hasPremium(user)) &&
+              !isNonOwnerFounderRole(access.server, user, role!),
           )
           .sort((a, b) => a.position - b.position);
         const top =
@@ -1622,6 +1631,19 @@ export const updateMemberRoles = mutation({
     const cleaned = Array.from(new Set(roleIds)).filter((roleId) =>
       valid.has(roleId),
     );
+    const targetUser = await ctx.db.get(userId);
+    if (
+      targetUser &&
+      serverRoles.some(
+        (role) =>
+          cleaned.includes(role._id) &&
+          isNonOwnerFounderRole(access.server, targetUser, role),
+      )
+    ) {
+      throw new Error(
+        "The Founder role is only available in servers this account owns.",
+      );
+    }
     const highestAssignable = cleaned
       .map(
         (roleId) =>

@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { VerifiedCommunityBadge } from "./VerifiedCommunityBadge";
 
 type Discovery = {
   id: string;
@@ -20,6 +21,7 @@ type Discovery = {
   createdAt: number;
   isJoined: boolean;
   applyToJoin: boolean;
+  verified?: boolean;
 };
 
 /**
@@ -219,7 +221,10 @@ function ServerCard({
       </div>
 
       <div className="flex flex-1 flex-col px-4 pt-8 pb-3">
-        <h2 className="truncate text-base font-semibold">{server.name}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="truncate text-base font-semibold">{server.name}</h2>
+          {server.verified && <VerifiedCommunityBadge className="size-5" />}
+        </div>
         <p className="mt-1 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
           {server.description || "No description yet."}
         </p>

@@ -1,6 +1,7 @@
 import "@vly-ai/integrations";
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import { AppLoading } from "@/components/AppLoading";
 import { SiteMotion } from "@/components/SiteMotion";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
@@ -148,6 +149,7 @@ createRoot(document.getElementById("root")!).render(
         </ToolbarErrorBoundary>
       )}
       <ConvexAuthProvider client={convex}>
+        <PresenceHeartbeat />
         <BrowserRouter>
           <RouteSyncer />
           <MobileDownloadBanner floating />

@@ -9,6 +9,7 @@ export default defineConfig({
       "tests/io/**/*.test.ts",
       "tests/email/**/*.spec.ts",
       "tests/legal/**/*.test.ts",
+      "tests/community/**/*.test.ts",
     ],
     environment: "node",
     testTimeout: 20000,

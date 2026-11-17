@@ -43,12 +43,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BUG_CATEGORY_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ServerVerificationAdmin } from "./ServerVerificationAdmin";
 
 type AdminTab =
   | "creatorReviews"
   | "premium"
   | "decorations"
   | "overview"
+  | "servers"
   | "badges"
   | "reports"
   | "bugs"
@@ -63,6 +65,7 @@ const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
   { id: "premium", label: "Premium", icon: ShieldCheck },
   { id: "decorations", label: "Decorations", icon: Check },
   { id: "overview", label: "Overview", icon: ShieldCheck },
+  { id: "servers", label: "Servers", icon: Globe },
   { id: "ips", label: "IP detector", icon: Globe },
   { id: "badges", label: "Badges", icon: Shield },
   { id: "reports", label: "Reports", icon: AlertTriangle },
@@ -261,6 +264,9 @@ export function AdminPortal() {
         {tab === "decorations" && me?.isPlatformStaff && <DecorationReview />}
         {tab === "creatorReviews" && <TrustReviewQueue />}
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
+        {tab === "servers" && (
+          <ServerVerificationAdmin canVerify={data.me.isFounder} />
+        )}
         {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (
           <BadgesTab isAdmin={data.me.isAdmin} isFounder={data.me.isFounder} />

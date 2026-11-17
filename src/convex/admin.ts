@@ -1,6 +1,12 @@
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, type MutationCtx } from "./functions";
+import {
+  internalMutation,
+  mutation,
+  query,
+  type MutationCtx,
+} from "./functions";
 import {
   isPresenceOnline,
   activeSiteBan,
@@ -8,10 +14,14 @@ import {
   globalBadgesFor,
   hydrateUsers,
   isFounderUser,
+  configuredFounderId,
+  isNonOwnerFounderRole,
+  isVerifiedServer,
   isPlatformAdmin,
   isPlatformStaff,
   isPlatformTrialStaff,
   isSyntheticUser,
+  ownsVerifiedServer,
   notify,
   platformRank,
   platformRoleFor,
@@ -105,6 +115,7 @@ type BadgeFlag =
   | "staff"
   | "trialstaff"
   | "verified"
+  | "verifiedserverowner"
   | "partner"
   | "donator"
   | "supporter"
@@ -113,8 +124,8 @@ type BadgeFlag =
   | "og";
 
 /** Mirrors hydrateUser's badge derivation so the portal agrees with profiles. */
-function badgeFlags(user: Doc<"users">): BadgeFlag[] {
-  return globalBadgesFor(user);
+async function badgeFlags(ctx: Ctx, user: Doc<"users">): Promise<BadgeFlag[]> {
+  return globalBadgesFor(user, await ownsVerifiedServer(ctx, user._id));
 }
 
 /** Everything the portal's Overview tab needs in one round trip. */
@@ -343,7 +354,7 @@ export const searchMembers = query({
           presence: user.status ?? "offline",
           isFounder: isFounder(user),
           isStaff: isStaff(user),
-          badges: badgeFlags(user),
+          badges: await badgeFlags(ctx, user),
           ban: ban
             ? {
                 id: ban._id as string,
@@ -649,6 +660,124 @@ export const deleteMessage = mutation({
       targetId: messageId,
       details: message.content.slice(0, 160),
     });
+  },
+});
+
+/** Search every community, including private servers, without joining it. */
+export const servers = query({
+  args: { term: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, { term, paginationOpts }) => {
+    const { id } = await requirePortalAccess(ctx);
+    const needle = term.trim();
+    const result = needle
+      ? await ctx.db
+          .query("servers")
+          .withSearchIndex("search_name", (q) => q.search("name", needle))
+          .paginate(paginationOpts)
+      : await ctx.db
+          .query("servers")
+          .withIndex("by_created")
+          .order("desc")
+          .paginate(paginationOpts);
+    const owners = await hydrateUsers(
+      ctx,
+      result.page.map((server) => server.ownerId),
+      id,
+    );
+    return {
+      ...result,
+      page: await Promise.all(
+        result.page.map(async (server) => ({
+          id: server._id as string,
+          name: server.name,
+          description: server.description ?? null,
+          isPublic: server.isPublic,
+          verified: isVerifiedServer(server),
+          isPlatformHome: server.isPlatformHome === true,
+          memberCount: await metricValue(ctx, `members:${server._id}`),
+          ownerName: owners.get(server.ownerId)?.name ?? "Unknown owner",
+          ownerUsername: owners.get(server.ownerId)?.username ?? null,
+        })),
+      ),
+    };
+  },
+});
+
+/** Only the configured founder may approve or revoke server verification. */
+export const setServerVerified = mutation({
+  args: { serverId: v.id("servers"), verified: v.boolean() },
+  handler: async (ctx, { serverId, verified }) => {
+    const { id, user } = await requireActiveUser(ctx);
+    if (!isFounderUser(user))
+      throw new Error("Only adrianeosyne can verify servers.");
+    const server = await ctx.db.get(serverId);
+    if (!server) throw new Error("That server no longer exists.");
+    if (server.isPlatformHome && !verified)
+      throw new Error("Kyro HQ verification is permanent.");
+    if (isVerifiedServer(server) === verified) return;
+    await ctx.db.patch(serverId, {
+      verified: verified || undefined,
+      verifiedAt: verified ? Date.now() : undefined,
+      verifiedById: verified ? id : undefined,
+    });
+    await logAction(ctx, {
+      actorId: id,
+      action: verified ? "verify_server" : "unverify_server",
+      targetType: "server",
+      targetId: serverId,
+      details: server.name,
+    });
+  },
+});
+
+/** One-time repair for existing assignments; other roles and real owners stay intact. */
+export const removeNonOwnerFounderRoles = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const founderId = configuredFounderId();
+    const founder = founderId
+      ? await ctx.db.get(founderId as Id<"users">)
+      : null;
+    const kyro = await ctx.db
+      .query("users")
+      .withIndex("by_username", (q) => q.eq("username", "kyro"))
+      .unique();
+    const accounts = [founder, kyro].filter(
+      (user): user is Doc<"users"> => user !== null,
+    );
+    let removed = 0;
+    for (const user of accounts) {
+      const memberships = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect();
+      for (const member of memberships) {
+        const server = await ctx.db.get(member.serverId);
+        if (!server || server.ownerId === user._id) continue;
+        const roles = await Promise.all(
+          member.roleIds.map((roleId) => ctx.db.get(roleId)),
+        );
+        const blocked = new Set(
+          roles
+            .filter((role) => role && isNonOwnerFounderRole(server, user, role))
+            .map((role) => role!._id),
+        );
+        if (!blocked.size) continue;
+        await ctx.db.patch(member._id, {
+          roleIds: member.roleIds.filter((roleId) => !blocked.has(roleId)),
+        });
+        removed += blocked.size;
+        if (founder)
+          await logAction(ctx, {
+            actorId: founder._id,
+            action: "remove_non_owner_founder_role",
+            targetType: "server",
+            targetId: server._id,
+            details: `${user.username ?? user.name}: ${server.name}`,
+          });
+      }
+    }
+    return { removed };
   },
 });
 

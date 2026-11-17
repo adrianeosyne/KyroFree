@@ -1,5 +1,5 @@
 import { WorkspaceAppearance } from "./WorkspaceStudio";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import {
   Bell,
   Home,
@@ -40,33 +40,12 @@ import { playNotificationPing, setNotificationSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 /**
- * Best-effort device class for the platform indicator. Tablet first, since
- * large Android/iPad tablets report neither `Mobile` nor a phone UA.
- */
-function detectDevice(): "desktop" | "mobile" | "tablet" {
-  if (typeof navigator === "undefined") return "desktop";
-  const ua = navigator.userAgent;
-  if (
-    /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
-    (/Android/i.test(ua) && !/Mobile/i.test(ua))
-  ) {
-    return "tablet";
-  }
-  if (/Mobi|Android|iPhone|iPod|Windows Phone|webOS|BlackBerry/i.test(ua)) {
-    return "mobile";
-  }
-  return "desktop";
-}
-
-/**
  * The application frame: community rail, channel sidebar and the routed
- * conversation area. It also owns global concerns — presence heartbeat,
- * keyboard shortcuts, search, the inbox and user settings.
+ * conversation area, keyboard shortcuts, search, the inbox and user settings.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
-  const heartbeat = useMutation(api.users.heartbeat);
   const unread = useQuery(
     api.notifications.unreadCount,
     isAuthenticated ? {} : "skip",
@@ -109,42 +88,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const settingsOpen = searchParams.get("settings") !== null;
   const isConversationView =
     Boolean(channelMatch) || location.pathname.startsWith("/dashboard/dm/");
-
-  // Presence heartbeat: keeps this account visible as online for others.
-  // Fires immediately, every 60s, and whenever the tab comes back to the
-  // foreground so idle background tabs never look offline to other people.
-  // Each tick also reports which device we're on, powering the platform
-  // indicator (phone / tablet / desktop) shown next to every profile.
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let inFlight = false;
-    let lastSent = 0;
-    const tick = () => {
-      const now = Date.now();
-      if (inFlight || now - lastSent < 45_000) return;
-      inFlight = true;
-      lastSent = now;
-      void heartbeat({ device: detectDevice() })
-        .catch(() => {
-          lastSent = 0;
-        })
-        .finally(() => {
-          inFlight = false;
-        });
-    };
-    tick();
-    const interval = window.setInterval(tick, 60_000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") tick();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", tick);
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", tick);
-    };
-  }, [heartbeat, isAuthenticated]);
 
   // Mention ping: only direct mentions/replies make a sound. Unlike the old
   // unread counter this also works while the tab is visible, Discord-style.

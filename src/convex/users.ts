@@ -10,6 +10,8 @@ import {
   hydrateUsers,
   getUserByUsername,
   isFounderUser,
+  isNonOwnerFounderRole,
+  ownsVerifiedServer,
   isPlatformAdmin,
   isPlatformStaff,
   isPlatformTrialStaff,
@@ -64,6 +66,7 @@ const PROFILE_BADGES = [
   "staff",
   "trialstaff",
   "verified",
+  "verifiedserverowner",
   "partner",
   "donator",
   "supporter",
@@ -331,7 +334,9 @@ export const updateProfile = mutation({
       }
       if (args.primaryBadge !== "none") {
         // You can only wear a badge the same derivation gives you everywhere.
-        const held = new Set<string>(globalBadgesFor(user));
+        const held = new Set<string>(
+          globalBadgesFor(user, await ownsVerifiedServer(ctx, id)),
+        );
         if (!held.has(args.primaryBadge)) {
           throw new Error("You don't hold that badge.");
         }
@@ -671,13 +676,20 @@ export const profile = query({
     let serverRoles: { id: string; name: string; color: string | null }[] = [];
     let serverJoinedAt: number | null = null;
     if (serverId && viewerServerMembership && profileServerMembership) {
+      const profileServer = await ctx.db.get(serverId);
       const roleDocs = await ctx.db
         .query("serverRoles")
         .withIndex("by_server", (q) => q.eq("serverId", serverId))
         .collect();
       const held = new Set(profileServerMembership.roleIds);
       serverRoles = roleDocs
-        .filter((role) => held.has(role._id) && !role.isDefault)
+        .filter(
+          (role) =>
+            held.has(role._id) &&
+            !role.isDefault &&
+            (profileServer === null ||
+              !isNonOwnerFounderRole(profileServer, publicUser, role)),
+        )
         .sort((a, b) => b.position - a.position)
         .map((role) => ({
           id: role._id as string,

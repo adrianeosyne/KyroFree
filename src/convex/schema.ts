@@ -450,10 +450,13 @@ const schema = defineSchema(
       isPlatformHome: v.optional(v.boolean()),
       /** Staff-approved community shown with the verified seal. */
       verified: v.optional(v.boolean()),
+      verifiedAt: v.optional(v.number()),
+      verifiedById: v.optional(v.id("users")),
       createdAt: v.number(),
       updatedAt: v.optional(v.number()),
     })
       .index("by_owner", ["ownerId"])
+      .index("by_owner_verified", ["ownerId", "verified"])
       .index("by_created", ["createdAt"])
       .index("by_vanity", ["vanityCode"])
       .index("by_platform_home", ["isPlatformHome"])

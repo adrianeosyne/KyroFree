@@ -14,11 +14,10 @@ export type Ctx = QueryCtx | MutationCtx;
 
 /**
  * A user is considered online if they heartbeated within this window.
- * The client heartbeats every 60s, so this comfortably survives a couple of
- * missed ticks (background tab throttling, flaky networks) before dropping
- * someone to offline.
+ * Allow for background timer throttling and brief reconnects. A disconnected
+ * account still expires; explicit offline/invisible choices remain private.
  */
-export const PRESENCE_TIMEOUT_MS = 150_000;
+export const PRESENCE_TIMEOUT_MS = 300_000;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_ATTACHMENTS = 6;
@@ -261,6 +260,7 @@ export type GlobalBadge =
   | "staff"
   | "trialstaff"
   | "verified"
+  | "verifiedserverowner"
   | "partner"
   | "donator"
   | "supporter"
@@ -347,7 +347,10 @@ export function isPlatformFounder(user: PlatformUser): boolean {
  * Every platform badge a user currently holds, in display order. This is the
  * single source of truth for profiles, the Admin Portal and badge selection.
  */
-export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
+export function globalBadgesFor(
+  user: Doc<"users">,
+  verifiedServerOwner = false,
+): GlobalBadge[] {
   const isFounder = isFounderUser(user);
   const badges: GlobalBadge[] = [];
   if (hasPremium(user) && !user.hidePremiumBadge) badges.push("premium");
@@ -370,6 +373,7 @@ export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   if (user.staff === true) badges.push("staff");
   if (user.trialStaff === true) badges.push("trialstaff");
   if (user.verified === true) badges.push("verified");
+  if (verifiedServerOwner) badges.push("verifiedserverowner");
   if (user.partner === true) badges.push("partner");
   if (user.donator === true) badges.push("donator");
   if (user.supporter === true) badges.push("supporter");
@@ -377,6 +381,45 @@ export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   if (user.bugHunter === true) badges.push("bughunter");
   if (user.og === true || user.hqOg === true) badges.push("og");
   return badges;
+}
+
+export function isVerifiedServer(
+  server: Pick<Doc<"servers">, "verified" | "isPlatformHome">,
+): boolean {
+  return server.isPlatformHome === true || server.verified === true;
+}
+
+/** Derived from current ownership so transfers, deletion and revocation stay correct. */
+export async function ownsVerifiedServer(ctx: Ctx, userId: Id<"users">) {
+  const verified = await ctx.db
+    .query("servers")
+    .withIndex("by_owner_verified", (q) =>
+      q.eq("ownerId", userId).eq("verified", true),
+    )
+    .first();
+  if (verified) return true;
+  const home = await ctx.db
+    .query("servers")
+    .withIndex("by_platform_home", (q) => q.eq("isPlatformHome", true))
+    .filter((q) => q.eq(q.field("ownerId"), userId))
+    .first();
+  return home !== null;
+}
+
+/** Platform identity does not make either account a founder of another server. */
+export function isNonOwnerFounderRole(
+  server: Pick<Doc<"servers">, "ownerId">,
+  user: { _id?: string; id?: string; username?: string | null },
+  role: Pick<Doc<"serverRoles">, "name" | "isDefault">,
+): boolean {
+  const userId = user._id ?? user.id;
+  return (
+    !role.isDefault &&
+    server.ownerId !== userId &&
+    role.name.trim().toLowerCase() === "founder" &&
+    (userId === configuredFounderId() ||
+      user.username?.toLowerCase() === "kyro")
+  );
 }
 
 /**
@@ -416,7 +459,7 @@ export async function hydrateUser(
     (user.showPresence !== false &&
       user.status !== "invisible" &&
       user.status !== "offline");
-  const badges = globalBadgesFor(user);
+  const badges = globalBadgesFor(user, await ownsVerifiedServer(ctx, user._id));
   return {
     premiumUntil: user.premiumUntil ?? null,
     premiumSince: user.premiumSince ?? null,
@@ -596,13 +639,32 @@ export async function getServerAccess(
 ): Promise<ServerAccess | null> {
   const server = await ctx.db.get(serverId);
   if (!server) return null;
-  const member = await ctx.db
+  let member = await ctx.db
     .query("serverMembers")
     .withIndex("by_server_user", (q) =>
       q.eq("serverId", serverId).eq("userId", userId),
     )
     .unique();
   if (!member) return null;
+  const user = await ctx.db.get(userId);
+  if (
+    user &&
+    server.ownerId !== userId &&
+    (userId === configuredFounderId() || user.username === "kyro")
+  ) {
+    const assigned = await Promise.all(
+      member.roleIds.map((roleId) => ctx.db.get(roleId)),
+    );
+    const blocked = new Set(
+      assigned
+        .filter((role) => role && isNonOwnerFounderRole(server, user, role))
+        .map((role) => role!._id),
+    );
+    member = {
+      ...member,
+      roleIds: member.roleIds.filter((roleId) => !blocked.has(roleId)),
+    };
+  }
   return {
     server,
     member,
@@ -644,7 +706,13 @@ export async function permissionsFor(
     ),
   ];
   const permissions = new Set<string>();
+  const user = roles.some(
+    (role) => role.name.trim().toLowerCase() === "founder",
+  )
+    ? await ctx.db.get(member.userId)
+    : null;
   for (const role of roles) {
+    if (user && isNonOwnerFounderRole(server, user, role)) continue;
     if (role.isDefault || member.roleIds.includes(role._id)) {
       for (const permission of role.permissions) permissions.add(permission);
     }
