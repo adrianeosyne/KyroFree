@@ -3522,9 +3522,12 @@ function DataTab() {
       const anchor = document.createElement("a");
       anchor.href = url;
       anchor.download = `kyro-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
       anchor.click();
-      URL.revokeObjectURL(url);
-      toast.success("Your data export has downloaded");
+      anchor.remove();
+      // WebKit hands this URL to the native download asynchronously.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success("Your data export is ready to save");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Export failed.");
     } finally {

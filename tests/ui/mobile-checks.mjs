@@ -141,10 +141,69 @@ export async function checkMobile(browser) {
         { exact: true },
       ),
     ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Kyro for iOS", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "View iOS source", exact: true }),
+    ).toHaveAttribute(
+      "href",
+      "https://github.com/adrianeosyne/KyroFree/tree/main/mobile/ios",
+    );
+    await expect(
+      page.getByRole("link", { name: "Install with Xcode", exact: true }),
+    ).toHaveAttribute("href", /mobile\/ios#build-and-test$/);
+    for (const download of await page
+      .getByRole("link", { name: "Download iOS project", exact: true })
+      .all()) {
+      await expect(download).toHaveAttribute(
+        "href",
+        "https://github.com/adrianeosyne/KyroFree/releases/download/ios-v1.0.0/Kyro-iOS-1.0.0-source.zip",
+      );
+    }
+    for (const width of [320, 390, 430, 768]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+        `iOS download page fits ${width}px`,
+      );
+    }
   } finally {
     await iphone.close();
   }
+
+  const nativeIOS = await browser.newContext({
+    ...devices["iPhone 13"],
+    userAgent: `${devices["iPhone 13"].userAgent} KyroIOS/1.0.0`,
+  });
+  try {
+    const page = await nativeIOS.newPage();
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    await page.goto(`${base}/dashboard/chats`);
+    await expect(
+      page.getByRole("heading", { name: "Messages." }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("complementary", {
+        name: "Install Kyro on your phone",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    await page.goto(`${base}/auth`);
+    await expect(
+      page.getByRole("complementary", {
+        name: "Install Kyro on your phone",
+        exact: true,
+      }),
+    ).toHaveCount(0);
+    assert.deepEqual(errors, []);
+  } finally {
+    await nativeIOS.close();
+  }
   console.log(
-    "PASS: Android browser prompt, source and APK links, native suppression, mobile messages/search/unread/back, 320–430px layouts and iPhone web installation",
+    "PASS: Android browser prompt, source and APK links, native Android/iOS suppression, mobile messages/search/unread/back, phone layouts and iPhone web installation and iOS source links",
   );
 }

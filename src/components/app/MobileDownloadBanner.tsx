@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Download as ArrowDownToLine, X } from "@/components/icons";
 import { KyroMark } from "@/components/KyroMark";
-import { isAndroidApp, mobilePlatform } from "@/lib/mobile";
+import { isNativeMobileApp, mobilePlatform } from "@/lib/mobile";
 
 const DISMISS_KEY = "kyro.mobileDownload.dismissedUntil";
 
@@ -22,7 +22,7 @@ export function MobileDownloadBanner({
   });
   if (
     !platform ||
-    isAndroidApp() ||
+    isNativeMobileApp() ||
     dismissed ||
     pathname === "/download" ||
     floating === pathname.startsWith("/dashboard")
