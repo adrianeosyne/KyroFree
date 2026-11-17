@@ -3,6 +3,7 @@ import { Bell, PanelRight, Search } from "@/components/icons";
 import { api } from "@/convex/_generated/api";
 import { useUiStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 export function WorkspaceActions({
   showMemberToggle = false,
@@ -17,6 +18,11 @@ export function WorkspaceActions({
   const setSearchOpen = useUiStore((state) => state.setSearchOpen);
   const setInboxOpen = useUiStore((state) => state.setInboxOpen);
   const toggleMemberList = useUiStore((state) => state.toggleMemberList);
+  const memberListOpen = useUiStore((state) => state.memberListOpen);
+  const mobileMemberListOpen = useUiStore(
+    (state) => state.mobileMemberListOpen,
+  );
+  const narrow = useMediaQuery("(max-width: 1023px)");
 
   const button =
     "relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground";
@@ -60,6 +66,8 @@ export function WorkspaceActions({
         <button
           type="button"
           aria-label="Toggle member list"
+          aria-expanded={narrow ? mobileMemberListOpen : memberListOpen}
+          aria-controls="channel-member-list"
           title="Toggle member list"
           onClick={toggleMemberList}
           className={button}

@@ -9,6 +9,7 @@ const person = (id, name, presence, customStatus = null) => ({
   customStatus,
   avatarUrl: null,
   badges: [],
+  links: [],
   hasUsername: true,
   device: "desktop",
 });
@@ -226,6 +227,13 @@ export function useQuery(reference, args) {
     );
   if (name === "conversations:get")
     return conversations.find((c) => c.id === args.conversationId) ?? null;
+  if (name === "users:profile")
+    return {
+      user: [me, ...friends].find((user) => user.id === args.userId),
+      serverRoles: [],
+      mutualFriends: [],
+      mutualServers: [],
+    };
   if (name === "users:search")
     return friends.filter((p) =>
       p.name.toLowerCase().includes((args.term ?? "").toLowerCase()),

@@ -306,8 +306,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
       toast.success(
         kind === "icon" ? "Server icon updated." : "Banner updated.",
       );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       setUploading(null);
     }
@@ -721,7 +719,7 @@ export function ServerSettings({ serverId }: { serverId: string }) {
                 )}
               </div>
               <div className="mt-4">
-                <div className="h-24 w-full overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand to-cyan">
+                <div className="aspect-[16/5] w-full overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand to-cyan">
                   {server.bannerUrl && (
                     <img
                       src={server.bannerUrl}
@@ -1346,7 +1344,6 @@ export function ServerSettings({ serverId }: { serverId: string }) {
             aspect={cropRequest.kind === "icon" ? 1 : 16 / 5}
             outputWidth={cropRequest.kind === "icon" ? 512 : 1600}
             outputHeight={cropRequest.kind === "icon" ? 512 : 500}
-            rounded={cropRequest.kind === "icon"}
             onCancel={() => setCropRequest(null)}
             onComplete={async (file) => {
               await uploadImage(cropRequest.kind, file);

@@ -133,7 +133,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
           // or stealing focus away mid-sentence.
           onKeyDown={(event) => event.stopPropagation()}
         >
-          <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,#111827,#27378f_62%,#4f5dff)]">
+          <div className="relative aspect-[3/1] overflow-hidden bg-[linear-gradient(135deg,#111827,#27378f_62%,#4f5dff)]">
             {me.bannerUrl ? (
               <img
                 src={me.bannerUrl}

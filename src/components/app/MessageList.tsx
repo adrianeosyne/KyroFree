@@ -876,6 +876,8 @@ function MessageRow({
             "message-row group relative rounded-xl px-3 py-1.5 transition-colors hover:bg-panel/45",
             grouped ? "mt-0 py-0.5" : "mt-1.5",
           )}
+          tabIndex={0}
+          aria-label={`Message from ${author?.name ?? message.botName ?? "Unknown"}`}
         >
           <div className="flex gap-3">
             <div className="w-10 shrink-0">

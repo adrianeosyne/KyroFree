@@ -6,6 +6,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import assert from "node:assert/strict";
 import { checkSettings } from "../tests/ui/settings-checks.mjs";
+import { checkMediaAndMobile } from "../tests/ui/media-mobile-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -36,6 +37,7 @@ const server = await createServer({
   },
   server: { host: "127.0.0.1", port: 5187, strictPort: true },
   optimizeDeps: {
+    entries: ["tests/ui/index.html"],
     include: ["react", "react-dom/client", "react/jsx-runtime", "react-router"],
   },
 });
@@ -48,6 +50,16 @@ const browser = await chromium.launch({
     "--use-fake-ui-for-media-stream",
   ],
 });
+if (process.argv.includes("--media-mobile")) {
+  try {
+    await checkMediaAndMobile(browser);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
+
 const context = await browser.newContext({
   viewport: { width: 1440, height: 960 },
   reducedMotion: "reduce",
@@ -279,6 +291,7 @@ try {
     "Voice preview fits phone",
   );
   assert.deepEqual(errors, []);
+  await checkMediaAndMobile(browser);
   console.log(
     "PASS: favorites persistence, keyboard switcher, appearance controls, friend and unread filters, isolated replies and drafts, reconnect banner, responsive layouts, discovery filters, communities and voice preview",
   );

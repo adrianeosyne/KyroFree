@@ -197,7 +197,7 @@ function ServerCard({
       aria-label={server.name}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-panel transition-all hover:-translate-y-1 hover:border-primary/30 hover:shadow-xl hover:shadow-black/5"
     >
-      <div className="relative h-32 bg-gradient-to-br from-brand/40 via-brand/15 to-cyan/30">
+      <div className="relative aspect-[16/5] bg-gradient-to-br from-brand/40 via-brand/15 to-cyan/30">
         {server.bannerUrl && (
           <img
             src={server.bannerUrl}

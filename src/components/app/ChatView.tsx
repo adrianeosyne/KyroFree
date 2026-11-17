@@ -26,6 +26,14 @@ import {
 import { toast } from "sonner";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
 import { useUiStore } from "@/lib/store";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 type SurfaceProps = {
   containerType: "channel" | "conversation";
@@ -316,6 +324,16 @@ export function ChannelChat({
     serverId: serverId as Id<"servers">,
   });
   const memberListOpen = useUiStore((state) => state.memberListOpen);
+  const mobileMemberListOpen = useUiStore(
+    (state) => state.mobileMemberListOpen,
+  );
+  const setMobileMemberList = useUiStore((state) => state.setMobileMemberList);
+  const narrow = useMediaQuery("(max-width: 1023px)");
+
+  useEffect(() => {
+    setMobileMemberList(false);
+    return () => setMobileMemberList(false);
+  }, [serverId, channelId, narrow, setMobileMemberList]);
 
   if (channels === undefined) {
     return <CenteredNote>Loading channel…</CenteredNote>;
@@ -399,7 +417,22 @@ export function ChannelChat({
           allowMassMentions={allowMassMentions}
         />
       </div>
-      {memberListOpen && <MemberList serverId={serverId} />}
+      {!narrow && memberListOpen && <MemberList serverId={serverId} />}
+      {narrow && (
+        <Sheet open={mobileMemberListOpen} onOpenChange={setMobileMemberList}>
+          <SheetContent side="right" className="w-[min(22rem,90vw)] gap-0 p-0">
+            <SheetHeader className="shrink-0 border-b border-border/70 pr-12 text-left">
+              <SheetTitle>Members</SheetTitle>
+              <SheetDescription>People in this community</SheetDescription>
+            </SheetHeader>
+            <MemberList
+              serverId={serverId}
+              mobile
+              onOpenProfile={() => setMobileMemberList(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

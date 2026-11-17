@@ -1514,7 +1514,8 @@ function ProfilePreviewCard({
     <section className="overflow-hidden rounded-2xl border border-border/70 bg-surface shadow-sm">
       <div
         className={cn(
-          "relative h-36 overflow-hidden sm:h-52",
+          "relative overflow-hidden",
+          me.bannerUrl ? "aspect-[3/1]" : "h-36 sm:h-52",
           !me.bannerUrl && "bg-gradient-to-br",
           !me.bannerUrl &&
             (PROFILE_THEMES.find((theme) => theme.id === me.profileTheme)
@@ -1739,8 +1740,6 @@ function ProfileTab() {
       );
       toast.success(avatar ? "Avatar updated" : "Banner updated");
       setCropRequest(null);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Upload failed.");
     } finally {
       if (avatar) setUploading(false);
       else setUploadingBanner(false);
@@ -1839,7 +1838,7 @@ function ProfileTab() {
             <div className="p-4 sm:p-5">
               <FieldRow label="Banner">
                 <div className="mt-3 flex flex-wrap items-center gap-4">
-                  <div className="h-16 w-44 overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand/80 to-cyan/80">
+                  <div className="aspect-[3/1] w-44 overflow-hidden rounded-lg border border-border/70 bg-gradient-to-br from-brand/80 to-cyan/80">
                     {me.bannerUrl && (
                       <img
                         src={me.bannerUrl}
@@ -2641,7 +2640,8 @@ function ProfilePreviewPane({
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(
-            "relative h-20",
+            "relative",
+            me.bannerUrl ? "aspect-[3/1]" : "h-20",
             !me.bannerUrl && "bg-gradient-to-r",
             !me.bannerUrl &&
               (themeEntry?.gradient ?? "from-brand/70 via-brand/40 to-cyan/50"),

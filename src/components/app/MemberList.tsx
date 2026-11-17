@@ -36,6 +36,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { PresenceState } from "@/lib/format";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 type Member = {
   user: {
@@ -68,7 +69,15 @@ type Member = {
 };
 
 /** Right-hand roster for a community. Clicking someone opens their profile. */
-export function MemberList({ serverId }: { serverId: string }) {
+export function MemberList({
+  serverId,
+  mobile = false,
+  onOpenProfile,
+}: {
+  serverId: string;
+  mobile?: boolean;
+  onOpenProfile?: () => void;
+}) {
   const data = useQuery(api.servers.members, {
     serverId: serverId as Id<"servers">,
   });
@@ -94,6 +103,7 @@ export function MemberList({ serverId }: { serverId: string }) {
   const navigate = useNavigate();
 
   const openProfile = (userId: string) => {
+    onOpenProfile?.();
     setParams((previous) => {
       const next = new URLSearchParams(previous);
       next.set("previewUser", userId);
@@ -120,7 +130,16 @@ export function MemberList({ serverId }: { serverId: string }) {
 
   if (data === undefined) {
     return (
-      <aside className="hidden w-[20.5rem] shrink-0 border-l border-border/70 bg-panel p-4 text-sm text-muted-foreground lg:block">
+      <aside
+        id="channel-member-list"
+        aria-label="Member list"
+        className={cn(
+          "bg-panel p-4 text-sm text-muted-foreground",
+          mobile
+            ? "min-h-0 flex-1"
+            : "hidden w-[20.5rem] shrink-0 border-l border-border/70 lg:block",
+        )}
+      >
         Loading members…
       </aside>
     );
@@ -379,11 +398,22 @@ export function MemberList({ serverId }: { serverId: string }) {
 
   return (
     <>
-      <aside className="hidden w-[20.5rem] shrink-0 flex-col border-l border-border/70 bg-panel lg:flex">
-        <div
-          aria-hidden
-          className="h-[3.75rem] shrink-0 border-b border-border/70"
-        />
+      <aside
+        id="channel-member-list"
+        aria-label="Member list"
+        className={cn(
+          "min-h-0 flex-col bg-panel",
+          mobile
+            ? "flex flex-1"
+            : "hidden w-[20.5rem] shrink-0 border-l border-border/70 lg:flex",
+        )}
+      >
+        {!mobile && (
+          <div
+            aria-hidden
+            className="h-[3.75rem] shrink-0 border-b border-border/70"
+          />
+        )}
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
           {[...groupedOnline.entries()].map(([label, members]) => (
             <section key={label} className="mb-4 last:mb-0">

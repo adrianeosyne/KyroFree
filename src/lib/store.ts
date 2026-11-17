@@ -176,6 +176,7 @@ export function applyPreferences(prefs: Preferences) {
 interface AppState extends Preferences {
   mobileNavOpen: boolean;
   memberListOpen: boolean;
+  mobileMemberListOpen: boolean;
   searchOpen: boolean;
   inboxOpen: boolean;
   drafts: Record<string, string>;
@@ -185,6 +186,7 @@ interface AppState extends Preferences {
   ) => void;
   setMobileNav: (open: boolean) => void;
   toggleMemberList: () => void;
+  setMobileMemberList: (open: boolean) => void;
   setSearchOpen: (open: boolean) => void;
   setInboxOpen: (open: boolean) => void;
   setDraft: (key: string, value: string) => void;
@@ -222,6 +224,7 @@ const initial = loadPrefs();
 export const useUiStore = create<AppState>((set, get) => ({
   ...initial,
   memberListOpen: initial.showMemberList,
+  mobileMemberListOpen: false,
   mobileNavOpen: false,
   searchOpen: false,
   inboxOpen: false,
@@ -237,8 +240,12 @@ export const useUiStore = create<AppState>((set, get) => ({
     } as Partial<AppState>);
   },
   setMobileNav: (open) => set({ mobileNavOpen: open }),
+  setMobileMemberList: (open) => set({ mobileMemberListOpen: open }),
   toggleMemberList: () =>
     set((state) => {
+      if (window.matchMedia("(max-width: 1023px)").matches) {
+        return { mobileMemberListOpen: !state.mobileMemberListOpen };
+      }
       const next = { ...state, showMemberList: !state.showMemberList };
       persist(pickPrefs(next));
       return {
@@ -251,7 +258,12 @@ export const useUiStore = create<AppState>((set, get) => ({
   setDraft: (key, value) =>
     set((state) => ({ drafts: { ...state.drafts, [key]: value } })),
   reset: () =>
-    set({ mobileNavOpen: false, searchOpen: false, inboxOpen: false }),
+    set({
+      mobileNavOpen: false,
+      mobileMemberListOpen: false,
+      searchOpen: false,
+      inboxOpen: false,
+    }),
 }));
 
 if (typeof window !== "undefined") {

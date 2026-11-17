@@ -94,7 +94,7 @@ export function UserPreviewPanel() {
 
         {user ? (
           <>
-            <div className="relative z-10 h-36 shrink-0 overflow-hidden bg-zinc-950">
+            <div className="relative z-10 aspect-[3/1] shrink-0 overflow-hidden bg-zinc-950">
               {user.bannerUrl ? (
                 <img
                   src={user.bannerUrl}

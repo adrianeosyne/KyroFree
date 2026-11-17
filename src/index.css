@@ -444,6 +444,8 @@ html[data-tint] {
   /* Message hover toolbar: hidden until the row is hovered or focused. */
   .message-row .message-toolbar {
     opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
     transition: opacity 120ms ease;
   }
   .message-row {
@@ -569,14 +571,20 @@ html[data-tint] {
       opacity: 0.45;
     }
   }
-  .message-row:hover .message-toolbar,
-  .message-row:focus-within .message-toolbar {
-    opacity: 1;
-  }
-  @media (hover: none) {
-    .message-row .message-toolbar {
+  @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+    .message-row:hover .message-toolbar,
+    .message-row:focus-within .message-toolbar {
       opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
     }
+  }
+  /* Touch uses the message context menu's long press gesture. */
+  .message-row:focus-visible .message-toolbar,
+  .message-row:has(:focus-visible) .message-toolbar {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
   }
   /* Interface density, set from Appearance settings. */
   [data-density="compact"] .message-row {

@@ -199,7 +199,7 @@ export function ProfileCard() {
             <div className="grid h-full min-h-0 md:grid-cols-[31rem_minmax(0,1fr)]">
               <div className="min-h-0 overflow-y-auto border-r border-border/70 bg-background">
                 {/* Banner is the top edge of the card — the avatar overlaps it. */}
-                <div className="relative h-40 w-full overflow-hidden bg-zinc-950 sm:h-44">
+                <div className="relative aspect-[3/1] w-full overflow-hidden bg-zinc-950">
                   {user.bannerUrl ? (
                     <img
                       src={user.bannerUrl}

@@ -194,7 +194,9 @@ function ServerSection({ serverId }: { serverId: string }) {
       <div
         className={cn(
           "sticky top-0 z-10 overflow-hidden border-b border-border/70 bg-sidebar",
-          server.bannerUrl ? "h-48 bg-cover bg-center" : "h-14",
+          server.bannerUrl
+            ? "aspect-[16/5] min-h-14 bg-cover bg-center"
+            : "h-14",
         )}
         style={
           server.bannerUrl
