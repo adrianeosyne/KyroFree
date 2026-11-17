@@ -11,12 +11,14 @@ import {
   Code,
 } from "@/components/icons";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
+import { IOSInstallGuide } from "@/components/app/IOSInstallGuide";
 import {
   ANDROID_DOWNLOAD_URL,
   ANDROID_SOURCE_URL,
   ANDROID_VERSION,
   IOS_BUILD_GUIDE_URL,
   IOS_DOWNLOAD_URL,
+  IOS_INSTALL_URL,
   IOS_SOURCE_URL,
   IOS_VERSION,
   mobilePlatform,
@@ -74,7 +76,9 @@ export default function DownloadPage() {
                 platform === "android"
                   ? ANDROID_DOWNLOAD_URL
                   : platform === "ios"
-                    ? IOS_DOWNLOAD_URL
+                    ? installed
+                      ? "/dashboard"
+                      : IOS_INSTALL_URL
                     : WINDOWS_DOWNLOAD_URL
               }
               className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-violet-400 px-6 font-bold text-[#171320] transition hover:bg-violet-300 sm:w-auto"
@@ -83,7 +87,9 @@ export default function DownloadPage() {
               {platform === "android"
                 ? "Download Kyro for Android"
                 : platform === "ios"
-                  ? "Download iOS project"
+                  ? installed
+                    ? "Open Kyro"
+                    : "Install Kyro on iPhone"
                   : "Download for Windows"}
             </a>
             <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-400">
@@ -209,19 +215,20 @@ export default function DownloadPage() {
             <Smartphone className="mb-5 size-7 text-violet-300" />
             <h2 className="text-xl font-bold">Kyro for iOS</h2>
             <p className="mt-2 text-xs text-slate-400">
-              iPhone and iPad · iOS 16+ · Version {IOS_VERSION}
+              iPhone and iPad · Install directly from Safari
             </p>
             <p className="mt-4 text-sm leading-6 text-slate-400">
-              Your existing chats, with native navigation, file sharing and
-              camera and microphone access.
+              Keep your chats and communities on your home screen. Install using
+              just your iPhone or iPad, with no computer needed.
             </p>
-            <a
-              href={IOS_DOWNLOAD_URL}
+            <Link
+              to={installed ? "/dashboard" : IOS_INSTALL_URL}
               className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-bold"
             >
               <Download className="size-4" />
-              Download iOS project
-            </a>
+              {installed ? "Open Kyro" : "Install on iPhone or iPad"}
+            </Link>
+            <IOSInstallGuide compact className="mt-4" />
             <a
               href={IOS_SOURCE_URL}
               className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-violet-300"
@@ -230,20 +237,20 @@ export default function DownloadPage() {
               View iOS source
             </a>
             <p className="mt-2 text-xs leading-5 text-slate-500">
-              Free Apple ID and Xcode Personal Team. Build on a Mac and install
-              on your own iPhone or iPad. This ZIP contains source code.
+              In Safari, use Share → Add to Home Screen. Kyro gets its own app
+              icon and window. No developer account or signing renewal needed.
             </p>
+            <a
+              href={IOS_DOWNLOAD_URL}
+              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-violet-300"
+            >
+              Native source project · {IOS_VERSION}
+            </a>
             <a
               href={IOS_BUILD_GUIDE_URL}
               className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-violet-300"
             >
-              Install with Xcode
-            </a>
-            <a
-              href="#web-app"
-              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-violet-300"
-            >
-              Add the web app to your home screen
+              Native developer build guide
             </a>
           </article>
           <article className="rounded-3xl border border-white/10 bg-white/[.025] p-6">

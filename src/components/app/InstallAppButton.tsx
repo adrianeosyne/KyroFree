@@ -2,10 +2,12 @@ import { useSyncExternalStore } from "react";
 import { Link } from "react-router";
 import { Download, MonitorSmartphone } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { IOSInstallGuide } from "@/components/app/IOSInstallGuide";
 import {
   ANDROID_DOWNLOAD_URL,
   ANDROID_SOURCE_URL,
   isAndroidApp,
+  mobilePlatform,
 } from "@/lib/mobile";
 import {
   getInstallState,
@@ -19,6 +21,19 @@ export function InstallAppButton() {
     getInstallState,
     getInstallState,
   );
+
+  if (mobilePlatform() === "ios") {
+    return (
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <p className="text-sm font-semibold">Kyro on your iPhone or iPad</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Your conversations in their own window, straight from your home
+          screen.
+        </p>
+        <IOSInstallGuide compact className="mt-3" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

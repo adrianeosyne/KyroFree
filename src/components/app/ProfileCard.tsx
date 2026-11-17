@@ -190,7 +190,7 @@ export function ProfileCard() {
           "data-[state=closed]:duration-0",
           // Radix's close button floats over the banner — keep it legible on
           // every banner (including bright photos) with a translucent coin.
-          "[&>button[data-slot=dialog-close]]:right-4 [&>button[data-slot=dialog-close]]:top-4 [&>button[data-slot=dialog-close]]:rounded-full [&>button[data-slot=dialog-close]]:bg-black/45 [&>button[data-slot=dialog-close]]:p-1.5 [&>button[data-slot=dialog-close]]:text-white [&>button[data-slot=dialog-close]]:opacity-90 [&>button[data-slot=dialog-close]]:shadow-sm [&>button[data-slot=dialog-close]]:hover:bg-black/65 [&>button[data-slot=dialog-close]]:hover:opacity-100",
+          "[&>button[data-slot=dialog-close]]:right-4 [&>button[data-slot=dialog-close]]:top-4 [&>button[data-slot=dialog-close]]:z-20 [&>button[data-slot=dialog-close]]:rounded-full [&>button[data-slot=dialog-close]]:bg-black/45 [&>button[data-slot=dialog-close]]:p-1.5 [&>button[data-slot=dialog-close]]:text-white [&>button[data-slot=dialog-close]]:opacity-90 [&>button[data-slot=dialog-close]]:shadow-sm [&>button[data-slot=dialog-close]]:hover:bg-black/65 [&>button[data-slot=dialog-close]]:hover:opacity-100",
         )}
       >
         <ProfileDecorationLayer
