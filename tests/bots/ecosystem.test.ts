@@ -199,6 +199,7 @@ describe("developer ecosystem integration", () => {
       size: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex"),
     });
+    if (typeof ticket === "string") throw new Error("Expected a managed upload reservation.");
     const storageId = await f.t.run((ctx) =>
       ctx.storage.store(new Blob([bytes], { type: "text/plain" })),
     );
@@ -233,6 +234,7 @@ describe("developer ecosystem integration", () => {
     const f = await fixture();
     const input = { name: "tiny.txt", size: 8, sha256: "a".repeat(64) };
     const ticket = await f.owner.mutation(api.files.generateUploadUrl, input);
+    if (typeof ticket === "string") throw new Error("Expected a managed upload reservation.");
     await expect(
       f.owner.mutation(api.files.generateUploadUrl, input),
     ).rejects.toThrow(/quota/);
@@ -417,6 +419,7 @@ describe("developer ecosystem integration", () => {
       size: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex"),
     });
+    if (typeof ticket === "string") throw new Error("Expected a managed upload reservation.");
     const storageId = await f.t.run((ctx) =>
       ctx.storage.store(new Blob([bytes])),
     );
@@ -458,6 +461,7 @@ describe("developer ecosystem integration", () => {
       size: bytes.length,
       sha256: createHash("sha256").update(bytes).digest("hex"),
     });
+    if (typeof ticket === "string") throw new Error("Expected a managed upload reservation.");
     const storageId = await f.t.run((ctx) =>
       ctx.storage.store(new Blob([bytes])),
     );

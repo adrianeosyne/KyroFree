@@ -16,6 +16,7 @@ import {
   requireUser,
 } from "./lib";
 import { deleteChannelData } from "./cleanup";
+import { canUsePremiumLounge } from "./premiumBenefits";
 
 const CHANNEL_NAME = /^[a-z0-9][a-z0-9-_]{0,99}$/i;
 
@@ -158,8 +159,13 @@ export const list = query({
             ),
       ]),
     );
-    const visibleChannels = channels.filter((channel) =>
-      (effective.get(channel._id) ?? []).includes(PERMISSIONS.VIEW_CHANNEL),
+    const loungeAllowed = await canUsePremiumLounge(ctx, id);
+    const visibleChannels = channels.filter(
+      (channel) =>
+        (!access.server.isPlatformHome ||
+          !channel.premiumOnly ||
+          loungeAllowed) &&
+        (effective.get(channel._id) ?? []).includes(PERMISSIONS.VIEW_CHANNEL),
     );
 
     return {

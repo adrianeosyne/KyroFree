@@ -1,5 +1,14 @@
-import { useMutation, useQuery } from "convex/react";
-import { Bell, Home, Loader2, Menu, Search, User } from "@/components/icons";
+import { WorkspaceAppearance } from "./WorkspaceStudio";
+import { useQuery } from "convex/react";
+import {
+  Bell,
+  Home,
+  Menu,
+  Search,
+  User,
+  MessageCircle,
+} from "@/components/icons";
+import { AppLoading } from "@/components/AppLoading";
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   useLocation,
@@ -11,6 +20,7 @@ import { api } from "@/convex/_generated/api";
 import { ClaimUsername } from "@/components/app/ClaimUsername";
 import { Inbox } from "@/components/app/Inbox";
 import { ProfileCard } from "@/components/app/ProfileCard";
+import { PremiumGiftNotice } from "@/components/app/PremiumGiftNotice";
 import { UserPreviewPanel } from "@/components/app/UserPreviewPanel";
 import { SearchOverlay } from "@/components/app/SearchOverlay";
 import { ServerRail } from "@/components/app/ServerRail";
@@ -18,42 +28,25 @@ import { SettingsDialog } from "@/components/app/Settings";
 import { Sidebar } from "@/components/app/Sidebar";
 import { IncomingCallBanner } from "@/components/app/Voice";
 import { ConnectionBanner } from "@/components/app/ConnectionBanner";
+import { PremiumExpiryBanner } from "@/components/app/PremiumExpiryBanner";
 import { QuickAppearance } from "@/components/app/QuickAppearance";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
+import { UserAvatar } from "@/components/app/UserAvatar";
 import { KyroMark } from "@/components/KyroMark";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
 import { useUiStore } from "@/lib/store";
-import { playNotificationPing } from "@/lib/sound";
+import { playNotificationPing, setNotificationSound } from "@/lib/sound";
 import { cn } from "@/lib/utils";
 
 /**
- * Best-effort device class for the platform indicator. Tablet first, since
- * large Android/iPad tablets report neither `Mobile` nor a phone UA.
- */
-function detectDevice(): "desktop" | "mobile" | "tablet" {
-  if (typeof navigator === "undefined") return "desktop";
-  const ua = navigator.userAgent;
-  if (
-    /iPad|Tablet|PlayBook|Silk/i.test(ua) ||
-    (/Android/i.test(ua) && !/Mobile/i.test(ua))
-  ) {
-    return "tablet";
-  }
-  if (/Mobi|Android|iPhone|iPod|Windows Phone|webOS|BlackBerry/i.test(ua)) {
-    return "mobile";
-  }
-  return "desktop";
-}
-
-/**
  * The application frame: community rail, channel sidebar and the routed
- * conversation area. It also owns global concerns — presence heartbeat,
- * keyboard shortcuts, search, the inbox and user settings.
+ * conversation area, keyboard shortcuts, search, the inbox and user settings.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isLoading, isAuthenticated } = useAuth();
   const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
-  const heartbeat = useMutation(api.users.heartbeat);
+  const privacyStatus = useQuery(api.privacyControls.status, isAuthenticated ? {} : "skip");
   const unread = useQuery(
     api.notifications.unreadCount,
     isAuthenticated ? {} : "skip",
@@ -63,6 +56,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     isAuthenticated ? {} : "skip",
   );
   const mentionCount = mentionSummary?.count;
+  useEffect(() => {
+    setNotificationSound(me?.notificationSoundUrl ?? null);
+    return () => setNotificationSound(null);
+  }, [me?.notificationSoundUrl]);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,50 +77,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const voiceMatch = useMatch("/dashboard/s/:serverId/v/:channelId");
   const forumMatch = useMatch("/dashboard/s/:serverId/f/:channelId");
   const serverSettingsMatch = useMatch("/dashboard/s/:serverId/settings/*");
+  const lobbyMatch = useMatch("/dashboard/s/:serverId/lobby");
   const serverMatch = useMatch("/dashboard/s/:serverId");
+  const serverToolsMatch = useMatch("/dashboard/s/:serverId/*");
   const activeServerId =
     channelMatch?.params.serverId ??
     voiceMatch?.params.serverId ??
     forumMatch?.params.serverId ??
     serverSettingsMatch?.params.serverId ??
-    serverMatch?.params.serverId;
+    lobbyMatch?.params.serverId ??
+    serverMatch?.params.serverId ??
+    serverToolsMatch?.params.serverId;
   const settingsOpen = searchParams.get("settings") !== null;
-
-  // Presence heartbeat: keeps this account visible as online for others.
-  // Fires immediately, every 60s, and whenever the tab comes back to the
-  // foreground so idle background tabs never look offline to other people.
-  // Each tick also reports which device we're on, powering the platform
-  // indicator (phone / tablet / desktop) shown next to every profile.
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let inFlight = false;
-    let lastSent = 0;
-    const tick = () => {
-      const now = Date.now();
-      if (inFlight || now - lastSent < 45_000) return;
-      inFlight = true;
-      lastSent = now;
-      void heartbeat({ device: detectDevice() })
-        .catch(() => {
-          lastSent = 0;
-        })
-        .finally(() => {
-          inFlight = false;
-        });
-    };
-    tick();
-    const interval = window.setInterval(tick, 60_000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") tick();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", tick);
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", tick);
-    };
-  }, [heartbeat, isAuthenticated]);
+  const isConversationView =
+    Boolean(channelMatch) || location.pathname.startsWith("/dashboard/dm/");
 
   // Mention ping: only direct mentions/replies make a sound. Unlike the old
   // unread counter this also works while the tab is visible, Discord-style.
@@ -176,11 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [location.pathname, location.search, setMobileNav]);
 
   if (isLoading || !user) {
-    return (
-      <div className="flex h-dvh items-center justify-center bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <AppLoading label="Opening your space" />;
   }
 
   // Onboarding gate: Kyro needs a unique handle before you can talk.
@@ -204,11 +167,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         ? "Developer portal"
         : location.pathname.startsWith("/dashboard/bots")
           ? "Bot directory"
-          : location.pathname === "/dashboard"
-            ? "Friends"
-            : activeServerId
-              ? "Community"
-              : "Direct Messages";
+          : location.pathname === "/dashboard/chats"
+            ? "Messages"
+            : location.pathname === "/dashboard"
+              ? "Friends"
+              : activeServerId
+                ? "Community"
+                : "Direct Messages";
 
   return (
     <div className="kyro-app-shell flex h-dvh w-full flex-col overflow-hidden bg-background text-foreground">
@@ -253,25 +218,38 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </button>
       </div>
+      <WorkspaceAppearance />
       <ConnectionBanner />
+      <PremiumExpiryBanner premiumUntil={me?.premiumUntil} />
       <div className="flex min-h-0 flex-1">
         <div className="hidden md:flex">{rail}</div>
         <div className="hidden md:flex">{sidebar}</div>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 bg-panel/90 px-2 backdrop-blur-xl md:hidden">
+          <header
+            className={cn(
+              "mobile-app-header h-16 shrink-0 items-center gap-3 px-4 md:hidden",
+              isConversationView ? "hidden" : "flex",
+            )}
+          >
             <button
               type="button"
               aria-label="Open navigation"
-              className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+              className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border/60 bg-panel text-muted-foreground active:bg-primary/10"
               onClick={() => setMobileNav(true)}
             >
               <Menu className="size-5" />
             </button>
 
-            <span className="flex min-w-0 flex-1 items-center gap-2 text-sm font-bold">
-              <KyroMark className="size-6" /> Kyro
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-base font-extrabold tracking-tight">
+                <KyroMark className="size-5" /> kyro
+                <span className="text-primary">.</span>
+              </span>
+              <p className="truncate text-[10px] font-medium text-muted-foreground">
+                {desktopTitle}
+              </p>
+            </div>
 
             <div className="ml-auto flex items-center gap-1">
               <QuickAppearance />
@@ -279,7 +257,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 aria-label="Search Kyro"
                 onClick={() => setSearchOpen(true)}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                className="grid size-11 place-items-center rounded-2xl text-muted-foreground active:bg-panel"
               >
                 <Search className="size-5" />
               </button>
@@ -287,7 +265,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 type="button"
                 aria-label="Inbox"
                 onClick={() => setInboxOpen(!inboxOpen)}
-                className="relative rounded-lg p-1.5 text-muted-foreground hover:bg-surface hover:text-foreground"
+                className="relative grid size-11 place-items-center rounded-2xl text-muted-foreground active:bg-panel"
               >
                 <Bell className="size-5" />
                 {(unread ?? 0) > 0 && (
@@ -298,19 +276,42 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </div>
           </header>
+          <MobileDownloadBanner />
 
-          <main className="min-h-0 flex-1 bg-background">{children}</main>
+          <main className="min-h-0 flex-1 bg-background">
+            <div
+              key={location.pathname}
+              className="kyro-view-enter h-full min-h-0"
+            >
+              {privacyStatus?.frozen && <div role="status" className="border-b bg-muted px-4 py-2 text-xs">Your account is frozen. Open Settings → Security to unfreeze with your password.</div>}
+          {children}
+            </div>
+          </main>
 
           {/* Phone-first dock: large touch targets, safe-area padding and one
             thumb-reachable route to every core surface. Account/status tools
             remain in the navigation sheet's UserBar. */}
-          <nav className="grid shrink-0 grid-cols-5 border-t border-border/70 bg-panel/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur md:hidden">
+          <nav
+            aria-label="Mobile navigation"
+            className={cn(
+              "mobile-dock shrink-0 grid-cols-5 md:hidden",
+              isConversationView ? "hidden" : "grid",
+            )}
+          >
             {[
               {
                 label: "Home",
                 icon: Home,
                 active: location.pathname === "/dashboard",
                 action: () => navigate("/dashboard"),
+              },
+              {
+                label: "Chats",
+                icon: MessageCircle,
+                active:
+                  location.pathname === "/dashboard/chats" ||
+                  location.pathname.includes("/dashboard/dm/"),
+                action: () => navigate("/dashboard/chats"),
               },
               {
                 label: "Servers",
@@ -325,12 +326,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                 action: () => setInboxOpen(true),
               },
               {
-                label: "Search",
-                icon: Search,
-                active: searchOpen,
-                action: () => setSearchOpen(true),
-              },
-              {
                 label: "You",
                 icon: User,
                 active: settingsOpen,
@@ -341,14 +336,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={entry.label}
                 type="button"
                 onClick={entry.action}
+                aria-pressed={entry.active}
                 className={cn(
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] font-medium transition-colors",
+                  "flex min-h-14 flex-col items-center justify-center gap-1 rounded-2xl text-[10px] font-semibold transition-colors",
                   entry.active
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground active:bg-surface active:text-foreground",
                 )}
               >
-                <entry.icon className="size-5" />
+                {entry.label === "You" && me ? (
+                  <UserAvatar user={me} size="xs" />
+                ) : (
+                  <entry.icon className="size-5" />
+                )}
                 {entry.label}
               </button>
             ))}
@@ -360,7 +360,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNav}>
         <SheetContent
           side="left"
-          className="w-[92vw] max-w-sm gap-0 border-r-border/70 p-0"
+          className="mobile-navigation-sheet w-[94vw] max-w-sm gap-0 rounded-r-3xl border-r-border/70 p-0"
         >
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <div className="flex h-full">
@@ -373,6 +373,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
       <Inbox open={inboxOpen} onOpenChange={setInboxOpen} />
       <SettingsDialog
+        initialTab={
+          searchParams.get("settings") === "1"
+            ? "account"
+            : (searchParams.get("settings") ?? "account")
+        }
         open={settingsOpen}
         onOpenChange={(open: boolean) => {
           if (!open) {
@@ -385,6 +390,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Profile popups are opened by adding ?user=<id> anywhere in the app. */}
       <UserPreviewPanel />
       <ProfileCard />
+      <PremiumGiftNotice
+        defer={
+          settingsOpen ||
+          inboxOpen ||
+          searchOpen ||
+          mobileNavOpen ||
+          searchParams.has("user") ||
+          searchParams.has("previewUser")
+        }
+      />
       {/* A ringing DM call surfaces over every view of the app. */}
       <IncomingCallBanner />
     </div>

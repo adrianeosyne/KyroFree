@@ -22,6 +22,7 @@ import { useQuery } from "convex/react";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { PremiumPrice } from "@/components/PremiumPrice";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 28 },
@@ -552,7 +553,9 @@ export default function Landing() {
               <KyroWordmark className="text-white [&_span]:font-black" />
             </Link>
             <nav className="mx-auto hidden items-center gap-7 text-sm font-bold text-white/85 lg:flex">
-              <Link className="transition hover:text-white" to="/download">Download</Link>
+              <Link className="transition hover:text-white" to="/download">
+                Download
+              </Link>
               <a className="transition hover:text-white" href="#features">
                 Features
               </a>
@@ -603,7 +606,8 @@ export default function Landing() {
               </h1>
               <p className="mx-auto mt-7 max-w-2xl text-pretty text-base leading-7 text-white/80 sm:text-xl sm:leading-8">
                 Group chat, voice rooms, forums, bots and community tools in one
-                place built for hanging out—not upgrading a subscription.
+                place with free core features and optional Premium for{" "}
+                <PremiumPrice suffix=" per month" showOfferLabel />.
               </p>
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
@@ -663,11 +667,13 @@ export default function Landing() {
             Made for the group chat
           </p>
           <h2 className="mt-5 text-balance text-4xl font-black uppercase leading-[0.92] tracking-[-0.045em] text-[#17182b] sm:text-6xl lg:text-7xl">
-            Hang out without hitting a paywall
+            Hang out free. Get more with Premium.
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-[#606378] sm:text-lg sm:leading-8">
-            Every member gets the same chat, voice, moderation and customization
-            tools. No premium rooms. No feature gates. No awkward upgrade pitch.
+            Chat, voice, moderation and everyday customization stay free.
+            Optional Premium adds bigger uploads, sharper screen sharing and a
+            studio to make Kyro yours for{" "}
+            <PremiumPrice suffix=" per month" showOfferLabel />.
           </p>
         </Reveal>
       </section>
@@ -863,7 +869,9 @@ export default function Landing() {
                 Product
               </p>
               <div className="mt-4 space-y-3 text-sm text-white/60">
-                <Link className="block hover:text-white" to="/download">Download for Windows</Link>
+                <Link className="block hover:text-white" to="/download">
+                  Download for Windows
+                </Link>
                 <a className="block hover:text-white" href="#features">
                   Features
                 </a>
@@ -915,8 +923,13 @@ export default function Landing() {
             </div>
           </div>
           <div className="flex flex-col gap-3 pt-8 text-xs text-white/60 sm:flex-row sm:items-center sm:justify-between">
-            <p>© {new Date().getFullYear()} Kyro. Built for belonging.</p>
-            <p>No premium tier. No paywalled features. No fine print.</p>
+            <p>
+              © {new Date().getFullYear()} Adrian Eosyne. All rights reserved.
+            </p>
+            <p>
+              Free core features. Optional Premium:{" "}
+              <PremiumPrice suffix="/month" showOfferLabel />.
+            </p>
           </div>
         </div>
       </footer>

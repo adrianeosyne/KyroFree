@@ -721,7 +721,10 @@ export const execute = internalMutation({
             )
             .order("desc")
             .paginate({ numItems: query.limit, cursor: query.cursor ?? null });
-          const rows = page.page;
+          const rows = page.page.filter(
+            (message) =>
+              message.expiresAt === undefined || message.expiresAt > Date.now(),
+          );
           return {
             messages: await Promise.all(
               rows.map((m) => messageDto(ctx, m, app.botUserId)),

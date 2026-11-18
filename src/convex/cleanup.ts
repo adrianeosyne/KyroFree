@@ -2,12 +2,26 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./functions";
 import { deleteClaimedUpload } from "./uploadSecurity";
 import { queueBotEvent } from "./botEvents";
+import { queueCleanup } from "./advancedLifecycle";
 
 /** Delete a message and every object that exists only because it exists. */
 export async function deleteMessageData(
   ctx: MutationCtx,
   message: Doc<"messages">,
 ): Promise<void> {
+  await queueCleanup(ctx, { kind: "message", id: message._id });
+  if (message.containerType === "conversation") {
+    const conversation = await ctx.db.get(
+      message.containerId as Id<"conversations">,
+    );
+    if (
+      conversation?.lastMessageAt === message.createdAt &&
+      conversation.lastMessageSenderId === message.authorId
+    )
+      await ctx.db.patch(conversation._id, {
+        lastMessagePreview: "Message removed",
+      });
+  }
   const reactions = await ctx.db
     .query("reactions")
     .withIndex("by_message", (q) => q.eq("messageId", message._id))
@@ -54,6 +68,11 @@ async function deleteContainerMetadata(
   containerType: "channel" | "conversation",
   containerId: string,
 ): Promise<void> {
+  await queueCleanup(ctx, {
+    kind: "container",
+    id: containerId,
+    containerType,
+  });
   const [sessions, signals, typing, reads, notifications] = await Promise.all([
     ctx.db
       .query("voiceSessions")
@@ -154,6 +173,7 @@ export async function deleteServerData(
   server: Doc<"servers">,
 ): Promise<void> {
   const serverId = server._id;
+  await queueCleanup(ctx, { kind: "server", id: serverId });
   await queueBotEvent(ctx, serverId, "server.deleted", { id: serverId });
   const [
     channels,
@@ -264,6 +284,40 @@ export async function deleteServerData(
     "server_banner",
     serverId,
   );
+  const events = await ctx.db
+    .query("communityEvents")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const event of events) {
+    const attendees = await ctx.db
+      .query("eventAttendees")
+      .withIndex("by_event", (q) => q.eq("eventId", event._id))
+      .collect();
+    for (const row of attendees) await ctx.db.delete(row._id);
+    await ctx.db.delete(event._id);
+  }
+  const tickets = await ctx.db
+    .query("supportTickets")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const row of tickets) await ctx.db.delete(row._id);
+  const charges = await ctx.db
+    .query("serverSupercharges")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  for (const row of charges) await ctx.db.delete(row._id);
+  for (const table of [
+    "serverLobbies",
+    "lobbyFeed",
+    "serverActivity",
+    "serverInviteCredits",
+  ] as const) {
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_server", (q) => q.eq("serverId", serverId))
+      .collect();
+    for (const row of rows) await ctx.db.delete(row._id);
+  }
   await ctx.db.delete(serverId);
 }
 

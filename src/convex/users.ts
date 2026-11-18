@@ -1,3 +1,6 @@
+import { requireReadAccess } from "./messages";
+import { queueCleanup } from "./advancedLifecycle";
+import { AVATAR_FRAMES } from "../lib/frames";
 import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -8,6 +11,8 @@ import {
   hydrateUsers,
   getUserByUsername,
   isFounderUser,
+  isNonOwnerFounderRole,
+  ownsVerifiedServer,
   isPlatformAdmin,
   isPlatformStaff,
   isPlatformTrialStaff,
@@ -16,6 +21,7 @@ import {
   normalizeUsername,
   platformRoleFor,
   requireActiveUser,
+  blockedUserIds,
   requireUser,
   USERNAME_PATTERN,
 } from "./lib";
@@ -52,6 +58,7 @@ const USERNAME_COOLDOWN_MS = 60 * 60 * 1000;
 
 /** Inline badge choices in the profile editor: a held badge, or none. */
 const PROFILE_BADGES = [
+  "premium",
   "none",
   "founder",
   "cofounder",
@@ -308,7 +315,7 @@ export const updateProfile = mutation({
     }
     if (args.avatarFrame !== undefined) {
       // Keep in sync with AVATAR_FRAMES in src/lib/frames.ts.
-      const knownFrames = ["ember", "aqua", "forest", "kyro", "gold", "rose"];
+      const knownFrames = AVATAR_FRAMES.map((frame) => frame.id);
       patch.avatarFrame =
         args.avatarFrame && knownFrames.includes(args.avatarFrame)
           ? args.avatarFrame
@@ -330,7 +337,9 @@ export const updateProfile = mutation({
       }
       if (args.primaryBadge !== "none") {
         // You can only wear a badge the same derivation gives you everywhere.
-        const held = new Set<string>(globalBadgesFor(user));
+        const held = new Set<string>(
+          globalBadgesFor(user, await ownsVerifiedServer(ctx, id)),
+        );
         if (!held.has(args.primaryBadge)) {
           throw new Error("You don't hold that badge.");
         }
@@ -670,13 +679,20 @@ export const profile = query({
     let serverRoles: { id: string; name: string; color: string | null }[] = [];
     let serverJoinedAt: number | null = null;
     if (serverId && viewerServerMembership && profileServerMembership) {
+      const profileServer = await ctx.db.get(serverId);
       const roleDocs = await ctx.db
         .query("serverRoles")
         .withIndex("by_server", (q) => q.eq("serverId", serverId))
         .collect();
       const held = new Set(profileServerMembership.roleIds);
       serverRoles = roleDocs
-        .filter((role) => held.has(role._id) && !role.isDefault)
+        .filter(
+          (role) =>
+            held.has(role._id) &&
+            !role.isDefault &&
+            (profileServer === null ||
+              !isNonOwnerFounderRole(profileServer, publicUser, role)),
+        )
         .sort((a, b) => b.position - a.position)
         .map((role) => ({
           id: role._id as string,
@@ -702,12 +718,26 @@ export const searchUsers = query({
     const { id: viewerId } = await requireUser(ctx);
     const needle = normalizeUsername(term);
     if (!needle) return [];
-    const results = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) =>
-        q.gte("username", needle).lt("username", needle + "\uffff"),
-      )
-      .take(Math.min(limit ?? 12, 25));
+    const cap = Math.max(1, Math.min(limit ?? 12, 25));
+    const [handles, names] = await Promise.all([
+      ctx.db
+        .query("users")
+        .withIndex("by_username", (q) =>
+          q.gte("username", needle).lt("username", needle + "\uffff"),
+        )
+        .take(cap),
+      ctx.db
+        .query("users")
+        .withSearchIndex("search_name", (q) =>
+          q.search("name", term.trim().slice(0, 64)).eq("deletedAt", undefined),
+        )
+        .take(cap),
+    ]);
+    const results = [
+      ...new Map(
+        [...handles, ...names].map((user) => [user._id, user]),
+      ).values(),
+    ].slice(0, cap);
     const users = await hydrateUsers(
       ctx,
       results.map((u) => u._id),
@@ -759,7 +789,14 @@ export const searchMessages = query({
         .query("channels")
         .withIndex("by_server", (q) => q.eq("serverId", membership.serverId))
         .collect();
-      for (const channel of channels) channelIds.add(channel._id);
+      for (const channel of channels) {
+        try {
+          await requireReadAccess(ctx, viewerId, "channel", channel._id);
+          channelIds.add(channel._id);
+        } catch {
+          /* A membership does not grant every channel. */
+        }
+      }
     }
     const conversationIds = new Set(conversations.map((c) => c.conversationId));
     conversationIds.forEach((id) => channelIds.add(id));
@@ -802,9 +839,11 @@ export const searchMessages = query({
     const has = filters.get("has");
     const pinned = filters.get("pinned");
     const mentions = filters.get("mentions");
+    const blockedAuthors = await blockedUserIds(ctx, viewerId);
     const allowed = [];
     for (const message of hits) {
-      if (!channelIds.has(message.containerId)) continue;
+      if (!channelIds.has(message.containerId) || blockedAuthors.has(message.authorId) || (message.expiresAt && message.expiresAt <= Date.now())) continue;
+      if (inName && message.containerType !== "channel") continue;
       if (fromName && message.authorId !== fromUser?._id) continue;
       if (!Number.isNaN(before) && message.createdAt >= before) continue;
       if (!Number.isNaN(after) && message.createdAt < after) continue;
@@ -996,6 +1035,40 @@ export const exportData = mutation({
     );
 
     const payload = {
+      creatorAndBotReviews: await ctx.db
+        .query("trustRequests")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      hidePremiumBadge: user.hidePremiumBadge === true,
+      premiumUntil: user.premiumUntil ?? null,
+      premiumSince: user.premiumSince ?? null,
+      premiumStreakSince: user.premiumStreakSince ?? null,
+      premiumBadgeTier: user.premiumBadgeTier ?? null,
+      premiumGiftCount: user.premiumGiftCount ?? 0,
+      activity: await ctx.db
+        .query("serverActivity")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect(),
+      level: await ctx.db
+        .query("playerLevels")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .unique(),
+      workspace: await ctx.db
+        .query("workspaces")
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .unique(),
+      decorationSubmissions: await ctx.db
+        .query("communityDecorations")
+        .withIndex("by_owner", (q) => q.eq("ownerId", id))
+        .collect(),
+      premiumRequests: await ctx.db
+        .query("premiumRequests")
+        .withIndex("by_requester", (q) => q.eq("requesterId", id))
+        .collect(),
+      supportTickets: await ctx.db
+        .query("supportTickets")
+        .withIndex("by_owner", (q) => q.eq("ownerId", id))
+        .collect(),
       exportedAt: new Date().toISOString(),
       profile: {
         username: user.username,
@@ -1006,6 +1079,7 @@ export const exportData = mutation({
         customStatus: user.customStatus,
         createdAt: user.createdAt,
         emailChangedAt: user.emailChangedAt,
+        legalAcceptance: user.legalAcceptance ?? null,
       },
       friends: friendDocs
         .filter((doc): doc is Doc<"users"> => Boolean(doc))
@@ -1217,18 +1291,7 @@ export const deleteAccount = mutation({
     );
     for (const caseId of caseIds) await ctx.db.delete(caseId);
 
-    const ownMessages = await ctx.db
-      .query("messages")
-      .withIndex("by_author", (q) => q.eq("authorId", id))
-      .take(5000);
-    for (const message of ownMessages) {
-      const reactions = await ctx.db
-        .query("reactions")
-        .withIndex("by_message", (q) => q.eq("messageId", message._id))
-        .collect();
-      for (const reaction of reactions) await ctx.db.delete(reaction._id);
-      await ctx.db.delete(message._id);
-    }
+    await queueCleanup(ctx, { kind: "user", id });
 
     for (const session of sessions) {
       const tokens = await ctx.db
@@ -1239,6 +1302,83 @@ export const deleteAccount = mutation({
       await ctx.db.delete(session._id);
     }
     for (const account of accounts) await ctx.db.delete(account._id);
+    await deleteClaimedUpload(
+      ctx,
+      user.notificationSoundStorageId,
+      "notification_sound",
+      id,
+    );
+    const workspaces = await ctx.db
+      .query("workspaces")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .collect();
+    for (const row of workspaces) {
+      await deleteClaimedUpload(
+        ctx,
+        row.backgroundStorageId,
+        "workspace_background",
+        row._id,
+      );
+      await deleteClaimedUpload(
+        ctx,
+        row.backgroundPosterStorageId,
+        "workspace_background_poster",
+        row._id,
+      );
+      await deleteClaimedUpload(
+        ctx,
+        row.cursorStorageId,
+        "workspace_cursor",
+        row._id,
+      );
+      await ctx.db.delete(row._id);
+    }
+    for (const table of [
+      "playerLevels",
+      "serverActivity",
+      "premiumCodeAttempts",
+      "accountRecoveryTokens",
+      "accountRecoveryRequests",
+    ] as const) {
+      const rows = await ctx.db
+        .query(table)
+        .withIndex("by_user", (q) => q.eq("userId", id))
+        .collect();
+      for (const row of rows) await ctx.db.delete(row._id);
+    }
+    const decorations = await ctx.db
+      .query("communityDecorations")
+      .withIndex("by_owner", (q) => q.eq("ownerId", id))
+      .collect();
+    for (const row of decorations) {
+      await deleteClaimedUpload(ctx, row.storageId, "decoration", row._id);
+      await ctx.db.delete(row._id);
+    }
+    const attendees = await ctx.db
+      .query("eventAttendees")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .collect();
+    for (const row of attendees) await ctx.db.delete(row._id);
+    const tickets = await ctx.db
+      .query("supportTickets")
+      .withIndex("by_owner", (q) => q.eq("ownerId", id))
+      .collect();
+    for (const row of tickets) await ctx.db.delete(row._id);
+    const charges = await ctx.db
+      .query("serverSupercharges")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .collect();
+    for (const row of charges) await ctx.db.delete(row._id);
+    const reviews = await ctx.db
+      .query("trustRequests")
+      .withIndex("by_user", (q) => q.eq("userId", id))
+      .collect();
+    for (const row of reviews) await ctx.db.delete(row._id);
+    const payments = await ctx.db
+      .query("premiumRequests")
+      .withIndex("by_requester", (q) => q.eq("requesterId", id))
+      .collect();
+    for (const row of payments) await ctx.db.delete(row._id);
     await deleteClaimedUpload(ctx, user.avatarStorageId, "user_avatar", id);
     await deleteClaimedUpload(ctx, user.bannerStorageId, "user_banner", id);
     await ctx.db.delete(id);

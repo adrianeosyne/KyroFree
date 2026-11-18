@@ -252,7 +252,9 @@ export async function checkAdminPortal(page) {
       await expect(
         page.getByRole("heading", { name: "Admin Portal", exact: true }),
       ).toBeVisible();
-      await expect(nav.getByRole("button")).toHaveCount(9);
+      await expect(nav.getByRole("button")).toHaveCount(11);
+      await expect(nav.getByRole("button", { name: "Servers", exact: true })).toBeVisible();
+      await expect(nav.getByRole("button", { name: "Creator & bot reviews", exact: true })).toBeVisible();
       for (const [tab, expected] of [
         ["Overview", "Your staff identity"],
         ["IP detector", "192.0.2.1"],

@@ -10,7 +10,13 @@
 
 import type { ApiFromModules, FilterApi, FunctionReference } from "convex/server";
 import { anyApi } from "convex/server";
+import type * as accountRecovery from "../accountRecovery.js";
+import type * as activityLib from "../activityLib.js";
 import type * as admin from "../admin.js";
+import type * as advancedLifecycle from "../advancedLifecycle.js";
+import type * as advancedMessages from "../advancedMessages.js";
+import type * as advancedSchema from "../advancedSchema.js";
+import type * as advancedValidation from "../advancedValidation.js";
 import type * as applications from "../applications.js";
 import type * as auth from "../auth.js";
 import type * as auth_config from "../auth.config.js";
@@ -35,8 +41,14 @@ import type * as botWebhooks from "../botWebhooks.js";
 import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
+import type * as collaboration from "../collaboration.js";
+import type * as communityDecorations from "../communityDecorations.js";
+import type * as communityHub from "../communityHub.js";
+import type * as communityKnowledge from "../communityKnowledge.js";
+import type * as communityMigration from "../communityMigration.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
+import type * as dataPortability from "../dataPortability.js";
 import type * as developerManagement from "../developerManagement.js";
 import type * as developerSandbox from "../developerSandbox.js";
 import type * as developerSchema from "../developerSchema.js";
@@ -54,20 +66,28 @@ import type * as fileSchema from "../fileSchema.js";
 import type * as fileVerification from "../fileVerification.js";
 import type * as forums from "../forums.js";
 import type * as functions from "../functions.js";
+import type * as gaming from "../gaming.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
 import type * as ioMaintenance from "../ioMaintenance.js";
+import type * as legalAcceptance from "../legalAcceptance.js";
 import type * as lib from "../lib.js";
+import type * as lobby from "../lobby.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as metricsLib from "../metricsLib.js";
 import type * as moderation from "../moderation.js";
 import type * as notifications from "../notifications.js";
+import type * as notificationSounds from "../notificationSounds.js";
 import type * as passwordReset from "../passwordReset.js";
 import type * as passwordResetInternal from "../passwordResetInternal.js";
 import type * as platformStats from "../platformStats.js";
 import type * as polls from "../polls.js";
+import type * as premium from "../premium.js";
+import type * as premiumBenefits from "../premiumBenefits.js";
+import type * as premiumCodes from "../premiumCodes.js";
 import type * as presence from "../presence.js";
+import type * as privacyControls from "../privacyControls.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
@@ -77,10 +97,13 @@ import type * as securityRefs from "../securityRefs.js";
 import type * as servers from "../servers.js";
 import type * as sha256 from "../sha256.js";
 import type * as social from "../social.js";
+import type * as socialFeed from "../socialFeed.js";
+import type * as socialGamingSchema from "../socialGamingSchema.js";
 import type * as templates from "../templates.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as threads from "../threads.js";
 import type * as totp from "../totp.js";
+import type * as trustReviews from "../trustReviews.js";
 import type * as uploadSecurity from "../uploadSecurity.js";
 import type * as users from "../users.js";
 import type * as users_changeEmail from "../users/changeEmail.js";
@@ -97,9 +120,18 @@ import type * as voiceAuthRefs from "../voiceAuthRefs.js";
 import type * as voiceMaintenance from "../voiceMaintenance.js";
 import type * as voiceTickets from "../voiceTickets.js";
 import type * as warnings from "../warnings.js";
+import type * as workspace from "../workspace.js";
+import type * as workspaceCursors from "../workspaceCursors.js";
+import type * as workspaceSchema from "../workspaceSchema.js";
 
 const fullApi: ApiFromModules<{
+  "accountRecovery": typeof accountRecovery,
+  "activityLib": typeof activityLib,
   "admin": typeof admin,
+  "advancedLifecycle": typeof advancedLifecycle,
+  "advancedMessages": typeof advancedMessages,
+  "advancedSchema": typeof advancedSchema,
+  "advancedValidation": typeof advancedValidation,
   "applications": typeof applications,
   "auth": typeof auth,
   "auth.config": typeof auth_config,
@@ -124,8 +156,14 @@ const fullApi: ApiFromModules<{
   "bugReports": typeof bugReports,
   "channels": typeof channels,
   "cleanup": typeof cleanup,
+  "collaboration": typeof collaboration,
+  "communityDecorations": typeof communityDecorations,
+  "communityHub": typeof communityHub,
+  "communityKnowledge": typeof communityKnowledge,
+  "communityMigration": typeof communityMigration,
   "conversations": typeof conversations,
   "crons": typeof crons,
+  "dataPortability": typeof dataPortability,
   "developerManagement": typeof developerManagement,
   "developerSandbox": typeof developerSandbox,
   "developerSchema": typeof developerSchema,
@@ -143,20 +181,28 @@ const fullApi: ApiFromModules<{
   "fileVerification": typeof fileVerification,
   "forums": typeof forums,
   "functions": typeof functions,
+  "gaming": typeof gaming,
   "gifs": typeof gifs,
   "http": typeof http,
   "ioMaintenance": typeof ioMaintenance,
+  "legalAcceptance": typeof legalAcceptance,
   "lib": typeof lib,
+  "lobby": typeof lobby,
   "maintenance": typeof maintenance,
   "messages": typeof messages,
   "metricsLib": typeof metricsLib,
   "moderation": typeof moderation,
   "notifications": typeof notifications,
+  "notificationSounds": typeof notificationSounds,
   "passwordReset": typeof passwordReset,
   "passwordResetInternal": typeof passwordResetInternal,
   "platformStats": typeof platformStats,
   "polls": typeof polls,
+  "premium": typeof premium,
+  "premiumBenefits": typeof premiumBenefits,
+  "premiumCodes": typeof premiumCodes,
   "presence": typeof presence,
+  "privacyControls": typeof privacyControls,
   "reports": typeof reports,
   "roles": typeof roles,
   "schema": typeof schema,
@@ -166,10 +212,13 @@ const fullApi: ApiFromModules<{
   "servers": typeof servers,
   "sha256": typeof sha256,
   "social": typeof social,
+  "socialFeed": typeof socialFeed,
+  "socialGamingSchema": typeof socialGamingSchema,
   "templates": typeof templates,
   "tempResetPassword": typeof tempResetPassword,
   "threads": typeof threads,
   "totp": typeof totp,
+  "trustReviews": typeof trustReviews,
   "uploadSecurity": typeof uploadSecurity,
   "users": typeof users,
   "users/changeEmail": typeof users_changeEmail,
@@ -186,6 +235,9 @@ const fullApi: ApiFromModules<{
   "voiceMaintenance": typeof voiceMaintenance,
   "voiceTickets": typeof voiceTickets,
   "warnings": typeof warnings,
+  "workspace": typeof workspace,
+  "workspaceCursors": typeof workspaceCursors,
+  "workspaceSchema": typeof workspaceSchema,
 }> = anyApi as any;
 
 /**

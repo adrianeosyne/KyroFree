@@ -23,6 +23,7 @@ export interface AvatarUser {
   avatarFrame?: string | null;
   /** Built-in decorative overlay rendered around the portrait. */
   avatarDecoration?: string | null;
+  avatarDecorationUrl?: string | null;
 }
 
 const SIZES = {
@@ -204,7 +205,10 @@ export function UserAvatar({
           )}
         </span>
       </span>
-      <AvatarDecorationArt decorationId={user.avatarDecoration} />
+      <AvatarDecorationArt
+        decorationId={user.avatarDecoration}
+        imageUrl={user.avatarDecorationUrl}
+      />
       {showStatus && (
         <PresenceDot
           presence={presence}

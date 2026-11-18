@@ -67,6 +67,20 @@ export async function checkSettings(page, context) {
   await dialog
     .getByRole("switch", { name: "Show image and GIF previews" })
     .click();
+  await dialog
+    .getByRole("switch", { name: "Group consecutive messages", exact: true })
+    .click();
+  await dialog
+    .getByRole("switch", {
+      name: "Show personal backgrounds in chats",
+      exact: true,
+    })
+    .click();
+  await dialog.getByLabel("Chat timestamp format").selectOption("24h");
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-chat-backgrounds",
+    "false",
+  );
   await dialog.getByRole("slider", { name: "Message text size" }).focus();
   await page.keyboard.press("End");
   await capture("test-results/kyro-settings-chat.png");
@@ -196,6 +210,28 @@ export async function checkSettings(page, context) {
   await expect(
     dialog.getByRole("switch", { name: "Show image and GIF previews" }),
   ).not.toBeChecked();
+  await expect(
+    dialog.getByRole("switch", {
+      name: "Group consecutive messages",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await expect(
+    dialog.getByRole("switch", {
+      name: "Show personal backgrounds in chats",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await expect(dialog.getByLabel("Chat timestamp format")).toHaveValue("24h");
+  await dialog
+    .getByRole("switch", { name: "Group consecutive messages", exact: true })
+    .click();
+  await dialog
+    .getByRole("switch", {
+      name: "Show personal backgrounds in chats",
+      exact: true,
+    })
+    .click();
   await expect(
     dialog.getByRole("slider", { name: "Message text size" }),
   ).toHaveAttribute("aria-valuenow", "20");

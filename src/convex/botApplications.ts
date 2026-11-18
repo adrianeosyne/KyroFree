@@ -1,3 +1,5 @@
+import { queueBotReview } from "./trustReviews";
+import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { makeFunctionReference } from "convex/server";
@@ -78,6 +80,8 @@ export const get = query({
     }
     return {
       ...(await publicBot(ctx, app)),
+      directoryStatus: app.directoryStatus ?? null,
+      directoryReviewNote: app.directoryReviewNote ?? null,
       tokenConfigured: Boolean(app.tokenHash),
       webhookMaxAttempts: app.webhookMaxAttempts ?? 6,
       webhookRetrySeconds: app.webhookRetrySeconds ?? 60,
@@ -128,7 +132,7 @@ export const create = mutation({
     tokenHash: v.string(),
   },
   handler: async (ctx, args) => {
-    const { id } = await requireActiveUser(ctx);
+    const { id, user } = await requireActiveUser(ctx);
     const name = args.name.trim();
     const username = args.username.trim().toLowerCase();
     if (
@@ -149,11 +153,11 @@ export const create = mutation({
       .query("botApplications")
       .withIndex("by_owner", (q) => q.eq("ownerId", id))
       .collect();
-    if (owned.filter((a) => !a.deletedAt).length >= 20)
+    if (owned.filter((a) => !a.deletedAt).length >= (hasPremium(user) ? 10 : 2))
       botError(
         409,
         "APPLICATION_LIMIT",
-        "An account may own up to 20 applications.",
+        "Free accounts can own 2 bot applications; Premium accounts can own 10.",
       );
     if (
       await ctx.db
@@ -241,15 +245,40 @@ export const update = mutation({
       .first();
     if (existing && existing._id !== app.botUserId)
       botError(409, "USERNAME_TAKEN", "That username is already taken.");
+    const sameListing =
+      app.directoryStatus === "approved" &&
+      app.name === args.name.trim() &&
+      app.description === args.description &&
+      app.category === args.category &&
+      JSON.stringify(app.permissions) ===
+        JSON.stringify(validPermissions(args.permissions));
     await ctx.db.patch(app._id, {
       name: args.name.trim(),
       description: args.description,
       enabled: args.enabled,
-      discoverable: args.discoverable,
+      discoverable: args.discoverable && sameListing,
+      directoryStatus:
+        args.discoverable && !sameListing
+          ? "pending"
+          : !args.discoverable && app.directoryStatus === "pending"
+            ? undefined
+            : app.directoryStatus,
       category: args.category,
       permissions: validPermissions(args.permissions),
       updatedAt: Date.now(),
     });
+    if (args.discoverable && !sameListing)
+      await queueBotReview(ctx, app._id, app.ownerId);
+    if (!args.discoverable) {
+      const pending = await ctx.db
+        .query("trustRequests")
+        .withIndex("by_application", (q) =>
+          q.eq("applicationId", app._id).eq("status", "pending"),
+        )
+        .collect();
+      for (const row of pending)
+        await ctx.db.patch(row._id, { status: "withdrawn" });
+    }
     await ctx.db.patch(app.botUserId, {
       name: args.name.trim(),
       username,

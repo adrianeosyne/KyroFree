@@ -9,6 +9,7 @@ import {
 } from "../securityRefs";
 import { normalizeRecoveryCode, verifyTotp } from "../totp";
 import { verificationRequirementRef } from "../verificationRefs";
+import { requireLegalAcceptance } from "../legalAcceptance";
 
 function recoveryHash(userId: string, code: string) {
   return sha256Hex(`${userId}:${normalizeRecoveryCode(code)}`);
@@ -30,13 +31,14 @@ export function PasswordWithTwoFactor() {
 
       let userId: Id<"users">;
       if (flow === "signUp") {
+        const legalAcceptance = requireLegalAcceptance(params.legalAcceptance);
         if (password.length < 8 || password.length > 200) {
           throw new Error("Password must be 8–200 characters.");
         }
         const created = await createAccount(ctx, {
           provider: "password",
           account: { id: email, secret: password },
-          profile: { email },
+          profile: { email, legalAcceptance },
           shouldLinkViaEmail: false,
           shouldLinkViaPhone: false,
         });

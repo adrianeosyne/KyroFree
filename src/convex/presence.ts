@@ -21,7 +21,8 @@ export async function renewPresence(
     explicitStatus ??
     (user.status === "idle" ||
     user.status === "dnd" ||
-    user.status === "invisible"
+    user.status === "invisible" ||
+    user.status === "offline"
       ? user.status
       : "online");
   const online = status !== "offline";

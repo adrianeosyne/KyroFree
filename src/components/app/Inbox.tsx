@@ -13,6 +13,7 @@ import {
 import { formatRelative } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
+import { useNow } from "@/hooks/use-now";
 
 /** Notification inbox: mentions, replies, friend requests and moderation. */
 export function Inbox({
@@ -22,12 +23,20 @@ export function Inbox({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const notes = useQuery(api.notifications.list, { limit: 50 });
+  const loadedNotes = useQuery(api.notifications.list, { limit: 50 });
+  const now = useNow(1000);
+  const notes = loadedNotes?.filter(
+    (note) => !note.expiresAt || note.expiresAt > now,
+  );
   const markRead = useMutation(api.notifications.markRead);
   const markAllRead = useMutation(api.notifications.markAllRead);
   const navigate = useNavigate();
 
-  const openNote = async (note: { id: string; read: boolean; link: string | null }) => {
+  const openNote = async (note: {
+    id: string;
+    read: boolean;
+    link: string | null;
+  }) => {
     if (!note.read) await markRead({ ids: [note.id as never] });
     onOpenChange(false);
     if (note.link) navigate(note.link);
@@ -98,7 +107,9 @@ export function Inbox({
                     {formatRelative(note.createdAt)}
                   </span>
                 </span>
-                {!note.read && <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />}
+                {!note.read && (
+                  <span className="mt-1 size-2 shrink-0 rounded-full bg-primary" />
+                )}
               </button>
             ))
           )}

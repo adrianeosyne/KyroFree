@@ -12,7 +12,7 @@ import { ArrowLeft, Ban, Loader2, Send, Users } from "@/components/icons";
  * Wraps everything rendered under `/dashboard/s/:id`.
  *
  * The server queries (channels, members, settings) all demand membership and
- * *throw* without it — a thrown query escapes to the root error boundary and
+ * *throw* without it â€” a thrown query escapes to the root error boundary and
  * the visitor sees "Preview runtime error" instead of a page. This gate asks a
  * question that never throws, so a missing membership renders a proper Join
  * screen (and a deleted community renders a proper not-found screen) while the
@@ -68,6 +68,7 @@ export function MembershipGate({
     try {
       await join({ serverId: serverId as Id<"servers"> });
       toast.success(`Welcome to ${state.name}!`);
+      navigate(`/dashboard/s/${serverId}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not join.");
       setBusy(false);
@@ -164,7 +165,7 @@ export function MembershipGate({
                 }
                 rows={3}
                 maxLength={1000}
-                placeholder="Your answer…"
+                placeholder="Your answerâ€¦"
               />
             </div>
           ))}

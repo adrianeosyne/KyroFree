@@ -1,6 +1,9 @@
 import "@vly-ai/integrations";
 import { Toaster } from "@/components/ui/sonner";
 import { RequireAuth } from "@/components/RequireAuth";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
+import { AppLoading } from "@/components/AppLoading";
+import { SiteMotion } from "@/components/SiteMotion";
 import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
@@ -9,10 +12,16 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router";
 import "./index.css";
 import "@/lib/installApp";
+import { startDesktopWebUpdates } from "@/lib/desktopWebUpdates";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
+
+startDesktopWebUpdates();
 
 // Lazy load route components for better code splitting
 const Landing = lazy(() => import("./pages/Landing.tsx"));
 const DownloadPage = lazy(() => import("./pages/Download.tsx"));
+const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
+const AccountRecoveryPage = lazy(() => import("./pages/AccountRecovery.tsx"));
 const AuthPage = lazy(() => import("./pages/Auth.tsx"));
 const Dashboard = lazy(() => import("./pages/Dashboard.tsx"));
 const NotFound = lazy(() => import("./pages/NotFound.tsx"));
@@ -26,16 +35,7 @@ const CopyrightPage = lazy(() =>
   import("./pages/Legal.tsx").then((m) => ({ default: m.CopyrightPage })),
 );
 const InviteRoute = lazy(() => import("./pages/Invite.tsx"));
-const DeveloperDocs = lazy(() => import("./pages/DeveloperDocs.tsx"));
-
-// Simple loading fallback for route transitions
-function RouteLoading() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="animate-pulse text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
+const GiftRoute = lazy(() => import("./pages/Gift.tsx"));
 
 /** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
  *  crashing the whole app (e.g. hook errors in the browser runtime). */
@@ -116,6 +116,7 @@ const convex = new ConvexReactClient(convexUrl);
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
+    if (location.pathname.startsWith("/gift/")) return;
     window.parent.postMessage(
       { type: "iframe-route-change", path: location.pathname },
       "*",
@@ -148,41 +149,50 @@ createRoot(document.getElementById("root")!).render(
         </ToolbarErrorBoundary>
       )}
       <ConvexAuthProvider client={convex}>
+        <PresenceHeartbeat />
         <BrowserRouter>
           <RouteSyncer />
-          <Suspense fallback={<RouteLoading />}>
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  window.location.hostname === "docs.kyro-chat.cyou" ? (
-                    <DeveloperDocs />
-                  ) : (
-                    <Landing />
-                  )
-                }
-              />
-              <Route path="/docs/:slug?" element={<DeveloperDocs />} />
-              <Route path="/download" element={<DownloadPage />} />
-              <Route
-                path="/auth"
-                element={<AuthPage redirectAfterAuth="/dashboard" />}
-              />
-              <Route
-                path="/dashboard/*"
-                element={
-                  <RequireAuth>
-                    <Dashboard />
-                  </RequireAuth>
-                }
-              />
-              <Route path="/terms" element={<TermsPage />} />
-              <Route path="/privacy" element={<PrivacyPage />} />
-              <Route path="/copyright" element={<CopyrightPage />} />
-              <Route path="/invite/:code" element={<InviteRoute />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
+          <MobileDownloadBanner floating />
+          <SiteMotion>
+            <Suspense fallback={<AppLoading />}>
+              <Routes>
+                <Route
+                  path="/"
+                  element={
+                    window.location.hostname === "docs.kyro-chat.cyou" ? (
+                      <DeveloperDocs />
+                    ) : (
+                      <Landing />
+                    )
+                  }
+                />
+                <Route path="/download" element={<DownloadPage />} />
+                <Route path="/docs/:slug?" element={<DeveloperDocs />} />
+                <Route
+                  path="/auth"
+                  element={<AuthPage redirectAfterAuth="/dashboard" />}
+                />
+                <Route
+                  path="/dashboard/*"
+                  element={
+                    <RequireAuth>
+                      <Dashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/account-recovery"
+                  element={<AccountRecoveryPage />}
+                />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
+                <Route path="/copyright" element={<CopyrightPage />} />
+                <Route path="/invite/:code" element={<InviteRoute />} />
+                <Route path="/gift/:code" element={<GiftRoute />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </SiteMotion>
         </BrowserRouter>
         <Toaster />
       </ConvexAuthProvider>

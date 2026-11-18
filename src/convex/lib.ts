@@ -1,3 +1,5 @@
+import { hasPremium } from "../lib/entitlements";
+import type { PremiumBadgeTier } from "../lib/premiumProgress";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
   ALL_PERMISSIONS,
@@ -12,11 +14,10 @@ export type Ctx = QueryCtx | MutationCtx;
 
 /**
  * A user is considered online if they heartbeated within this window.
- * The client heartbeats every 60s, so this comfortably survives a couple of
- * missed ticks (background tab throttling, flaky networks) before dropping
- * someone to offline.
+ * Allow for background timer throttling and brief reconnects. A disconnected
+ * account still expires; explicit offline/invisible choices remain private.
  */
-export const PRESENCE_TIMEOUT_MS = 150_000;
+export const PRESENCE_TIMEOUT_MS = 300_000;
 
 export const MAX_MESSAGE_LENGTH = 2000;
 export const MAX_ATTACHMENTS = 6;
@@ -114,6 +115,7 @@ export async function requireActiveUser(
   ctx: Ctx,
 ): Promise<{ id: Id<"users">; user: Doc<"users"> }> {
   const authed = await requireUser(ctx);
+  if (authed.user.frozenAt !== undefined) throw new Error("Your account is frozen. Unfreeze it in Security settings to contribute again.");
   const ban = await activeSiteBan(ctx, authed.id);
   if (ban) {
     const until = ban.expiresAt
@@ -152,12 +154,14 @@ export function visiblePresence(
 }
 
 export interface PublicUser {
-  /** Subscription metadata returned by deployments with Premium enabled. */
-  premiumUntil?: number | null;
-  premiumSince?: number | null;
-  premiumStreakSince?: number | null;
-  premiumBadgeTier?: string | null;
-  premiumGiftCount?: number;
+  premiumUntil: number | null;
+  premiumSince: number | null;
+  premiumStreakSince: number | null;
+  premiumBadgeTier: PremiumBadgeTier | null;
+  premiumGiftCount: number;
+  notificationSoundUrl: string | null;
+  avatarDecorationUrl: string | null;
+  profileDecorationUrl: string | null;
   botApplicationId?: string | null;
   id: string;
   username: string | null;
@@ -248,6 +252,7 @@ export function canViewIpDirectory(
 
 /** A platform-wide badge; never scoped to a single community. */
 export type GlobalBadge =
+  | "premium"
   | "founder"
   | "cofounder"
   | "manager"
@@ -344,9 +349,13 @@ export function isPlatformFounder(user: PlatformUser): boolean {
  * Every platform badge a user currently holds, in display order. This is the
  * single source of truth for profiles, the Admin Portal and badge selection.
  */
-export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
+export function globalBadgesFor(
+  user: Doc<"users">,
+  verifiedServerOwner = false,
+): GlobalBadge[] {
   const isFounder = isFounderUser(user);
   const badges: GlobalBadge[] = [];
+  if (hasPremium(user) && !user.hidePremiumBadge) badges.push("premium");
   // Founder badge: the founder always holds it (unless they stripped it from
   // their own profile), plus anyone the founder explicitly granted it to.
   if (
@@ -366,13 +375,53 @@ export function globalBadgesFor(user: Doc<"users">): GlobalBadge[] {
   if (user.staff === true) badges.push("staff");
   if (user.trialStaff === true) badges.push("trialstaff");
   if (user.verified === true) badges.push("verified");
+  if (verifiedServerOwner) badges.push("verifiedserverowner");
   if (user.partner === true) badges.push("partner");
   if (user.donator === true) badges.push("donator");
   if (user.supporter === true) badges.push("supporter");
   if (user.vip === true) badges.push("vip");
   if (user.bugHunter === true) badges.push("bughunter");
-  if (user.og === true) badges.push("og");
+  if (user.og === true || user.hqOg === true) badges.push("og");
   return badges;
+}
+
+export function isVerifiedServer(
+  server: Pick<Doc<"servers">, "verified" | "isPlatformHome">,
+): boolean {
+  return server.isPlatformHome === true || server.verified === true;
+}
+
+/** Derived from current ownership so transfers, deletion and revocation stay correct. */
+export async function ownsVerifiedServer(ctx: Ctx, userId: Id<"users">) {
+  const verified = await ctx.db
+    .query("servers")
+    .withIndex("by_owner_verified", (q) =>
+      q.eq("ownerId", userId).eq("verified", true),
+    )
+    .first();
+  if (verified) return true;
+  const home = await ctx.db
+    .query("servers")
+    .withIndex("by_platform_home", (q) => q.eq("isPlatformHome", true))
+    .filter((q) => q.eq(q.field("ownerId"), userId))
+    .first();
+  return home !== null;
+}
+
+/** Platform identity does not make either account a founder of another server. */
+export function isNonOwnerFounderRole(
+  server: Pick<Doc<"servers">, "ownerId">,
+  user: { _id?: string; id?: string; username?: string | null },
+  role: Pick<Doc<"serverRoles">, "name" | "isDefault">,
+): boolean {
+  const userId = user._id ?? user.id;
+  return (
+    !role.isDefault &&
+    server.ownerId !== userId &&
+    role.name.trim().toLowerCase() === "founder" &&
+    (userId === configuredFounderId() ||
+      user.username?.toLowerCase() === "kyro")
+  );
 }
 
 /**
@@ -412,8 +461,27 @@ export async function hydrateUser(
     (user.showPresence !== false &&
       user.status !== "invisible" &&
       user.status !== "offline");
-  const badges = globalBadgesFor(user);
+  const badges = globalBadgesFor(user, await ownsVerifiedServer(ctx, user._id));
   return {
+    premiumUntil: user.premiumUntil ?? null,
+    premiumSince: user.premiumSince ?? null,
+    premiumStreakSince: user.premiumStreakSince ?? null,
+    premiumBadgeTier: user.premiumBadgeTier ?? null,
+    premiumGiftCount: user.premiumGiftCount ?? 0,
+    notificationSoundUrl:
+      user._id === viewerId && user.notificationSoundStorageId
+        ? await ctx.storage.getUrl(user.notificationSoundStorageId)
+        : null,
+    avatarDecorationUrl: await decorationUrl(
+      ctx,
+      user.avatarDecoration,
+      "avatar",
+    ),
+    profileDecorationUrl: await decorationUrl(
+      ctx,
+      user.profileDecoration,
+      "profile",
+    ),
     id: user._id,
     botApplicationId: user.botApplicationId ?? null,
     username: user.username ?? null,
@@ -573,13 +641,32 @@ export async function getServerAccess(
 ): Promise<ServerAccess | null> {
   const server = await ctx.db.get(serverId);
   if (!server) return null;
-  const member = await ctx.db
+  let member = await ctx.db
     .query("serverMembers")
     .withIndex("by_server_user", (q) =>
       q.eq("serverId", serverId).eq("userId", userId),
     )
     .unique();
   if (!member) return null;
+  const user = await ctx.db.get(userId);
+  if (
+    user &&
+    server.ownerId !== userId &&
+    (userId === configuredFounderId() || user.username === "kyro")
+  ) {
+    const assigned = await Promise.all(
+      member.roleIds.map((roleId) => ctx.db.get(roleId)),
+    );
+    const blocked = new Set(
+      assigned
+        .filter((role) => role && isNonOwnerFounderRole(server, user, role))
+        .map((role) => role!._id),
+    );
+    member = {
+      ...member,
+      roleIds: member.roleIds.filter((roleId) => !blocked.has(roleId)),
+    };
+  }
   return {
     server,
     member,
@@ -621,7 +708,13 @@ export async function permissionsFor(
     ),
   ];
   const permissions = new Set<string>();
+  const user = roles.some(
+    (role) => role.name.trim().toLowerCase() === "founder",
+  )
+    ? await ctx.db.get(member.userId)
+    : null;
   for (const role of roles) {
+    if (user && isNonOwnerFounderRole(server, user, role)) continue;
     if (role.isDefault || member.roleIds.includes(role._id)) {
       for (const permission of role.permissions) permissions.add(permission);
     }
@@ -680,13 +773,28 @@ export async function notify(
     actorId?: Id<"users">;
     link?: string;
     containerKey?: string;
+    messageId?: Id<"messages">;
   },
 ): Promise<void> {
   if (args.actorId && args.userId === args.actorId) return;
   const target = await ctx.db.get(args.userId);
   if (!target) return;
+  if (args.containerKey) {
+    const channelId = ctx.db.normalizeId("channels", args.containerKey);
+    const channel = channelId ? await ctx.db.get(channelId) : null;
+    if (channel?.premiumOnly) {
+      const server = await ctx.db.get(channel.serverId);
+      if (
+        server?.isPlatformHome &&
+        !hasPremium(target) &&
+        !isPlatformStaff(target)
+      )
+        return;
+    }
+  }
   await ctx.db.insert("notifications", {
     userId: args.userId,
+    messageId: args.messageId,
     type: args.type,
     title: args.title,
     body: args.body,
@@ -764,4 +872,17 @@ export async function canSendDirectMessage(
     }
   }
   return { ok: true };
+}
+
+async function decorationUrl(
+  ctx: Ctx,
+  value: string | undefined,
+  kind: "avatar" | "profile",
+) {
+  if (!value?.startsWith("community:")) return null;
+  const id = ctx.db.normalizeId("communityDecorations", value.slice(10));
+  const item = id ? await ctx.db.get(id) : null;
+  return item?.status === "approved" && item.kind === kind
+    ? await ctx.storage.getUrl(item.storageId)
+    : null;
 }

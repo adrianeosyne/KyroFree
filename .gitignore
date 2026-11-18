@@ -13,3 +13,13 @@ desktop/release/
 
 # Windows installers are distributed separately from source control.
 /Kyro-Setup-*.exe
+
+# Android build output and local signing material are never source artifacts.
+mobile/android/.gradle/
+mobile/android/.idea/
+mobile/android/**/build/
+mobile/android/local.properties
+*.jks
+*.keystore
+*.apk
+*.aab

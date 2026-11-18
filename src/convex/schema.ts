@@ -1,9 +1,17 @@
+import { socialGamingTables } from "./socialGamingSchema";
+import { workspaceValidator } from "./workspaceSchema";
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
 import { Infer, v } from "convex/values";
 import { botTables } from "./botSchema";
 import { fileTables } from "./fileSchema";
+import { advancedTables } from "./advancedSchema";
 import { developerTables } from "./developerSchema";
+import { PREMIUM_TIERS } from "../lib/premiumProgress";
+
+export const premiumBadgeTierValidator = v.union(
+  ...PREMIUM_TIERS.map((tier) => v.literal(tier.name)),
+);
 
 // default user roles. can add / remove based on the project as needed
 export const ROLES = {
@@ -36,6 +44,7 @@ const schema = defineSchema(
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({
+      frozenAt: v.optional(v.number()),
       botApplicationId: v.optional(v.id("botApplications")),
       name: v.optional(v.string()), // name of the user. do not remove
       image: v.optional(v.string()), // image of the user. do not remove
@@ -43,6 +52,15 @@ const schema = defineSchema(
       emailVerificationTime: v.optional(v.number()), // email verification time. do not remove
       isAnonymous: v.optional(v.boolean()), // is the user is anonymous. do not remove
 
+      premiumUntil: v.optional(v.number()),
+      premiumSince: v.optional(v.number()),
+      premiumStreakSince: v.optional(v.number()),
+      /** Expiry timestamp for which the one-day renewal reminder was sent. */
+      premiumReminderFor: v.optional(v.number()),
+      /** Founder-assigned badge tier, independent of the real Premium streak. */
+      premiumBadgeTier: v.optional(premiumBadgeTierValidator),
+      premiumGiftCount: v.optional(v.number()),
+      notificationSoundStorageId: v.optional(v.id("_storage")),
       role: v.optional(roleValidator), // role of the user. do not remove
 
       // --- Platform-wide (global) badges, granted by staff ---
@@ -66,6 +84,8 @@ const schema = defineSchema(
       vip: v.optional(v.boolean()),
       /** Site-wide OG badge — granted to early Kyro members. */
       og: v.optional(v.boolean()),
+      hqOg: v.optional(v.boolean()),
+      premiumHistoryMigrated: v.optional(v.boolean()),
       /** Site-wide Supporter badge — granted to members who back Kyro. */
       supporter: v.optional(v.boolean()),
       /** Site-wide Donator badge — granted to members who donated. */
@@ -125,6 +145,15 @@ const schema = defineSchema(
       allowFriendRequests: v.optional(v.boolean()),
       showPresence: v.optional(v.boolean()),
       createdAt: v.optional(v.number()),
+      /** Server-recorded acceptance at signup; absent for accounts created earlier. */
+      legalAcceptance: v.optional(
+        v.object({
+          acceptedAt: v.number(),
+          termsVersion: v.string(),
+          privacyVersion: v.string(),
+          copyrightVersion: v.string(),
+        }),
+      ),
       /** Username changes are limited to once every hour. */
       usernameChangedAt: v.optional(v.number()),
       /** Email changes are limited to once every seven days. */
@@ -143,6 +172,7 @@ const schema = defineSchema(
       pronouns: v.optional(v.string()),
       /** Which badge shows next to the name in chat; `"none"` hides them. */
       primaryBadge: v.optional(v.string()),
+      hidePremiumBadge: v.optional(v.boolean()),
       /** Profile theme preset id from the profile editor. */
       profileTheme: v.optional(v.string()),
       /** Decorative animated/static overlay rendered across the profile card. */
@@ -156,12 +186,162 @@ const schema = defineSchema(
     })
       .index("email", ["email"]) // index for the email. do not remove or modify
       .index("by_username", ["username"])
+      .index("by_premium_until", ["premiumUntil"])
       .index("by_active_recent", ["deletedAt", "lastSeen"])
       .searchIndex("search_name", {
         searchField: "name",
         filterFields: ["deletedAt"],
       }),
 
+    communityEvents: defineTable({
+      serverId: v.id("servers"),
+      title: v.string(),
+      description: v.string(),
+      startsAt: v.number(),
+      endsAt: v.number(),
+      location: v.string(),
+      capacity: v.number(),
+      createdBy: v.id("users"),
+      createdAt: v.number(),
+      cancelled: v.boolean(),
+    }).index("by_server", ["serverId"]),
+    eventAttendees: defineTable({
+      eventId: v.id("communityEvents"),
+      userId: v.id("users"),
+    })
+      .index("by_event", ["eventId"])
+      .index("by_user", ["userId"]),
+    supportTickets: defineTable({
+      serverId: v.id("servers"),
+      ownerId: v.id("users"),
+      title: v.string(),
+      details: v.string(),
+      category: v.union(
+        v.literal("help"),
+        v.literal("report"),
+        v.literal("idea"),
+      ),
+      status: v.union(
+        v.literal("open"),
+        v.literal("in_progress"),
+        v.literal("closed"),
+      ),
+      assignedTo: v.optional(v.id("users")),
+      createdAt: v.number(),
+      updatedAt: v.number(),
+      responses: v.array(
+        v.object({
+          userId: v.id("users"),
+          name: v.string(),
+          text: v.string(),
+          at: v.number(),
+        }),
+      ),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_owner", ["ownerId"])
+      .index("by_server_owner", ["serverId", "ownerId"]),
+    serverSupercharges: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      until: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_server", ["serverId"]),
+    workspaces: defineTable({
+      userId: v.id("users"),
+      theme: workspaceValidator,
+      backgroundStorageId: v.optional(v.id("_storage")),
+      backgroundPosterStorageId: v.optional(v.id("_storage")),
+      backgroundMayAnimate: v.optional(v.boolean()),
+      cursorStorageId: v.optional(v.id("_storage")),
+      cursorHotspotX: v.optional(v.number()),
+      cursorHotspotY: v.optional(v.number()),
+    }).index("by_user", ["userId"]),
+    premiumCodes: defineTable({
+      hash: v.string(),
+      suffix: v.string(),
+      days: v.number(),
+      creatorId: v.id("users"),
+      createdAt: v.number(),
+      expiresAt: v.optional(v.number()),
+      /** null locks the code to no attribution; missing preserves legacy sharing. */
+      giftSenderId: v.optional(v.union(v.id("users"), v.null())),
+      giftSenderName: v.optional(v.string()),
+      giftSenderUsername: v.optional(v.string()),
+      redeemedBy: v.optional(v.id("users")),
+      recipientId: v.optional(v.id("users")),
+      redeemedAt: v.optional(v.number()),
+      revokedAt: v.optional(v.number()),
+    })
+      .index("by_hash", ["hash"])
+      .index("by_created", ["createdAt"]),
+    premiumCodeAttempts: defineTable({
+      userId: v.id("users"),
+      windowStart: v.number(),
+      count: v.number(),
+    }).index("by_user", ["userId"]),
+    premiumRequests: defineTable({
+      requesterId: v.id("users"),
+      recipientId: v.id("users"),
+      reference: v.string(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_requester", ["requesterId"])
+      .index("by_status", ["status"]),
+    communityDecorations: defineTable({
+      ownerId: v.id("users"),
+      storageId: v.id("_storage"),
+      kind: v.union(v.literal("avatar"), v.literal("profile")),
+      name: v.string(),
+      description: v.string(),
+      animated: v.boolean(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("withdrawn"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_owner", ["ownerId"])
+      .index("by_status", ["status"])
+      .index("by_status_kind", ["status", "kind"])
+      .searchIndex("search_name", {
+        searchField: "name",
+        filterFields: ["status", "kind"],
+      }),
+    trustRequests: defineTable({
+      userId: v.id("users"),
+      kind: v.union(v.literal("creator"), v.literal("bot")),
+      applicationId: v.optional(v.id("botApplications")),
+      evidence: v.string(),
+      priority: v.boolean(),
+      status: v.union(
+        v.literal("pending"),
+        v.literal("approved"),
+        v.literal("rejected"),
+        v.literal("withdrawn"),
+      ),
+      createdAt: v.number(),
+      reviewedAt: v.optional(v.number()),
+      reviewerId: v.optional(v.id("users")),
+      note: v.optional(v.string()),
+    })
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_application", ["applicationId", "status"])
+      .index("by_queue", ["status", "priority", "createdAt"]),
     userPresence: defineTable({
       userId: v.id("users"),
       lastHeartbeatAt: v.number(),
@@ -275,10 +455,13 @@ const schema = defineSchema(
       isPlatformHome: v.optional(v.boolean()),
       /** Staff-approved community shown with the verified seal. */
       verified: v.optional(v.boolean()),
+      verifiedAt: v.optional(v.number()),
+      verifiedById: v.optional(v.id("users")),
       createdAt: v.number(),
       updatedAt: v.optional(v.number()),
     })
       .index("by_owner", ["ownerId"])
+      .index("by_owner_verified", ["ownerId", "verified"])
       .index("by_created", ["createdAt"])
       .index("by_vanity", ["vanityCode"])
       .index("by_platform_home", ["isPlatformHome"])
@@ -289,6 +472,82 @@ const schema = defineSchema(
         filterFields: ["isPublic"],
       }),
 
+    serverLobbies: defineTable({
+      serverId: v.id("servers"),
+      enabled: v.boolean(),
+      title: v.string(),
+      intro: v.string(),
+      layout: v.string(),
+      background: v.string(),
+      panel: v.string(),
+      accent: v.string(),
+      sections: v.array(
+        v.object({
+          id: v.string(),
+          type: v.string(),
+          title: v.string(),
+          text: v.optional(v.string()),
+        }),
+      ),
+      buttons: v.array(
+        v.object({ id: v.string(), label: v.string(), url: v.string() }),
+      ),
+      feedTokenHash: v.optional(v.string()),
+      updatedAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_feed_token", ["feedTokenHash"]),
+    lobbyFeed: defineTable({
+      serverId: v.id("servers"),
+      title: v.string(),
+      text: v.string(),
+      url: v.optional(v.string()),
+      source: v.string(),
+      clientId: v.string(),
+      createdAt: v.number(),
+    })
+      .index("by_server", ["serverId"])
+      .index("by_server_created", ["serverId", "createdAt"])
+      .index("by_server_client", ["serverId", "clientId"]),
+    serverActivity: defineTable({
+      serverId: v.id("servers"),
+      userId: v.id("users"),
+      active: v.boolean(),
+      xp: v.number(),
+      totalMessages: v.number(),
+      weeklyMessages: v.number(),
+      weekStart: v.number(),
+      invites: v.number(),
+      lastXpAt: v.number(),
+    })
+      .index("by_server_user", ["serverId", "userId"])
+      .index("by_user", ["userId"])
+      .index("by_server", ["serverId"])
+      .index("by_server_xp", ["serverId", "active", "xp"])
+      .index("by_server_week", [
+        "serverId",
+        "active",
+        "weekStart",
+        "weeklyMessages",
+      ])
+      .index("by_server_invites", ["serverId", "active", "invites"]),
+    /** Historical global scores, retained only for account export and deletion. */
+    playerLevels: defineTable({
+      userId: v.id("users"),
+      active: v.boolean(),
+      xp: v.number(),
+      lastXpAt: v.number(),
+    })
+      .index("by_user", ["userId"])
+      .index("by_xp", ["active", "xp"]),
+    serverInviteCredits: defineTable({
+      serverId: v.id("servers"),
+      inviteeId: v.id("users"),
+      inviterId: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_server_invitee", ["serverId", "inviteeId"])
+      .index("by_server", ["serverId"]),
     serverMembers: defineTable({
       serverId: v.id("servers"),
       userId: v.id("users"),
@@ -307,6 +566,7 @@ const schema = defineSchema(
       .index("by_server_user", ["serverId", "userId"]),
 
     serverRoles: defineTable({
+      premiumRole: v.optional(v.boolean()),
       botApplicationId: v.optional(v.id("botApplications")),
       serverId: v.id("servers"),
       name: v.string(),
@@ -334,6 +594,7 @@ const schema = defineSchema(
       .index("by_server_position", ["serverId", "position"]),
 
     channels: defineTable({
+      premiumOnly: v.optional(v.boolean()),
       serverId: v.id("servers"),
       categoryId: v.optional(v.id("categories")),
       name: v.string(),
@@ -437,6 +698,8 @@ const schema = defineSchema(
 
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
+      expiresAt: v.optional(v.number()),
+      forwardedFrom: v.optional(v.object({ messageId: v.id("messages"), authorId: v.id("users"), authorName: v.string() })),
       components: v.optional(v.array(v.any())),
       embeds: v.optional(
         v.array(
@@ -457,6 +720,7 @@ const schema = defineSchema(
       content: v.string(),
       createdAt: v.number(),
       editedAt: v.optional(v.number()),
+      revision: v.optional(v.number()),
       replyToId: v.optional(v.id("messages")),
       pinnedAt: v.optional(v.number()),
       pinnedById: v.optional(v.id("users")),
@@ -480,6 +744,7 @@ const schema = defineSchema(
       callDurationMs: v.optional(v.number()),
     })
       .index("by_container", ["containerId", "createdAt"])
+      .index("by_expiry", ["expiresAt"])
       .index("by_container_client", ["containerId", "clientId"])
       .index("by_author", ["authorId"])
       .searchIndex("search_content", {
@@ -593,6 +858,11 @@ const schema = defineSchema(
           v.literal("user_banner"),
           v.literal("server_icon"),
           v.literal("server_banner"),
+          v.literal("decoration"),
+          v.literal("notification_sound"),
+          v.literal("workspace_background"),
+          v.literal("workspace_background_poster"),
+          v.literal("workspace_cursor"),
           v.literal("server_emoji"),
           v.literal("bot_icon"),
           v.literal("bot_banner"),
@@ -608,6 +878,8 @@ const schema = defineSchema(
       .index("by_application", ["applicationId"]),
     ...fileTables,
     ...developerTables,
+    ...advancedTables,
+    ...socialGamingTables,
 
     reactions: defineTable({
       messageId: v.id("messages"),
@@ -724,9 +996,11 @@ const schema = defineSchema(
       createdAt: v.number(),
     })
       .index("by_created", ["createdAt"])
-      .index("by_actor", ["actorId"]),
+      .index("by_actor", ["actorId"])
+      .index("by_target", ["targetId", "createdAt"]),
 
     notifications: defineTable({
+      messageId: v.optional(v.id("messages")),
       userId: v.id("users"),
       type: v.union(
         v.literal("friend_request"),
@@ -735,10 +1009,15 @@ const schema = defineSchema(
         v.literal("reply"),
         v.literal("moderation"),
         v.literal("system"),
+        v.literal("premium_gift"),
       ),
       title: v.string(),
       body: v.optional(v.string()),
       actorId: v.optional(v.id("users")),
+      giftDays: v.optional(v.number()),
+      giftPremiumUntil: v.optional(v.number()),
+      giftSenderName: v.optional(v.string()),
+      giftSenderUsername: v.optional(v.string()),
       /** Client route to open, e.g. `/dashboard/s/<server>/c/<channel>`. */
       link: v.optional(v.string()),
       /** Channel/conversation key so opening it can clear the badge. */
@@ -746,6 +1025,7 @@ const schema = defineSchema(
       read: v.boolean(),
       createdAt: v.number(),
     })
+      .index("by_message", ["messageId"])
       .index("by_user", ["userId", "createdAt"])
       .index("by_user_unread", ["userId", "read"])
       .index("by_user_container_unread", ["userId", "containerKey", "read"])
@@ -761,6 +1041,7 @@ const schema = defineSchema(
       template: v.union(
         v.literal("password_reset"),
         v.literal("email_verification"),
+        v.literal("two_factor_recovery"),
         v.literal("temporary_ban"),
         v.literal("permanent_ban"),
         v.literal("warning"),
@@ -944,6 +1225,24 @@ const schema = defineSchema(
       .index("by_expiry", ["expiresAt"]),
 
     /** Separate request history keeps resend throttles after code replacement. */
+    accountRecoveryTokens: defineTable({
+      userId: v.id("users"),
+      email: v.string(),
+      securityId: v.id("accountSecurity"),
+      tokenHash: v.string(),
+      createdAt: v.number(),
+      expiresAt: v.number(),
+      consumedAt: v.optional(v.number()),
+    })
+      .index("by_token", ["tokenHash"])
+      .index("by_user", ["userId"])
+      .index("by_expiry", ["expiresAt"]),
+    accountRecoveryRequests: defineTable({
+      userId: v.id("users"),
+      createdAt: v.number(),
+    })
+      .index("by_user", ["userId", "createdAt"])
+      .index("by_created", ["createdAt"]),
     emailVerificationRequests: defineTable({
       email: v.string(),
       createdAt: v.number(),

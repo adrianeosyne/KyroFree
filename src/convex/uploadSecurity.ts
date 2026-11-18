@@ -1,11 +1,18 @@
+import { uploadLimit } from "../lib/entitlements";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { Ctx } from "./lib";
 import type { MutationCtx } from "./functions";
 import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
+import { contextualUploadLimit } from "./premiumBenefits";
 
 export { MAX_UPLOAD_BYTES };
 
 export type UploadClaim =
+  | "workspace_background"
+  | "workspace_background_poster"
+  | "workspace_cursor"
+  | "decoration"
+  | "notification_sound"
   | "message"
   | "user_avatar"
   | "user_banner"
@@ -29,7 +36,7 @@ const SAFE_CONTENT_TYPES = new Set([
 export function isAllowedUploadType(contentType: string): boolean {
   const normalized = contentType.toLowerCase().split(";", 1)[0].trim();
   return (
-    ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(
+    ["image/png", "image/apng", "image/jpeg", "image/gif", "image/webp", "image/avif"].includes(
       normalized,
     ) ||
     normalized.startsWith("video/") ||
@@ -56,14 +63,18 @@ export async function requireOwnedUpload(
   ctx: Ctx,
   ownerId: Id<"users">,
   storageId: Id<"_storage">,
-  options: { imageOnly?: boolean } = {},
+  options: {
+    imageOnly?: boolean;
+    channelId?: Id<"channels">;
+    ignoreLimit?: boolean;
+  } = {},
 ): Promise<Doc<"uploads">> {
   const upload = await uploadByStorageId(ctx, storageId);
-  const owner =
+  const requester =
     upload && upload.ownerId !== ownerId ? await ctx.db.get(ownerId) : null;
   const application =
-    owner?.botApplicationId && upload?.applicationId === owner.botApplicationId
-      ? await ctx.db.get(owner.botApplicationId)
+    requester?.botApplicationId && upload?.applicationId === requester.botApplicationId
+      ? await ctx.db.get(requester.botApplicationId)
       : null;
   if (
     !upload ||
@@ -82,8 +93,12 @@ export async function requireOwnedUpload(
       "That upload is no longer available. Please upload the file again.",
     );
   }
-  if (metadata.size > MAX_UPLOAD_BYTES) {
-    throw new Error("That file is larger than the 10 MB upload limit.");
+  const owner = await ctx.db.get(ownerId);
+  const limit = owner
+    ? await contextualUploadLimit(ctx, owner, options.channelId)
+    : uploadLimit(null);
+  if (!options.ignoreLimit && metadata.size > limit) {
+    throw new Error("That file exceeds your current upload limit.");
   }
   return upload;
 }
@@ -109,7 +124,7 @@ export async function claimUpload(
   storageId: Id<"_storage">,
   claimType: UploadClaim,
   claimId: string,
-  options: { imageOnly?: boolean } = {},
+  options: { imageOnly?: boolean; channelId?: Id<"channels"> } = {},
 ): Promise<Doc<"uploads">> {
   const upload = await requireOwnedUpload(ctx, ownerId, storageId, options);
   if (upload.claimType !== undefined || upload.claimId !== undefined) {
@@ -167,7 +182,9 @@ export async function deleteUnclaimedUpload(
   ownerId: Id<"users">,
   storageId: Id<"_storage">,
 ): Promise<void> {
-  const upload = await requireOwnedUpload(ctx, ownerId, storageId);
+  const upload = await requireOwnedUpload(ctx, ownerId, storageId, {
+    ignoreLimit: true,
+  });
   if (upload.claimType !== undefined) return;
   await deleteStorageObjectIfPresent(ctx, storageId);
   await ctx.db.delete(upload._id);

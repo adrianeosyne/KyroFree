@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { ConvexError } from "convex/values";
 import { fileUrl } from "./fileAccess";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -67,7 +68,15 @@ export async function activeBot(ctx: Ctx, tokenHash: string) {
     activeSiteBan(ctx, app.ownerId),
     activeSiteBan(ctx, app.botUserId),
   ]);
-  if (!owner || owner.deletedAt || !bot || bot.deletedAt || ownerBan || botBan)
+  if (
+    !owner ||
+    owner.deletedAt ||
+    owner.frozenAt !== undefined ||
+    !bot ||
+    bot.deletedAt ||
+    ownerBan ||
+    botBan
+  )
     botError(403, "BOT_UNAVAILABLE", "This bot is unavailable.");
   return app;
 }
@@ -122,6 +131,7 @@ export async function botChannel(
 ) {
   const channel = await ctx.db.get(channelId);
   if (!channel) botError(404, "NOT_FOUND", "Channel not found.");
+  await requirePremiumChannel(ctx, channel, app.botUserId);
   const access = await botServer(ctx, app, channel.serverId);
   const roles = await ctx.db
     .query("serverRoles")
@@ -242,6 +252,8 @@ export async function messageDto(
   message: Doc<"messages">,
   viewerId?: Id<"users">,
 ) {
+  if (message.expiresAt !== undefined && message.expiresAt <= Date.now())
+    botError(404, "NOT_FOUND", "Message unavailable.");
   const author = await ctx.db.get(message.authorId);
   return {
     id: message._id,

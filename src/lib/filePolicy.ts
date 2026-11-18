@@ -3,6 +3,8 @@ export const FILE_TYPES: Record<
   { mime: string; extensions: string[] }
 > = {
   png: { mime: "image/png", extensions: ["png"] },
+  apng: { mime: "image/apng", extensions: ["apng"] },
+  avif: { mime: "image/avif", extensions: ["avif"] },
   jpg: { mime: "image/jpeg", extensions: ["jpg", "jpeg"] },
   gif: { mime: "image/gif", extensions: ["gif"] },
   webp: { mime: "image/webp", extensions: ["webp"] },

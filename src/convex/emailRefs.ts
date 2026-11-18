@@ -10,6 +10,7 @@ export const claimEmailRef = makeFunctionReference<
     template:
       | "password_reset"
       | "email_verification"
+      | "two_factor_recovery"
       | "temporary_ban"
       | "permanent_ban"
       | "warning"

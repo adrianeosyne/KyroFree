@@ -1,28 +1,39 @@
 ## Overview
 
+Copyright © 2026 Adrian Eosyne. Kyro's original materials are source-available,
+with reuse restricted by [LICENSE](LICENSE). Public access does not grant
+permission to use Kyro files to launch another service. Third-party licences
+and applicable statutory rights are preserved. See the
+[Copyright Policy](https://kyro-chat.cyou/copyright).
+
 Kyro is a React community chat application with a Convex backend. Start with
 the [technical architecture overview](docs/architecture.md) for the framework,
 database/schema, authentication, API structure, features and dependencies.
+
+The [advanced feature guide](docs/advanced-features.md) covers scheduled and
+temporary messaging, saved messages, cloud drafts, shared documents/tasks,
+community knowledge, social posts, Party Finder, account freeze and retention.
+The [implementation report](docs/advanced-expansion-report.md) records delivered
+scope, verification and the remaining ecosystem work. Run `npm run test:advanced`
+and `npm run test:advanced:ui` for the new backend and browser checks.
 
 The [Bot Developer Platform guide](docs/bot-platform.md) documents application
 creation, installation consent, permissions, REST endpoints, slash commands,
 signed webhooks and deployment. The [kyro.js SDK](sdk/kyro.js/README.md) is
 distributed from this repository and has not been published to npm.
 
-The developer ecosystem upgrade adds [developer documentation](https://kyro-chat.cyou/docs),
-Mermaid chat diagrams and verified file uploads. See the [delivery and deployment report](docs/developer-ecosystem-delivery.md)
-for implemented features, tests, limits, schema changes and required configuration.
-
 Application source is maintained in `adrianeosyne/KyroFree`. Keep credentials,
 local profiles and build outputs out of source control. Distribute Windows
-installers and their SHA-256 checksums through MediaFire or another approved
-download host. See [desktop setup and build instructions](desktop/README.md).
+installers and their SHA-256 checksums through the public
+[GitHub releases](https://github.com/adrianeosyne/KyroFree/releases/latest).
+See [desktop setup and build instructions](desktop/README.md).
 
 For the replacement Vercel project, follow [email setup](docs/email-notifications.md).
 Password-reset and warning delivery require production SMTP configuration;
 creating a new Vercel project does not copy the old project's environment.
 
-The local desktop 1.0.1 build fixes startup redirects and adds automatic reconnect.
+Desktop 1.1.1 stays in the system tray and prompts for available updates with
+the version, release notes and download size.
 Run `npm run build:desktop` to generate its installer. Deploy the root web build
 to ship the refreshed app interface; existing clients load it from the live site.
 Run `npm run test:ui` for isolated browser checks of the friends hub, chat drafts,
@@ -89,6 +100,61 @@ features are needed:
    Data → users, or `npx convex run`).
 2. Set it on the deployment: `npx convex env set KYRO_FOUNDER_USER_ID <id>`.
    Until it is set, founder-only features are simply unavailable (fail-closed).
+
+The founder can grant or remove Premium and assign any badge tier from the
+admin portal, including for their own account. To remove Premium from the
+configured adrianeosyne account using an authenticated Convex CLI:
+
+```powershell
+node scripts/remove-founder-premium.mjs <deployment>
+node scripts/remove-founder-premium.mjs <deployment> --apply
+```
+
+The first command previews the account. The second uses the deployed founder
+controls and verifies that Premium, its badge and the Premium HQ role are gone.
+It checks the configured account's username and active status before changing it.
+
+## Android app
+
+[Download Kyro for Android](https://github.com/adrianeosyne/KyroFree/releases/download/android-v1.0.0/Kyro-Android-1.0.0.apk)
+for Android 10 and newer. The full native project, Gradle wrapper, tests and
+build instructions are in [mobile/android](mobile/android/README.md). Shared
+web and backend source remain in `src/`. GitHub releases include signed APKs,
+Android App Bundles, checksums and links to the exact source tag. The app uses
+the live Kyro site with Android navigation, permission prompts and uploads.
+
+On Android browsers, Kyro shows a dismissible download prompt. In the native
+app, the prompt is hidden. The mobile interface has a Messages screen with
+search and unread filters, a five-tab dock, larger controls, and a conversation
+layout that leaves more room for chat and the keyboard. iPhone users can add
+the web app to their home screen; there is no native iOS release.
+
+## Premium gifts
+
+The founder can edit subscription dates, durations and days in a row in the
+Admin Portal. Members receive a one-day renewal warning, and Premium perks end
+automatically at expiry. See [Premium subscription controls](docs/premium-subscriptions.md).
+
+In Settings → Premium, enter an unused redeem code and choose **Create gift
+link**. Share the resulting `https://kyro-chat.cyou/gift/<code>` link. The first
+signed-in member to claim it receives its full duration; existing Premium time
+is preserved. The same code or gift URL can also be redeemed in Premium settings.
+
+Recipients receive a popup showing who sent the gift and its duration. Gifts
+remain pending while offline or using another dialog, until acknowledged.
+The sender's gift count increases only after a successful claim. Code generation
+remains founder-only, and full codes are not stored in the database.
+
+In Admin Portal → Premium, **Gift attribution** lets the founder create single
+codes or batches in another member's name, or choose **No sender · no gift badge**.
+Attributed codes credit the selected member only when another account redeems
+them. Codes created with no sender stay unattributed when shared or redeemed,
+show no sender on the claim page, and never increase anyone's gift count.
+The founder remains the code creator in the staff audit history.
+
+Profiles display one Premium tier beside the name. Premium is excluded from
+the general badge tray, and tier tooltips show membership history without
+assignment attribution.
 
 ## Password reset
 

@@ -1,3 +1,7 @@
+import { PendingAttachments } from "./PendingAttachments";
+import { useCloudDraft } from "@/hooks/use-cloud-draft";
+import { ScheduleMessageButton } from "./AdvancedMessageTools";
+import { messageLimit } from "@/lib/entitlements";
 import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import {
   BarChart3,
@@ -24,7 +28,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { ReplyTarget } from "@/components/app/MessageList";
-import { formatBytes } from "@/lib/format";
 import { useUiStore } from "@/lib/store";
 import { audioCapturePreferences } from "@/lib/audioPreferences";
 import { ACCEPTED_UPLOAD, MAX_ATTACHMENTS } from "@/lib/upload";
@@ -81,9 +84,19 @@ export function Composer({
   mentionRoles?: MentionRole[];
   allowMassMentions?: boolean;
 }) {
+  const me = useQuery(api.users.me);
+  const maxCharacters = messageLimit(me);
+  const benefits = useQuery(
+    api.premium.communityBenefits,
+    containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
   const draftKey = `${containerType}:${containerId}`;
-  const draft = useUiStore((state) => state.drafts[draftKey] ?? "");
-  const setDraft = useUiStore((state) => state.setDraft);
+  const cloudDraft = useCloudDraft({ containerType, containerId }, me?.id);
+  const draft = cloudDraft.content;
+  const setDraft = (_key: string, value: string) =>
+    cloudDraft.setContent(value);
   const sendOnEnter = useUiStore((state) => state.sendOnEnter);
   const showTyping = useUiStore((state) => state.showTyping);
   const sendMessage = useMutation(api.messages.send);
@@ -116,6 +129,7 @@ export function Composer({
   const convex = useConvex();
   const registerGifShare = useAction(api.gifs.registerShare);
   const [busy, setBusy] = useState(false);
+  const [lifetimeSeconds, setLifetimeSeconds] = useState<number | undefined>();
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [gifOpen, setGifOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
@@ -141,6 +155,12 @@ export function Composer({
   const recordingTimeoutRef = useRef<number | null>(null);
 
   const addFiles = (files: FileList | File[] | null) => {
+    if (benefits?.canPostMedia === false) {
+      toast.error(
+        "Share files in #media in Kyro HQ, or use Premium to share across HQ.",
+      );
+      return;
+    }
     if (!busy && !recording) queueFiles(files);
   };
 
@@ -299,6 +319,10 @@ export function Composer({
     const content = draft.trim();
     if (!content && attachments.length === 0) return;
     if (busy || recording || uploads.pending) return;
+    if (content.length > maxCharacters) {
+      toast.error(`Messages are limited to ${maxCharacters} characters.`);
+      return;
+    }
     setBusy(true);
     const clientId = crypto.randomUUID();
     try {
@@ -354,6 +378,7 @@ export function Composer({
         return;
       }
       const result = await sendMessage({
+        lifetimeSeconds,
         containerType,
         containerId,
         content,
@@ -489,8 +514,11 @@ export function Composer({
   return (
     <div
       className={cn(
-        "bg-transparent px-3 pb-4 pt-2 sm:px-5",
+        "mobile-composer bg-transparent px-3 pb-4 pt-2 sm:px-5",
         dragging && "ring-2 ring-inset ring-primary",
+      )}
+      data-kyro-update-blocked={Boolean(
+        draft || reply || uploads.jobs.length || busy || recording,
       )}
       onDragOver={(event) => {
         if (event.dataTransfer.types.includes("Files")) {
@@ -508,6 +536,58 @@ export function Composer({
         if (!busy && !recording) addFiles(event.dataTransfer.files);
       }}
     >
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1">
+          Message expiry
+          <select
+            aria-label="Message expiry"
+            className="max-w-32 rounded-md border bg-background px-1 py-1 text-xs"
+            value={lifetimeSeconds ?? ""}
+            onChange={(e) =>
+              setLifetimeSeconds(
+                e.target.value ? Number(e.target.value) : undefined,
+              )
+            }
+          >
+            <option value="">Keep</option>
+            <option value="300">5 minutes</option>
+            <option value="3600">1 hour</option>
+            <option value="86400">1 day</option>
+            <option value="604800">7 days</option>
+            <option value="2592000">30 days</option>
+          </select>
+        </label>
+        <span role="status">
+          {cloudDraft.status === "offline"
+            ? "Draft saved on this device · offline"
+            : cloudDraft.status === "saved"
+              ? "Draft synced"
+              : cloudDraft.status === "conflict"
+                ? "Another device has a different draft"
+                : cloudDraft.status === "error"
+                  ? "Draft sync failed"
+                  : "Saving draft…"}
+        </span>
+        {(cloudDraft.status === "conflict" ||
+          cloudDraft.status === "error") && (
+          <>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => cloudDraft.resolve(false)}
+            >
+              Use cloud draft
+            </button>
+            <button
+              type="button"
+              className="underline"
+              onClick={() => cloudDraft.resolve(true)}
+            >
+              Keep my draft
+            </button>
+          </>
+        )}
+      </div>
       {dragging && (
         <p className="pb-2 text-sm text-primary">Drop files to attach</p>
       )}
@@ -546,73 +626,15 @@ export function Composer({
         </div>
       )}
 
-      {uploads.jobs.length > 0 && (
-        <div
-          className="flex flex-wrap gap-2 rounded-t-lg border border-border/70 bg-surface p-2"
-          aria-label="Pending attachments"
-        >
-          {uploads.jobs.map((job) => (
-            <div
-              key={job.id}
-              className="flex w-full max-w-xs items-center gap-2 rounded-md border border-border/70 bg-panel p-2 text-xs"
-            >
-              {job.preview && (
-                <img
-                  src={job.preview}
-                  alt="Attachment preview"
-                  className="size-12 rounded object-cover"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="truncate" title={job.file.name}>
-                  {job.file.name}
-                </p>
-                <p className="text-muted-foreground">
-                  {formatBytes(job.file.size)} ·{" "}
-                  {job.status === "complete"
-                    ? "Ready"
-                    : job.status === "failed"
-                      ? "Failed"
-                      : job.progress >= 90
-                        ? "Verifying…"
-                        : `${job.progress}%`}
-                </p>
-                {job.status === "uploading" && (
-                  <progress
-                    aria-label={`Uploading ${job.file.name}`}
-                    className="w-full"
-                    value={job.progress}
-                    max={100}
-                  />
-                )}
-                {job.error && (
-                  <p role="alert" className="text-destructive">
-                    {job.error}
-                  </p>
-                )}
-                {job.status === "failed" && (
-                  <button
-                    type="button"
-                    className="underline"
-                    onClick={() => uploads.retry(job.id)}
-                  >
-                    Retry {job.file.name}
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                aria-label={`${job.status === "uploading" ? "Cancel" : "Remove"} ${job.file.name}`}
-                disabled={busy}
-                onClick={() => uploads.remove(job.id)}
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <PendingAttachments
+        files={uploads.jobs.map((job) => ({
+          ...job,
+          status: job.status === "complete" ? ("ready" as const) : job.status,
+        }))}
+        busy={busy}
+        onRemove={uploads.remove}
+        onRetry={uploads.retry}
+      />
 
       {recording && (
         <div className="mb-1 flex items-center justify-between gap-3 rounded-xl border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs">
@@ -645,7 +667,7 @@ export function Composer({
             type="file"
             multiple
             accept={ACCEPTED_UPLOAD}
-            disabled={busy || recording}
+            disabled={busy || recording || benefits?.canPostMedia === false}
             aria-label="Attach files"
             className="sr-only"
             onChange={(event) => {
@@ -950,13 +972,26 @@ export function Composer({
         <button
           type="button"
           aria-label="Create poll"
-          title="Create poll"
+          title={
+            benefits?.canPoll === false
+              ? "HQ polls require creator verification or Premium"
+              : "Create poll"
+          }
+          disabled={benefits?.canPoll === false}
           onClick={() => setPollOpen(true)}
           className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-foreground"
         >
           <BarChart3 className="size-4" />
         </button>
 
+        <ScheduleMessageButton
+          containerType={containerType}
+          containerId={containerId}
+          content={draft}
+          disabled={busy || recording || uploads.jobs.length > 0 || !!reply}
+          lifetimeSeconds={lifetimeSeconds}
+          onScheduled={() => setDraft(draftKey, "")}
+        />
         <button
           type="button"
           aria-label="Create Mermaid diagram"

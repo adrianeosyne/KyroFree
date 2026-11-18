@@ -1,3 +1,6 @@
+import { MessageToolsDialog } from "./AdvancedMessageTools";
+import { useNow } from "@/hooks/use-now";
+import { Bookmark, Clock, History } from "lucide-react";
 import { FileAttachment } from "./FileAttachment";
 import { BotMessageComponents } from "./BotMessageComponents";
 import { BotContextCommands } from "./BotCommandDialog";
@@ -79,6 +82,11 @@ import {
 } from "@/components/ui/dialog";
 
 export interface MessageAuthor {
+  premiumUntil?: number | null;
+  premiumSince?: number | null;
+  premiumStreakSince?: number | null;
+  premiumBadgeTier?: import("@/lib/premiumProgress").PremiumBadgeTier | null;
+  premiumGiftCount?: number;
   botApplicationId?: string | null;
   id: string;
   name: string;
@@ -111,6 +119,12 @@ export interface MessageDto {
   }[];
   id: string;
   content: string;
+  expiresAt?: number | null;
+  forwardedFrom?: {
+    messageId: string;
+    authorId: string;
+    authorName: string;
+  } | null;
   /** Call records render as their own system row instead of a chat bubble. */
   kind?: "call_missed" | "call_ended" | "bot_command" | "bot_response" | null;
   botName?: string | null;
@@ -118,6 +132,7 @@ export interface MessageDto {
   callDurationMs?: number | null;
   createdAt: number;
   editedAt: number | null;
+  revision?: number;
   author: MessageAuthor | null;
   authorId: string;
   attachments: {
@@ -138,6 +153,7 @@ export interface MessageDto {
   replyTo: {
     id: string;
     excerpt: string;
+    expiresAt?: number | null;
     author: MessageAuthor | null;
     botName?: string | null;
   } | null;
@@ -208,6 +224,8 @@ export function MessageList({
   mentionUsers?: { id: string; name: string; username: string | null }[];
 }) {
   const [olderPages, setOlderPages] = useState<MessageDto[][]>([]);
+  const now = useNow(1000);
+  const groupMessages = useUiStore((state) => state.groupMessages);
   const [cursor, setCursor] = useState<{
     container: string;
     at: number;
@@ -222,12 +240,21 @@ export function MessageList({
   const [forwardMessage, setForwardMessage] = useState<MessageDto | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const openThread = useMutation(api.threads.openForMessage);
-  const [listParams] = useSearchParams();
+  const [listParams, setListParams] = useSearchParams();
+  const linkedMessageId = listParams.get("message");
+  const locator = useQuery(
+    api.advancedMessages.locate,
+    linkedMessageId
+      ? { containerType, containerId, messageId: linkedMessageId }
+      : "skip",
+  );
 
   const latest = useQuery(api.messages.list, {
     containerType,
     containerId,
     limit: 50,
+    before:
+      locator?.createdAt !== undefined ? locator.createdAt + 1 : undefined,
   }) as MessageListResult | undefined;
 
   // A cursor left behind by the previous conversation is ignored and cleared.
@@ -269,8 +296,15 @@ export function MessageList({
       for (const message of page) map.set(message.id, message);
     }
     for (const message of latest?.messages ?? []) map.set(message.id, message);
-    return Array.from(map.values()).sort((a, b) => a.createdAt - b.createdAt);
-  }, [olderPages, latest]);
+    return Array.from(map.values())
+      .filter((message) => !message.expiresAt || message.expiresAt > now)
+      .map((message) =>
+        message.replyTo?.expiresAt && message.replyTo.expiresAt <= now
+          ? { ...message, replyTo: null }
+          : message,
+      )
+      .sort((a, b) => a.createdAt - b.createdAt);
+  }, [olderPages, latest, now]);
 
   // Stick to the bottom when new messages arrive, but respect manual scrolling.
   // On a fresh conversation (or right after switching) we force the jump first,
@@ -292,7 +326,6 @@ export function MessageList({
     }
   }, [messages.length, containerId, latest]);
 
-  const linkedMessageId = listParams.get("message");
   useEffect(() => {
     if (!linkedMessageId || messages.length === 0) return;
     const frame = window.requestAnimationFrame(() => {
@@ -333,6 +366,30 @@ export function MessageList({
           </div>
         ) : (
           <>
+            {linkedMessageId && (
+              <div className="mb-3 flex items-center justify-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {locator === null
+                    ? "This message is unavailable."
+                    : "Viewing message history"}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setListParams((previous) => {
+                      const next = new URLSearchParams(previous);
+                      next.delete("message");
+                      return next;
+                    });
+                    setOlderPages([]);
+                    jumpToBottomRef.current = true;
+                  }}
+                >
+                  Latest messages
+                </Button>
+              </div>
+            )}
             <div className="mb-3 flex justify-center">
               {activeCursor === null && latest.hasMore ? (
                 <Button
@@ -360,6 +417,7 @@ export function MessageList({
                   !previous ||
                   dayKey(previous.createdAt) !== dayKey(message.createdAt);
                 const grouped =
+                  groupMessages &&
                   !newDay &&
                   previous?.authorId === message.authorId &&
                   previous?.kind === message.kind &&
@@ -524,6 +582,7 @@ function MessageRow({
 }) {
   const [editing, setEditing] = useState(false);
   const mediaPreviews = useUiStore((state) => state.mediaPreviews);
+  const timestampFormat = useUiStore((state) => state.timestampFormat);
   const [draft, setDraft] = useState(message.content);
   const [, setParams] = useSearchParams();
   const convex = useConvex();
@@ -539,6 +598,9 @@ function MessageRow({
   const [reactionOpen, setReactionOpen] = useState(false);
   const [translated, setTranslated] = useState<string | null>(null);
   const [botActionsOpen, setBotActionsOpen] = useState(false);
+  const [toolMode, setToolMode] = useState<
+    "save" | "remind" | "history" | null
+  >(null);
 
   const loadReactionEmojis = () => {
     if (reactionEmojisLoaded) return;
@@ -741,6 +803,24 @@ function MessageRow({
         ]
       : []),
     {
+      key: "save",
+      label: "Save to collection",
+      icon: <Bookmark className="size-4" />,
+      onSelect: () => setToolMode("save"),
+    },
+    {
+      key: "remind",
+      label: "Remind me",
+      icon: <Clock className="size-4" />,
+      onSelect: () => setToolMode("remind"),
+    },
+    {
+      key: "history",
+      label: "Edit history",
+      icon: <History className="size-4" />,
+      onSelect: () => setToolMode("history"),
+    },
+    {
       key: "forward",
       label: "Forward",
       icon: <Forward className="size-4" />,
@@ -861,7 +941,7 @@ function MessageRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-medium">{label}</p>
           <p className="text-[11px] text-muted-foreground">
-            {formatTime(message.createdAt)}
+            {formatTime(message.createdAt, timestampFormat)}
           </p>
         </div>
       </div>
@@ -937,7 +1017,7 @@ function MessageRow({
                   ) : null}
                   <span className="text-[11px] text-muted-foreground">
                     {dayLabel(message.createdAt)}{" "}
-                    {formatTime(message.createdAt)}
+                    {formatTime(message.createdAt, timestampFormat)}
                   </span>
                   {message.pinnedAt && (
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-primary">
@@ -1035,6 +1115,11 @@ function MessageRow({
                 </div>
               ) : (
                 <div className="chat-text whitespace-pre-wrap break-words text-sm leading-[1.375rem] text-foreground/95">
+                  {message.forwardedFrom && (
+                    <p className="mb-1 text-xs text-muted-foreground">
+                      Forwarded from {message.forwardedFrom.authorName}
+                    </p>
+                  )}
                   {renderMessage(message.content, {
                     customEmojis: message.customEmojis,
                     roleMentions: message.roleMentions,
@@ -1044,6 +1129,12 @@ function MessageRow({
                       : undefined,
                     jumboEmoji: jumbo,
                   })}
+                  {message.expiresAt && (
+                    <span className="ml-2 text-[10px] text-muted-foreground">
+                      Temporary · expires{" "}
+                      {new Date(message.expiresAt).toLocaleString()}
+                    </span>
+                  )}
                   {message.editedAt && (
                     <span className="ml-1.5 text-[10px] text-muted-foreground">
                       (edited)
@@ -1297,6 +1388,14 @@ function MessageRow({
           </Fragment>
         ))}
       </ContextMenuContent>
+      {toolMode && (
+        <MessageToolsDialog
+          message={message}
+          mode={toolMode}
+          isAuthor={isAuthor}
+          onClose={() => setToolMode(null)}
+        />
+      )}
       {botActionsOpen && containerType === "channel" && (
         <BotContextCommands
           channelId={containerId as Id<"channels">}
@@ -1432,24 +1531,20 @@ function ForwardMessageDialog({
 }) {
   const conversations = useQuery(api.conversations.list);
   const me = useQuery(api.users.me);
-  const sendMessage = useMutation(api.messages.send);
+  const sendMessage = useMutation(api.advancedMessages.forward);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const forward = async (conversationId: string) => {
     if (busyId) return;
     setBusyId(conversationId);
-    const author = message.author?.username
-      ? `@${message.author.username}`
-      : (message.author?.name ?? "a Kyro member");
-    const source = message.content.trim() || "Shared an attachment";
-    const content = `↪ Forwarded from ${author}\n${source}`.slice(0, 2000);
     try {
-      await sendMessage({
+      const result = await sendMessage({
         containerType: "conversation",
         containerId: conversationId,
-        content,
+        messageId: message.id as Id<"messages">,
         clientId: crypto.randomUUID(),
       });
+      if (result.blocked) throw new Error(result.blocked);
       toast.success("Message forwarded.");
       onOpenChange(false);
     } catch (error) {

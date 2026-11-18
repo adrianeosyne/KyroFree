@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/hooks/use-auth";
 import { KyroMark } from "@/components/KyroMark";
+import { PremiumPrice } from "@/components/PremiumPrice";
 import {
   ArrowRight,
   Check,
@@ -24,7 +25,14 @@ import {
   Mail,
 } from "@/components/icons";
 import { Link } from "react-router";
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   forgetAccount,
   rememberAccount,
@@ -32,6 +40,9 @@ import {
 } from "@/lib/accounts";
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,32}$/;
+const LegalPolicyContent = React.lazy(() =>
+  import("./Legal").then((module) => ({ default: module.LegalPolicyContent })),
+);
 
 function resolveRedirectAfterAuth(
   returnTo: string | null,
@@ -60,6 +71,8 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   // Convex Auth can create the credential account itself, then we reserve the
   // handle with the long-standing claimProfile mutation.
   const claimProfile = useMutation(api.users.claimProfile);
+  const requestPhoneRecovery = useAction(api.accountRecovery.request);
+  const [showEmailHint, setShowEmailHint] = React.useState(false);
   const requestCodeAction = useAction(api.passwordReset.requestCode);
   const resetPasswordAction = useAction(api.passwordReset.resetPassword);
   const requestVerificationAction = useAction(
@@ -86,6 +99,33 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   const [confirmNewPassword, setConfirmNewPassword] = React.useState("");
   const [showNewPassword, setShowNewPassword] = React.useState(false);
   const [verificationCode, setVerificationCode] = React.useState("");
+  const registrationPolicies = useQuery(
+    api.legalAcceptance.currentPolicies,
+    step === "register" ? {} : "skip",
+  );
+  const [acceptedPolicies, setAcceptedPolicies] = React.useState<
+    Record<"terms" | "privacy" | "copyright", string | null>
+  >({
+    terms: null,
+    privacy: null,
+    copyright: null,
+  });
+  const policyKeys = ["terms", "privacy", "copyright"] as const;
+  const allPoliciesAccepted =
+    registrationPolicies !== undefined &&
+    policyKeys.every(
+      (key) => acceptedPolicies[key] === registrationPolicies.versions[key],
+    );
+  const policiesChanged =
+    registrationPolicies !== undefined &&
+    policyKeys.some(
+      (key) =>
+        acceptedPolicies[key] !== null &&
+        acceptedPolicies[key] !== registrationPolicies.versions[key],
+    );
+  const [reviewPolicy, setReviewPolicy] = React.useState<
+    "terms" | "privacy" | "copyright" | null
+  >(null);
 
   React.useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -145,11 +185,32 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   ) => {
     event.preventDefault();
     if (isLoading) return;
+    if (!registrationPolicies) {
+      setError("Please wait for the current policies to load.");
+      return;
+    }
+    if (!allPoliciesAccepted) {
+      setError(
+        "Accept the Terms of Service, Privacy Policy and Copyright Policy before creating an account.",
+      );
+      return;
+    }
     setIsLoading(true);
     setError(null);
     const normalizedEmail = email.trim().toLowerCase();
     const handle = username.trim().toLowerCase();
     const displayNameValue = displayName.trim() || handle;
+    const legalAcceptance = {
+      termsAccepted:
+        acceptedPolicies.terms === registrationPolicies.versions.terms,
+      privacyAccepted:
+        acceptedPolicies.privacy === registrationPolicies.versions.privacy,
+      copyrightAccepted:
+        acceptedPolicies.copyright === registrationPolicies.versions.copyright,
+      termsVersion: registrationPolicies.versions.terms,
+      privacyVersion: registrationPolicies.versions.privacy,
+      copyrightVersion: registrationPolicies.versions.copyright,
+    };
     try {
       if (!USERNAME_PATTERN.test(handle)) {
         setError(
@@ -172,6 +233,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           password,
           username: handle,
           name: displayNameValue,
+          legalAcceptance,
         });
         if (created.verificationRequired) {
           setVerificationCode("");
@@ -214,6 +276,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           flow: "signUp",
           email: normalizedEmail,
           password,
+          legalAcceptance,
         });
         rememberAccount({
           email: normalizedEmail,
@@ -232,6 +295,14 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         return;
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("LEGAL_POLICY_UPDATED")) {
+        setAcceptedPolicies({ terms: null, privacy: null, copyright: null });
+        setError(
+          "The policies have changed. Review and accept the updated policies below, then create your account again.",
+        );
+        return;
+      }
       setError(
         err instanceof Error
           ? err.message
@@ -243,6 +314,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
   };
 
   const startRegister = () => {
+    setAcceptedPolicies({ terms: null, privacy: null, copyright: null });
     setStep("register");
     setError(null);
     setTwoFactorRequired(false);
@@ -431,15 +503,22 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             Communities, channels, friends, roles and moderation — the whole
-            platform, free for everyone, with nothing to upgrade to.
+            core platform, free for everyone. Optional Premium gives you more
+            room to create.
           </p>
           <ul className="mt-6 space-y-2.5">
             {[
-              "Unlimited communities, messages and uploads",
+              "Communities, messages and everyday uploads",
               "Every moderation tool, included for all",
-              "No subscriptions and no premium tier",
+              <>
+                Optional Premium for{" "}
+                <PremiumPrice suffix=" per month" showOfferLabel />
+              </>,
             ].map((line) => (
-              <li key={line} className="flex items-start gap-2.5 text-sm">
+              <li
+                key={typeof line === "string" ? line : "premium"}
+                className="flex items-start gap-2.5 text-sm"
+              >
                 <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-success/15 text-[10px] font-bold text-success">
                   <Check className="size-3" />
                 </span>
@@ -450,7 +529,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
         </div>
 
         <p className="relative text-xs text-muted-foreground">
-          Free forever · no paywalled features · your data stays yours
+          Free core features · optional Premium · your data stays yours
         </p>
       </aside>
 
@@ -615,9 +694,70 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                         Open your authenticator app, or use one unused recovery
                         code.
                       </p>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        className="mt-2 text-xs text-primary underline"
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            await requestPhoneRecovery({ email, password });
+                            toast.success(
+                              "If your credentials match an account with 2FA, a recovery link has been emailed. Check your inbox.",
+                            );
+                          } catch {
+                            toast.error(
+                              "Could not request recovery. Try again later.",
+                            );
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                      >
+                        Lost your phone?
+                      </button>
                     </div>
                   )}
 
+                  <button
+                    type="button"
+                    className="text-xs text-primary underline"
+                    onClick={() => setShowEmailHint(!showEmailHint)}
+                  >
+                    Forgot which email?
+                  </button>
+                  {showEmailHint && (
+                    <div className="space-y-2 rounded-xl border border-border bg-surface p-3 text-xs text-muted-foreground">
+                      {accounts.length ? (
+                        accounts.map((account) => (
+                          <button
+                            type="button"
+                            key={account.email}
+                            className="block w-full rounded-lg p-2 text-left hover:bg-primary/10"
+                            onClick={() => {
+                              setEmail(account.email);
+                              setShowEmailHint(false);
+                            }}
+                          >
+                            {account.username ??
+                              account.name ??
+                              "Saved account"}{" "}
+                            ·{" "}
+                            {account.email.replace(
+                              /^(.)([^@]*)@(.)(.*)$/,
+                              "$1•••@$3•••",
+                            )}
+                          </button>
+                        ))
+                      ) : (
+                        <p>
+                          Check the inbox where Kyro sent your verification
+                          email. Email hints are available for accounts saved on
+                          this device.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-end">
                     <button
                       type="button"
@@ -654,7 +794,7 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                 </CardContent>
               </form>
               <div className="rounded-b-lg border-t bg-muted px-6 py-4 text-center text-xs text-muted-foreground">
-                Kyro is free forever ·{" "}
+                Free core features · optional Premium ·{" "}
                 <Link
                   to="/terms"
                   className="underline transition-colors hover:text-primary"
@@ -667,6 +807,13 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                   className="underline transition-colors hover:text-primary"
                 >
                   Privacy
+                </Link>{" "}
+                ·{" "}
+                <Link
+                  to="/copyright"
+                  className="underline transition-colors hover:text-primary"
+                >
+                  Copyright
                 </Link>
                 {" "}·{" "}
                 <Link
@@ -776,6 +923,84 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                       autoComplete="name"
                     />
                   </div>
+                  <fieldset className="space-y-3 rounded-lg border border-border/70 p-4">
+                    <legend className="px-1 text-sm font-semibold">
+                      Review and accept
+                    </legend>
+                    {(
+                      [
+                        ["terms", "Terms of Service", "/terms"],
+                        ["privacy", "Privacy Policy", "/privacy"],
+                        ["copyright", "Copyright Policy", "/copyright"],
+                      ] as const
+                    ).map(([key, label, href]) => (
+                      <div key={key} className="flex items-start gap-3 text-sm">
+                        <input
+                          id={`accept-${key}`}
+                          type="checkbox"
+                          required
+                          disabled={isLoading || !registrationPolicies}
+                          checked={
+                            registrationPolicies !== undefined &&
+                            acceptedPolicies[key] ===
+                              registrationPolicies.versions[key]
+                          }
+                          onChange={(event) =>
+                            setAcceptedPolicies((current) => ({
+                              ...current,
+                              [key]: event.target.checked
+                                ? registrationPolicies!.versions[key]
+                                : null,
+                            }))
+                          }
+                          className="mt-1 size-4 shrink-0 accent-primary"
+                        />
+                        <label htmlFor={`accept-${key}`} className="leading-6">
+                          I have read and accept the{" "}
+                          <Link
+                            to={href}
+                            onClick={(event) => {
+                              if (
+                                event.ctrlKey ||
+                                event.metaKey ||
+                                event.shiftKey ||
+                                event.altKey
+                              )
+                                return;
+                              event.preventDefault();
+                              setReviewPolicy(key);
+                            }}
+                            className="text-primary underline underline-offset-4"
+                          >
+                            {label}
+                          </Link>
+                          .
+                        </label>
+                      </div>
+                    ))}
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      Review each policy here without losing your registration
+                      details. Privacy acceptance does not opt you into optional
+                      advertising or marketing.
+                    </p>
+                    {!registrationPolicies && (
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Loading current policies…
+                      </p>
+                    )}
+                    {policiesChanged && (
+                      <p
+                        role="status"
+                        className="text-sm text-muted-foreground"
+                      >
+                        The policies have changed. Review and accept the updated
+                        policies to continue.
+                      </p>
+                    )}
+                  </fieldset>
                 </CardContent>
                 <div className="space-y-3">
                   {error && (
@@ -796,7 +1021,10 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                     >
                       Back to sign-in
                     </Button>
-                    <Button type="submit" disabled={isLoading}>
+                    <Button
+                      type="submit"
+                      disabled={isLoading || !allPoliciesAccepted}
+                    >
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
@@ -807,6 +1035,33 @@ function Auth({ redirectAfterAuth }: { redirectAfterAuth?: string }) {
                   </div>
                 </div>
               </form>
+              <Dialog
+                open={reviewPolicy !== null}
+                onOpenChange={(open) => {
+                  if (!open) setReviewPolicy(null);
+                }}
+              >
+                <DialogContent className="max-h-[85dvh] max-w-3xl overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Review policy</DialogTitle>
+                    <DialogDescription>
+                      Close this review to return to your registration.
+                      Acceptance is your choice using the checkboxes.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <React.Suspense fallback={<p>Loading policy…</p>}>
+                    {reviewPolicy &&
+                      (registrationPolicies ? (
+                        <LegalPolicyContent
+                          policy={reviewPolicy}
+                          snapshot={registrationPolicies}
+                        />
+                      ) : (
+                        <p>Loading current policies…</p>
+                      ))}
+                  </React.Suspense>
+                </DialogContent>
+              </Dialog>
             </>
           ) : step === "verifyEmail" ? (
             <form onSubmit={handleVerifyEmail} className="space-y-4">

@@ -50,10 +50,18 @@ export function normalizePresence(value: unknown): PresenceState {
     : "offline";
 }
 
-export function formatTime(timestamp: number): string {
+export function formatTime(
+  timestamp: number,
+  format: "locale" | "12h" | "24h" = "locale",
+): string {
   return new Date(timestamp).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
+    ...(format === "12h"
+      ? { hour12: true }
+      : format === "24h"
+        ? { hourCycle: "h23" as const }
+        : {}),
   });
 }
 
@@ -73,8 +81,7 @@ export function dayLabel(timestamp: number): string {
     weekday: "short",
     month: "short",
     day: "numeric",
-    year:
-      date.getFullYear() === today.getFullYear() ? undefined : "numeric",
+    year: date.getFullYear() === today.getFullYear() ? undefined : "numeric",
   });
 }
 
@@ -112,10 +119,12 @@ export function seedColor(seed: string): string {
   return `hsl(${hue} 62% 48%)`;
 }
 
-export function displayName(user: {
-  name?: string | null;
-  username?: string | null;
-} | null): string {
+export function displayName(
+  user: {
+    name?: string | null;
+    username?: string | null;
+  } | null,
+): string {
   if (!user) return "Unknown user";
   return user.name || user.username || "Kyro user";
 }
@@ -127,14 +136,12 @@ export function shortName(name: string, max = 24): string {
 /** Device class reported by the heartbeat, used for the platform indicator. */
 export type DeviceKind = "desktop" | "mobile" | "tablet";
 
-export const DEVICE_META: Record<
-  DeviceKind,
-  { label: string; hint: string }
-> = {
-  desktop: { label: "Desktop", hint: "on desktop" },
-  mobile: { label: "Mobile", hint: "on mobile" },
-  tablet: { label: "Tablet", hint: "on tablet" },
-};
+export const DEVICE_META: Record<DeviceKind, { label: string; hint: string }> =
+  {
+    desktop: { label: "Desktop", hint: "on desktop" },
+    mobile: { label: "Mobile", hint: "on mobile" },
+    tablet: { label: "Tablet", hint: "on tablet" },
+  };
 
 /** What kind of bug a report is — shared by the reporter and the portal. */
 export const BUG_CATEGORY_LABELS: Record<string, string> = {
@@ -156,6 +163,14 @@ export function conversationName(
   name: string | null,
   others: { name: string }[],
 ): string {
-  if (type === "group") return name || others.map((user) => user.name).slice(0, 3).join(", ") || "Group message";
+  if (type === "group")
+    return (
+      name ||
+      others
+        .map((user) => user.name)
+        .slice(0, 3)
+        .join(", ") ||
+      "Group message"
+    );
   return others[0]?.name ?? "Direct message";
 }

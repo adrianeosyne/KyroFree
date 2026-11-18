@@ -1,3 +1,7 @@
+import { checkCommunity, checkOffline } from "../tests/ui/community-checks.mjs";
+import { checkAdvanced } from "../tests/ui/advanced-checks.mjs";
+import { checkFeatures } from "../tests/ui/feature-checks.mjs";
+import { checkReleasePromotion } from "../tests/ui/premium-release-checks.mjs";
 import { createServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -11,6 +15,7 @@ import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
 import { checkAdminPortal } from "../tests/ui/admin-portal-checks.mjs";
 import { checkBadgeVisibility } from "../tests/ui/badge-visibility-checks.mjs";
 import { checkAttachments } from "../tests/ui/attachment-checks.mjs";
+import { checkMobile } from "../tests/ui/mobile-checks.mjs";
 
 // The mock aliases exist only in this test server, never in the shipped app.
 const server = await createServer({
@@ -22,7 +27,12 @@ const server = await createServer({
       name: "ui-fixture",
       configureServer(server) {
         server.middlewares.use((req, _res, next) => {
-          if (req.url?.startsWith("/dashboard"))
+          if (
+            req.url?.startsWith("/dashboard") ||
+            req.url?.startsWith("/gift/") ||
+            req.url?.startsWith("/auth") ||
+            req.url?.startsWith("/download")
+          )
             req.url = "/tests/ui/index.html";
           next();
         });
@@ -44,7 +54,7 @@ const server = await createServer({
       process.argv.includes("--managed-files") ? "managed" : "legacy",
     ),
   },
-  server: { host: "127.0.0.1", port: 5187, strictPort: true },
+  server: { host: "127.0.0.1", port: 5187, strictPort: true, preTransformRequests: false },
   optimizeDeps: {
     entries: ["tests/ui/index.html"],
     include: [
@@ -86,6 +96,45 @@ await context.route(/^https?:\/\/(?!127\.0\.0\.1:5187)/, (route) =>
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+if (process.argv.includes("--community")) {
+  try {
+    await checkCommunity(page);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/community-failure.png" });
+    console.error(errors, (await page.locator("body").innerText()).slice(-2200));
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
+if (process.argv.includes("--advanced")) {
+  try {
+    await checkAdvanced(page, context);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/advanced-failure.png" });
+    console.error(errors, (await page.locator("body").innerText()).slice(-2200));
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
+if (process.argv.includes("--features")) {
+  try {
+    await page.goto("http://127.0.0.1:5187/dashboard", { waitUntil: "domcontentloaded", timeout: 120000 });
+    await expect(page.getByRole("heading", { name: /Good to see you/ })).toBeVisible({ timeout: 120000 });
+    await checkFeatures(page); assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/feature-failure.png" });
+    console.error(errors, (await page.locator("body").innerText()).slice(-2200)); throw error;
+  } finally { await browser.close(); await server.close(); }
+  process.exit(0);
+}
 if (process.argv.includes("--attachments")) {
   try {
     await page.goto("http://127.0.0.1:5187/dashboard");
@@ -136,11 +185,16 @@ try {
     page.getByRole("heading", { name: /Good to see you/ }),
   ).toBeVisible({ timeout: 120000 });
   await page.screenshot({ path: "test-results/kyro-friends-desktop.png" });
-  await checkSettings(page, context);
-  await checkProfileBadges(page);
-  await checkBadgeVisibility(page);
-  await checkAdminPortal(page);
-  await checkAttachments(page, context);
+  if (!process.argv.includes("--shell")) {
+    await checkSettings(page, context);
+    await checkProfileBadges(page);
+    await checkBadgeVisibility(page);
+    await checkAdminPortal(page);
+    await checkAttachments(page, context);
+    await checkReleasePromotion(browser);
+    await checkFeatures(page);
+    await checkCommunity(page);
+  }
   await page
     .getByRole("button", { name: "Favorite Leo Parker", exact: true })
     .click();
@@ -258,14 +312,15 @@ try {
     "Keep this draft while I look around",
   );
   await page.evaluate(() => window.setFixtureConnection(false));
-  await expect(page.getByRole("status")).toContainText("Reconnecting to Kyro", {
+  const connectionBanner = page.getByRole("status").filter({ hasText: "Reconnecting to Kyro" });
+  await expect(connectionBanner).toBeVisible({
     timeout: 10000,
   });
   await expect(page.locator("textarea")).toHaveValue(
     "Keep this draft while I look around",
   );
   await page.evaluate(() => window.setFixtureConnection(true));
-  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(connectionBanner).toHaveCount(0);
   await page.getByRole("button", { name: "Kyro home" }).click();
   await page.evaluate(() => window.setFixtureTheme("light"));
   await expect(
@@ -353,6 +408,9 @@ try {
   );
   assert.deepEqual(errors, []);
   await checkMediaAndMobile(browser);
+  await checkOffline(browser);
+  await checkMobile(browser);
+  assert.deepEqual(errors, []);
   console.log(
     "PASS: favorites persistence, keyboard switcher, appearance controls, friend and unread filters, isolated replies and drafts, reconnect banner, responsive layouts, discovery filters, communities and voice preview",
   );

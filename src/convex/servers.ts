@@ -1,3 +1,6 @@
+import { creditInvite } from "./activityLib";
+import { canUsePremiumLounge } from "./premiumBenefits";
+import { hasPremium } from "../lib/entitlements";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
@@ -10,6 +13,8 @@ import { DEFAULT_EVERYONE_PERMISSIONS, PERMISSIONS } from "../lib/permissions";
 import {
   can,
   configuredFounderId,
+  isNonOwnerFounderRole,
+  isVerifiedServer,
   hydrateUsers,
   logAudit,
   MAX_BADGE_NOTIFICATIONS,
@@ -50,8 +55,13 @@ async function topPosition(
     .query("serverRoles")
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
+  const user = await ctx.db.get(member.userId);
   const positions = roles
-    .filter((role) => member.roleIds.includes(role._id))
+    .filter(
+      (role) =>
+        member.roleIds.includes(role._id) &&
+        (!user || !isNonOwnerFounderRole(server, user, role)),
+    )
     .map((role) => role.position);
   return positions.length > 0 ? Math.max(...positions) : 0;
 }
@@ -60,13 +70,18 @@ async function hasUnreadChannels(
   ctx: Ctx,
   server: Doc<"servers">,
   readMap: Map<string, number>,
+  viewerId: Id<"users">,
 ): Promise<boolean> {
   const channels = await ctx.db
     .query("channels")
     .withIndex("by_server", (q) => q.eq("serverId", server._id))
     .collect();
+  const loungeAllowed =
+    !server.isPlatformHome || (await canUsePremiumLounge(ctx, viewerId));
   return channels.some(
-    (channel) => (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
+    (channel) =>
+      (!channel.premiumOnly || loungeAllowed) &&
+      (channel.lastMessageAt ?? 0) > (readMap.get(channel._id) ?? 0),
   );
 }
 
@@ -141,13 +156,14 @@ export const listMine = query({
             ? ctx.storage.getUrl(server.iconStorageId)
             : Promise.resolve(null),
           metricValue(ctx, `members:${server._id}`),
-          hasUnreadChannels(ctx, server, readMap),
+          hasUnreadChannels(ctx, server, readMap, id),
           permissionsFor(ctx, server, membership),
         ]);
         return {
           id: server._id as string,
           name: server.name,
           iconUrl,
+          verified: isVerifiedServer(server),
           memberCount,
           muted: membership.muted === true,
           isOwner: server.ownerId === id,
@@ -225,6 +241,7 @@ export const discover = query({
             id: server._id as string,
             name: server.name,
             description: server.description ?? null,
+            verified: isVerifiedServer(server),
             iconUrl,
             bannerUrl,
             tags: server.tags ?? [],
@@ -243,7 +260,7 @@ export const discover = query({
 
 /** Everything the sidebar needs for one community. */
 /**
- * Public preview behind a worn community tag — name, description, member
+ * Public preview behind a worn community tag â€” name, description, member
  * count and owner, shown when someone taps a tag on a profile or message.
  */
 export const previewByTag = query({
@@ -396,9 +413,7 @@ export const get = query({
       welcomeMessage: access.server.welcomeMessage ?? null,
       isPublic: access.server.isPublic,
       isPlatformHome: access.server.isPlatformHome === true,
-      verified:
-        access.server.isPlatformHome === true ||
-        access.server.verified === true,
+      verified: isVerifiedServer(access.server),
       ownerId: access.server.ownerId as string,
       iconUrl,
       bannerUrl,
@@ -468,7 +483,12 @@ export const members = query({
         if (!user) return null;
         const memberRoles = row.roleIds
           .map((roleId) => roleMap.get(roleId))
-          .filter((role): role is NonNullable<typeof role> => Boolean(role))
+          .filter(
+            (role): role is NonNullable<typeof role> =>
+              Boolean(role) &&
+              (!role?.premiumRole || hasPremium(user)) &&
+              !isNonOwnerFounderRole(access.server, user, role!),
+          )
           .sort((a, b) => a.position - b.position);
         const top =
           memberRoles.length > 0 ? memberRoles[memberRoles.length - 1] : null;
@@ -512,7 +532,7 @@ export const members = query({
   },
 });
 
-/** Public invite preview — what someone sees before joining. */
+/** Public invite preview â€” what someone sees before joining. */
 export const invitePreview = query({
   args: { code: v.string() },
   handler: async (ctx, { code }) => {
@@ -611,8 +631,72 @@ export const invitePreview = query({
 /* Mutations                                                           */
 /* ------------------------------------------------------------------ */
 
-/** Kyro HQ — the platform's home community, owned by the founder. */
+/** Kyro HQ â€” the platform's home community, owned by the founder. */
 const HQ_NAME = "Kyro HQ";
+
+async function ensurePremiumHq(
+  ctx: MutationCtx,
+  serverId: Id<"servers">,
+  founderId: Id<"users">,
+  userId: Id<"users">,
+) {
+  const roles = await ctx.db
+    .query("serverRoles")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  const roleId =
+    roles.find((r) => r.premiumRole)?._id ??
+    (await ctx.db.insert("serverRoles", {
+      serverId,
+      name: "Premium",
+      color: "#e879f9",
+      position: 1,
+      permissions: [],
+      isDefault: false,
+      hoist: true,
+      premiumRole: true,
+    }));
+  const channels = await ctx.db
+    .query("channels")
+    .withIndex("by_server", (q) => q.eq("serverId", serverId))
+    .collect();
+  if (!channels.some((c) => c.premiumOnly))
+    await ctx.db.insert("channels", {
+      serverId,
+      name: "premium-chat",
+      topic:
+        "The Kyro Premium lounge: creators, gameplay and community conversation.",
+      position: channels.length,
+      premiumOnly: true,
+      createdAt: Date.now(),
+      createdById: founderId,
+    });
+  if (!channels.some((c) => c.name === "media"))
+    await ctx.db.insert("channels", {
+      serverId,
+      name: "media",
+      topic: "Share your pictures, clips and artwork here.",
+      position: channels.length + 1,
+      createdAt: Date.now(),
+      createdById: founderId,
+    });
+  const member = await ctx.db
+    .query("serverMembers")
+    .withIndex("by_server_user", (q) =>
+      q.eq("serverId", serverId).eq("userId", userId),
+    )
+    .unique();
+  const user = await ctx.db.get(userId);
+  if (member && user) {
+    const ids = member.roleIds.filter((id) => id !== roleId);
+    if ((user.premiumUntil ?? 0) > Date.now()) ids.push(roleId);
+    if (
+      ids.length !== member.roleIds.length ||
+      ids.some((id, i) => id !== member.roleIds[i])
+    )
+      await ctx.db.patch(member._id, { roleIds: ids });
+  }
+}
 
 async function ensureMembership(
   ctx: MutationCtx,
@@ -639,7 +723,7 @@ async function createHq(
   const serverId = await ctx.db.insert("servers", {
     name: HQ_NAME,
     description:
-      "The official Kyro home base — announcements, support and hangouts for everyone on Kyro.",
+      "The official Kyro home base â€” announcements, support and hangouts for everyone on Kyro.",
     ownerId,
     isPublic: true,
     isPlatformHome: true,
@@ -713,6 +797,7 @@ export async function joinKyroHq(
   const serverId = home?._id ?? (await createHq(ctx, founder._id));
   await ensureMembership(ctx, serverId, userId);
   await ensureMembership(ctx, serverId, founder._id);
+  await ensurePremiumHq(ctx, serverId, founder._id, userId);
 }
 
 /** Internal hook so sign-up (an action) can auto-join Kyro HQ. */
@@ -733,7 +818,7 @@ export const create = mutation({
     const { id } = await requireProfile(ctx);
     const cleanName = name.trim();
     if (cleanName.length < 2 || cleanName.length > SERVER_NAME_MAX) {
-      throw new Error("Community names are 2–64 characters.");
+      throw new Error("Community names are 2â€“64 characters.");
     }
     const serverId = await ctx.db.insert("servers", {
       name: cleanName,
@@ -832,7 +917,7 @@ export const update = mutation({
     if (args.name !== undefined) {
       const name = args.name.trim();
       if (name.length < 2 || name.length > SERVER_NAME_MAX) {
-        throw new Error("Community names are 2–64 characters.");
+        throw new Error("Community names are 2â€“64 characters.");
       }
       patch.name = name;
     }
@@ -857,7 +942,7 @@ export const update = mutation({
       } else {
         const tag = args.tag.trim().toUpperCase().slice(0, 4);
         if (!/^[A-Z0-9]{2,4}$/.test(tag)) {
-          throw new Error("Community tags are 2–4 letters or numbers.");
+          throw new Error("Community tags are 2â€“4 letters or numbers.");
         }
         patch.tag = tag;
       }
@@ -878,7 +963,7 @@ export const update = mutation({
         for (const link of links) {
           if (!/^https?:\/\//i.test(link.url)) {
             throw new Error(
-              `Links need to start with http:// or https:// — check "${link.label}".`,
+              `Links need to start with http:// or https:// â€” check "${link.label}".`,
             );
           }
         }
@@ -1546,6 +1631,19 @@ export const updateMemberRoles = mutation({
     const cleaned = Array.from(new Set(roleIds)).filter((roleId) =>
       valid.has(roleId),
     );
+    const targetUser = await ctx.db.get(userId);
+    if (
+      targetUser &&
+      serverRoles.some(
+        (role) =>
+          cleaned.includes(role._id) &&
+          isNonOwnerFounderRole(access.server, targetUser, role),
+      )
+    ) {
+      throw new Error(
+        "The Founder role is only available in servers this account owns.",
+      );
+    }
     const highestAssignable = cleaned
       .map(
         (roleId) =>
@@ -1722,6 +1820,7 @@ export const joinByCode = mutation({
       });
       if (invite && !invite.revoked) {
         await ctx.db.patch(invite._id, { uses: invite.uses + 1 });
+        await creditInvite(ctx, server._id, id, invite.creatorId);
       }
       await logAudit(ctx, {
         serverId: server._id,
@@ -1738,7 +1837,7 @@ export const joinByCode = mutation({
 
 /**
  * Pick the community's permanent invite path: kyro.app/invite/<code>.
- * Letters, numbers, dashes and underscores — never expires, never capped.
+ * Letters, numbers, dashes and underscores â€” never expires, never capped.
  */
 export const setVanity = mutation({
   args: { serverId: v.id("servers"), code: v.string() },
@@ -1762,7 +1861,7 @@ export const setVanity = mutation({
     }
     if (!/^[a-z0-9][a-z0-9_-]{2,23}$/.test(clean)) {
       throw new Error(
-        "Custom links are 3–24 characters: letters, numbers, dashes and underscores.",
+        "Custom links are 3â€“24 characters: letters, numbers, dashes and underscores.",
       );
     }
     const taken = await ctx.db
@@ -1770,7 +1869,7 @@ export const setVanity = mutation({
       .withIndex("by_vanity", (q) => q.eq("vanityCode", clean))
       .unique();
     if (taken && taken._id !== serverId) {
-      throw new Error("That link is already taken — try another one.");
+      throw new Error("That link is already taken â€” try another one.");
     }
     const inviteClash = await ctx.db
       .query("invites")

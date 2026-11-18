@@ -1,3 +1,5 @@
+import { hasPremium } from "@/lib/entitlements";
+import { isAndroidApp } from "@/lib/mobile";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
   ConnectionState,
@@ -43,7 +45,7 @@ import { audioCapturePreferences } from "@/lib/audioPreferences";
 
 type ContainerType = "channel" | "conversation";
 
-/** Screen shares are capped at 720p/30fps to protect CPU and bandwidth. */
+/** Free display capture target; Premium targets come from the server grant. */
 const SCREEN_SHARE_RESOLUTION = {
   width: 1280,
   height: 720,
@@ -51,6 +53,8 @@ const SCREEN_SHARE_RESOLUTION = {
 } as const;
 
 type TokenResponse = {
+  audioBitrate?: number;
+  screenShare: { width: number; height: number; frameRate: number };
   ok: true;
   serverUrl: string;
   token: string;
@@ -129,6 +133,12 @@ export function LiveKitVoiceRoom({
   onConnectionChange?: (state: string) => void;
 }) {
   const me = useQuery(api.users.me);
+  const communityBenefits = useQuery(
+    api.premium.communityBenefits,
+    active && containerType === "channel"
+      ? { channelId: containerId as Id<"channels"> }
+      : "skip",
+  );
   const roster = useQuery(
     api.voice.roster,
     active ? { containerType, containerId } : "skip",
@@ -155,9 +165,18 @@ export function LiveKitVoiceRoom({
     TokenResponse["canPublishSources"]
   >([]);
   const [muted, setMuted] = useState(false);
+  const [tokenAudioBitrate, setAudioBitrate] = useState(64000);
+  const audioBitrate = communityBenefits?.audioBitrate ?? tokenAudioBitrate;
+  const appliedAudioBitrate = useRef(64000);
   const [deafened, setDeafened] = useState(false);
   const [cameraEnabled, setCameraEnabled] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [shareGrant, setShareGrant] = useState<{
+    width: number;
+    height: number;
+    frameRate: number;
+  }>(SCREEN_SHARE_RESOLUTION);
+  const shareResolution = hasPremium(me) ? shareGrant : SCREEN_SHARE_RESOLUTION;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
@@ -179,6 +198,19 @@ export function LiveKitVoiceRoom({
     sharing: false,
   });
   const now = useNow(1_000);
+  useEffect(() => {
+    if (!room.localParticipant.isScreenShareEnabled) return;
+    const track = room.localParticipant.getTrackPublication(
+      Track.Source.ScreenShare,
+    )?.videoTrack?.mediaStreamTrack;
+    void track
+      ?.applyConstraints({
+        width: { max: shareResolution.width },
+        height: { max: shareResolution.height },
+        frameRate: { max: shareResolution.frameRate },
+      })
+      .catch(() => {});
+  }, [room, shareResolution]);
 
   const refresh = () => setRevision((value) => value + 1);
   const signalLeave = () => {
@@ -217,6 +249,14 @@ export function LiveKitVoiceRoom({
       sharing,
     };
   }, [muted, deafened, cameraEnabled, sharing]);
+
+  useEffect(() => {
+    if (!active) return;
+    const blocker = document.createElement("meta");
+    blocker.dataset.kyroUpdateBlocked = "true";
+    document.head.appendChild(blocker);
+    return () => blocker.remove();
+  }, [active]);
 
   useEffect(() => {
     if (!active) return;
@@ -332,6 +372,9 @@ export function LiveKitVoiceRoom({
         if (disposed) return;
         setCanManage(credentials.canManage);
         setAllowedSources(credentials.canPublishSources);
+        setAudioBitrate(credentials.audioBitrate ?? 64000);
+        appliedAudioBitrate.current = credentials.audioBitrate ?? 64000;
+        setShareGrant(credentials.screenShare ?? SCREEN_SHARE_RESOLUTION);
         await nextRoom.connect(credentials.serverUrl, credentials.token, {
           autoSubscribe: true,
         });
@@ -346,6 +389,9 @@ export function LiveKitVoiceRoom({
             await nextRoom.localParticipant.setMicrophoneEnabled(
               true,
               audioCapturePreferences(),
+              {
+                audioPreset: { maxBitrate: credentials.audioBitrate ?? 64000 },
+              },
             );
           } catch (error) {
             const name = error instanceof DOMException ? error.name : "";
@@ -415,14 +461,46 @@ export function LiveKitVoiceRoom({
     void join({ containerType, containerId, ...patch }).catch(() => undefined);
   };
 
+  useEffect(() => {
+    const next = communityBenefits?.audioBitrate;
+    if (
+      !next ||
+      next === appliedAudioBitrate.current ||
+      connection !== ConnectionState.Connected
+    )
+      return;
+    appliedAudioBitrate.current = next;
+    if (room.localParticipant.isMicrophoneEnabled) {
+      void (async () => {
+        await room.localParticipant.setMicrophoneEnabled(false);
+        if (stateRef.current.muted || room.state !== ConnectionState.Connected)
+          return;
+        await room.localParticipant.setMicrophoneEnabled(
+          true,
+          {
+            ...audioCapturePreferences(),
+            deviceId: selectedAudioInput || undefined,
+          },
+          { audioPreset: { maxBitrate: next } },
+        );
+      })().catch((error) =>
+        toast.error(readableError(error, "Could not update voice quality.")),
+      );
+    }
+  }, [communityBenefits?.audioBitrate, connection, room, selectedAudioInput]);
+
   const toggleMicrophone = async () => {
     if (!room || !allowedSources.includes("microphone")) return;
     try {
       const enabled = !room.localParticipant.isMicrophoneEnabled;
-      await room.localParticipant.setMicrophoneEnabled(enabled, {
-        ...audioCapturePreferences(),
-        deviceId: selectedAudioInput || undefined,
-      });
+      await room.localParticipant.setMicrophoneEnabled(
+        enabled,
+        {
+          ...audioCapturePreferences(),
+          deviceId: selectedAudioInput || undefined,
+        },
+        { audioPreset: { maxBitrate: audioBitrate } },
+      );
       setMuted(!enabled);
       updateSeat({ muted: !enabled });
       refresh();
@@ -476,25 +554,28 @@ export function LiveKitVoiceRoom({
         {
           audio: allowedSources.includes("screen_share_audio"),
           video: true,
-          resolution: SCREEN_SHARE_RESOLUTION,
+          resolution: shareResolution,
           selfBrowserSurface: "include",
           surfaceSwitching: "include",
           systemAudio: "include",
           contentHint: "detail",
         },
         {
-          screenShareEncoding: ScreenSharePresets.h720fps30.encoding,
+          screenShareEncoding:
+            shareResolution.frameRate === 60
+              ? { maxBitrate: 8_000_000, maxFramerate: 60 }
+              : ScreenSharePresets.h720fps30.encoding,
           degradationPreference: "maintain-resolution",
         },
       );
       if (enabled) {
         // Chromium treats display-capture resolution hints as "ideal" rather
         // than a hard ceiling. Apply max constraints to the captured track so
-        // high-resolution monitors cannot publish above 720p/30fps.
+        // high-resolution monitors respect the current entitlement target.
         await publication?.videoTrack?.mediaStreamTrack.applyConstraints({
-          width: { max: SCREEN_SHARE_RESOLUTION.width },
-          height: { max: SCREEN_SHARE_RESOLUTION.height },
-          frameRate: { max: SCREEN_SHARE_RESOLUTION.frameRate },
+          width: { max: shareResolution.width },
+          height: { max: shareResolution.height },
+          frameRate: { max: shareResolution.frameRate },
         });
       }
       setSharing(enabled);
@@ -789,20 +870,22 @@ export function LiveKitVoiceRoom({
               <VideoOff className="size-4" />
             )}
           </Button>
-          <Button
-            size="sm"
-            variant={sharing ? "default" : "outline"}
-            className="h-9 px-2.5"
-            disabled={!connected || !allowedSources.includes("screen_share")}
-            onClick={() => void toggleScreenShare()}
-            aria-label={sharing ? "Stop screen sharing" : "Share screen"}
-          >
-            {sharing ? (
-              <ScreenShareOff className="size-4" />
-            ) : (
-              <ScreenShare className="size-4" />
-            )}
-          </Button>
+          {!isAndroidApp() && (
+            <Button
+              size="sm"
+              variant={sharing ? "default" : "outline"}
+              className="h-9 px-2.5"
+              disabled={!connected || !allowedSources.includes("screen_share")}
+              onClick={() => void toggleScreenShare()}
+              aria-label={sharing ? "Stop screen sharing" : "Share screen"}
+            >
+              {sharing ? (
+                <ScreenShareOff className="size-4" />
+              ) : (
+                <ScreenShare className="size-4" />
+              )}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="destructive"

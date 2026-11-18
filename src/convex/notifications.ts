@@ -2,10 +2,34 @@ import { v } from "convex/values";
 import { mutation, query } from "./functions";
 import {
   hydrateUsers,
+  isBlockedBetween,
   MAX_BADGE_NOTIFICATIONS,
   requireServerAccess,
   requireUser,
 } from "./lib";
+import { requireReadAccess } from "./messages";
+
+/** Gifts remain pending across sessions until the recipient dismisses them. */
+export const pendingPremiumGifts = query({
+  args: {},
+  handler: async (ctx) => {
+    const { id } = await requireUser(ctx);
+    const notes = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread_type", (q) =>
+        q.eq("userId", id).eq("read", false).eq("type", "premium_gift"),
+      )
+      .order("asc")
+      .take(20);
+    return notes.map((note) => ({
+      id: note._id,
+      days: note.giftDays ?? 30,
+      premiumUntil: note.giftPremiumUntil ?? null,
+      senderName: note.giftSenderName ?? "A Kyro member",
+      senderUsername: note.giftSenderUsername ?? null,
+    }));
+  },
+});
 
 /** Notification inbox for the signed-in user. */
 export const list = query({
@@ -17,12 +41,39 @@ export const list = query({
       .withIndex("by_user", (q) => q.eq("userId", id))
       .order("desc")
       .take(Math.min(limit ?? 40, 100));
+    // Message previews must become unavailable at expiry or access removal,
+    // even while the bounded deletion worker is still processing its queue.
+    const visible = (
+      await Promise.all(
+        notes.map(async (note) => {
+          if (!note.messageId) return { note, expiresAt: null };
+          const message = await ctx.db.get(note.messageId);
+          if (
+            !message ||
+            (message.expiresAt !== undefined && message.expiresAt <= Date.now())
+          )
+            return null;
+          try {
+            await requireReadAccess(
+              ctx,
+              id,
+              message.containerType,
+              message.containerId,
+            );
+            if (await isBlockedBetween(ctx, id, message.authorId)) return null;
+          } catch {
+            return null;
+          }
+          return { note, expiresAt: message.expiresAt ?? null };
+        }),
+      )
+    ).filter((row): row is NonNullable<typeof row> => row !== null);
     const actors = await hydrateUsers(
       ctx,
-      notes.map((note) => note.actorId),
+      visible.map(({ note }) => note.actorId),
       id,
     );
-    return notes.map((note) => ({
+    return visible.map(({ note, expiresAt }) => ({
       id: note._id as string,
       type: note.type,
       title: note.title,
@@ -31,6 +82,7 @@ export const list = query({
       containerKey: note.containerKey ?? null,
       read: note.read,
       createdAt: note.createdAt,
+      expiresAt,
       actor: note.actorId ? (actors.get(note.actorId) ?? null) : null,
     }));
   },

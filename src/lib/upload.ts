@@ -1,8 +1,8 @@
-import { useAction, useMutation } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useCallback } from "react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
+import { uploadLimit } from "./entitlements";
 import { ACCEPTED_FILES, allowedFilename } from "./filePolicy";
 import { isManagedFileApi, legacyFileApi } from "./file-api";
 export { MAX_UPLOAD_BYTES } from "@/lib/uploadLimits";
@@ -83,6 +83,9 @@ export function useUploadFile(
     channelId?: Id<"channels">;
   } = {},
 ) {
+  const me = useQuery(api.users.me);
+  const benefits = useQuery(api.premium.communityBenefits, options.channelId ? { channelId: options.channelId } : "skip");
+  const maximumBytes = Math.max(uploadLimit(me), benefits?.uploadBytes ?? 0);
   const reserve = useMutation(api.files.generateUploadUrl),
     register = useMutation(api.files.registerUpload),
     verify = useAction(api.files.verifyUpload),
@@ -95,8 +98,8 @@ export function useUploadFile(
       file: File,
       transfer: UploadOptions = {},
     ): Promise<PendingAttachment> => {
-      if (!file.size || file.size > MAX_UPLOAD_BYTES)
-        throw new Error(`"${file.name}" must be between 1 byte and 10 MiB.`);
+      if (!file.size || file.size > maximumBytes)
+        throw new Error(`"${file.name}" must be between 1 byte and ${maximumBytes / 1024 / 1024} MiB.`);
       if (!allowedFilename(file.name))
         throw new Error(
           "This file format is not supported. Choose an image, media file, document or ZIP archive.",
@@ -142,7 +145,9 @@ export function useUploadFile(
         ...(options.applicationId
           ? { applicationId: options.applicationId }
           : {}),
+        ...(options.channelId ? { channelId: options.channelId } : {}),
       });
+      if (typeof ticket === "string") throw new Error("The upload service did not return a reservation.");
       try {
         transfer.signal?.throwIfAborted();
         const storageId = (await directUpload(
@@ -176,6 +181,7 @@ export function useUploadFile(
       discardLegacyUpload,
       options.applicationId,
       options.channelId,
+      maximumBytes,
     ],
   );
 }

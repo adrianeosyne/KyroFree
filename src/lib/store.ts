@@ -45,12 +45,16 @@ export interface Preferences {
   showTyping: boolean;
   mediaPreviews: boolean;
   chatFontSize: number;
+  groupMessages: boolean;
+  chatBackgrounds: boolean;
+  timestampFormat: "locale" | "12h" | "24h";
   notificationVolume: number;
   callSounds: boolean;
   reducedMotion: boolean;
   underlineLinks: boolean;
   noiseSuppression: boolean;
   autoGainControl: boolean;
+  customCursor: boolean;
 }
 
 const DEFAULT_PREFS: Preferences = {
@@ -69,12 +73,16 @@ const DEFAULT_PREFS: Preferences = {
   showTyping: true,
   mediaPreviews: true,
   chatFontSize: 14,
+  groupMessages: true,
+  chatBackgrounds: true,
+  timestampFormat: "locale",
   notificationVolume: 60,
   callSounds: true,
   reducedMotion: false,
   underlineLinks: false,
   noiseSuppression: true,
   autoGainControl: true,
+  customCursor: true,
 };
 
 function loadPrefs(): Preferences {
@@ -168,7 +176,9 @@ export function applyPreferences(prefs: Preferences) {
   root.dataset.accent = prefs.accent === "default" ? "" : prefs.accent;
   root.dataset.density = prefs.density;
   root.dataset.reducedMotion = String(prefs.reducedMotion);
+  root.dataset.customCursor = String(prefs.customCursor);
   root.dataset.underlineLinks = String(prefs.underlineLinks);
+  root.dataset.chatBackgrounds = String(prefs.chatBackgrounds);
   root.style.setProperty("--chat-font-size", `${prefs.chatFontSize}px`);
   applyTint(prefs);
 }
@@ -210,12 +220,16 @@ function pickPrefs(state: AppState): Preferences {
     showTyping: state.showTyping,
     mediaPreviews: state.mediaPreviews,
     chatFontSize: state.chatFontSize,
+    groupMessages: state.groupMessages,
+    chatBackgrounds: state.chatBackgrounds,
+    timestampFormat: state.timestampFormat,
     notificationVolume: state.notificationVolume,
     callSounds: state.callSounds,
     reducedMotion: state.reducedMotion,
     underlineLinks: state.underlineLinks,
     noiseSuppression: state.noiseSuppression,
     autoGainControl: state.autoGainControl,
+    customCursor: state.customCursor,
   };
 }
 

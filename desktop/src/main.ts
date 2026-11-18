@@ -8,6 +8,8 @@ import {
   desktopCapturer,
   ipcMain,
   screen,
+  Tray,
+  Notification,
   type MenuItemConstructorOptions,
   type WebContents,
 } from "electron";
@@ -21,6 +23,7 @@ import {
   externalUrl,
   canRequestPermission,
 } from "./security";
+import { DesktopUpdates } from "./updates";
 
 const resources = path.join(__dirname, "../resources");
 const offlinePage = pathToFileURL(path.join(resources, "offline.html")).href;
@@ -29,6 +32,10 @@ let mainWindow: BrowserWindow | null = null;
 let captureWindow: BrowserWindow | null = null;
 let capturePending = false;
 let lastKyroUrl = KYRO_HOME;
+let tray: Tray | null = null;
+let quitting = false;
+let trayNoticeShown = false;
+let updates: DesktopUpdates | null = null;
 const granted = new Set<string>();
 app.setName("Kyro");
 app.enableSandbox();
@@ -36,6 +43,34 @@ app.enableSandbox();
 function openExternal(value: string) {
   const url = externalUrl(value);
   if (url) void shell.openExternal(url).catch(() => undefined);
+}
+
+function showWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!testMode) mainWindow.show();
+  mainWindow.focus();
+}
+
+function createTray() {
+  try {
+    tray = new Tray(path.join(resources, "icon.ico"));
+    tray.setToolTip("Kyro");
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: "Open Kyro", click: showWindow },
+        { label: "Check for updates", click: () => void updates?.check(true) },
+        { type: "separator" },
+        { label: "Quit Kyro", click: () => app.quit() },
+      ]),
+    );
+    tray.on("double-click", showWindow);
+    tray.on("click", showWindow);
+    tray.on("balloon-click", showWindow);
+  } catch {
+    // If the tray cannot be created, the close button must still exit.
+    tray = null;
+  }
 }
 
 function secureContents(contents: WebContents) {
@@ -98,6 +133,14 @@ function createMenu() {
         {
           label: "Downloads & updates",
           click: () => openExternal(`${KYRO_ORIGIN}/download`),
+        },
+        {
+          label: "Check for updates",
+          click: () => void updates?.check(true),
+        },
+        {
+          label: "Restart to update",
+          click: () => void updates?.install(),
         },
         { type: "separator" },
         { role: "quit" },
@@ -431,6 +474,7 @@ function createWindow() {
       webSecurity: true,
       webviewTag: false,
       allowRunningInsecureContent: false,
+      backgroundThrottling: false,
     },
   });
   mainWindow = window;
@@ -450,7 +494,7 @@ function createWindow() {
   window.webContents.on("did-navigate", (_event, url) => {
     if (isKyroUrl(url)) lastKyroUrl = url;
   });
-  window.on("close", () => {
+  window.on("close", (event) => {
     try {
       fs.mkdirSync(app.getPath("userData"), { recursive: true });
       fs.writeFileSync(stateFile, JSON.stringify(window.getNormalBounds()));
@@ -458,6 +502,19 @@ function createWindow() {
       /* Window position is optional. */
     }
     if (captureWindow && !captureWindow.isDestroyed()) captureWindow.close();
+    if (!quitting && tray && !tray.isDestroyed()) {
+      event.preventDefault();
+      window.hide();
+      if (!trayNoticeShown && !testMode) {
+        trayNoticeShown = true;
+        tray.displayBalloon({
+          title: "Kyro is still running",
+          content:
+            "Calls and notifications stay active. Open Kyro or quit from the tray icon.",
+          respectQuietTime: true,
+        });
+      }
+    }
   });
   window.on("closed", () => {
     mainWindow = null;
@@ -469,18 +526,38 @@ if (testMode && process.env.KYRO_DESKTOP_TEST_PROFILE)
   app.setPath("userData", process.env.KYRO_DESKTOP_TEST_PROFILE);
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!testMode) mainWindow.show();
-      mainWindow.focus();
-    }
+  app.on("second-instance", showWindow);
+  app.on("before-quit", () => {
+    quitting = true;
+  });
+  app.on("will-quit", () => {
+    updates?.stop();
+    tray?.destroy();
   });
   app.whenReady().then(() => {
     app.setAppUserModelId("org.kyro.chat");
     configureSession();
     createMenu();
     createWindow();
+    createTray();
+    updates = new DesktopUpdates({
+      enabled: app.isPackaged && !testMode,
+      beforePrompt: showWindow,
+      beforeInstall: () => {
+        quitting = true;
+      },
+      notify: () => {
+        if (!Notification.isSupported()) return;
+        const notification = new Notification({
+          title: "Kyro update ready",
+          body: "The update is downloaded. Restart now from the update prompt, or quit Kyro to install later.",
+          icon: path.join(resources, "icon.png"),
+        });
+        notification.on("click", showWindow);
+        notification.show();
+      },
+    });
+    updates.start();
   });
   app.on("window-all-closed", () => app.quit());
 }

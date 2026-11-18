@@ -66,14 +66,23 @@ function CropFixture() {
     </>
   );
 }
+import { SiteMotion } from "@/components/SiteMotion";
+import GiftRoute from "@/pages/Gift";
+import DownloadPage from "@/pages/Download";
+import { MobileDownloadBanner } from "@/components/app/MobileDownloadBanner";
+import { GifterBadge } from "@/components/app/PremiumBadge";
+import { StyledDisplayName } from "@/components/app/StyledDisplayName";
+import { BadgeTray } from "@/components/app/GlobalBadges";
 
 window.setFixtureTheme = (theme) =>
   useUiStore.getState().setPreference("theme", theme);
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
-    <TooltipProvider>
-      <Toaster />
-      <Routes>
+    <MobileDownloadBanner floating />
+    <SiteMotion>
+      <TooltipProvider>
+        <Toaster />
+        <Routes>
         <Route
           path="/dashboard/crop-fixture"
           element={
@@ -82,8 +91,52 @@ createRoot(document.getElementById("root")).render(
             </React.StrictMode>
           }
         />
-        <Route path="/dashboard/*" element={<Dashboard />} />
-      </Routes>
-    </TooltipProvider>
+
+          <Route path="/auth" element={<p>Sign in fixture</p>} />
+          <Route path="/download" element={<DownloadPage />} />
+          <Route path="/gift/:code" element={<GiftRoute />} />
+          <Route
+            path="/dashboard/badge-preview"
+            element={
+              <main className="space-y-4 p-6">
+                {[0, 1, 9, 10, 24, 25, 49, 50, 100].map((count) => (
+                  <div key={count} data-testid={`gift-${count}`}>
+                    <GifterBadge count={count} />
+                  </div>
+                ))}
+                <div data-testid="gifts-only-profile">
+                  <BadgeTray badges={[]} user={{ premiumGiftCount: 25 }} />
+                </div>
+                <BadgeTray badges={["moderator"]} />
+                {["Premium", "Ember"].map((tier) => (
+                  <div key={tier} data-testid={`premium-tier-${tier}`}>
+                    <StyledDisplayName
+                      user={{
+                        name: tier,
+                        badges: ["premium"],
+                        premiumUntil: Date.now() + 86400000,
+                        premiumBadgeTier: tier,
+                      }}
+                    />
+                  </div>
+                ))}
+                <StyledDisplayName
+                  user={{
+                    name: "Adrian Eosyne",
+                    badges: ["premium"],
+                    premiumUntil: Date.now() + 86400000,
+                    premiumBadgeTier: "Celestial",
+                    displayNameColorMode: "gradient",
+                    displayNameColor: "#111827",
+                    displayNameColor2: "#94a3b8",
+                  }}
+                />
+              </main>
+            }
+          />
+          <Route path="/dashboard/*" element={<Dashboard />} />
+        </Routes>
+      </TooltipProvider>
+    </SiteMotion>
   </BrowserRouter>,
 );

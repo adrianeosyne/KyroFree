@@ -3,6 +3,7 @@ import { mutation, query, type MutationCtx } from "./functions";
 import type { Id } from "./_generated/dataModel";
 import { PERMISSIONS } from "../lib/permissions";
 import { can, requireProfile, requireServerAccess, requireUser } from "./lib";
+import { serverBenefits } from "./premiumBenefits";
 import {
   claimUpload,
   deleteClaimedUpload,
@@ -10,7 +11,6 @@ import {
 } from "./uploadSecurity";
 
 const EMOJI_NAME = /^[a-zA-Z0-9_]{2,32}$/;
-const MAX_SERVER_EMOJIS = 100;
 const MAX_ACCOUNT_EMOJIS = 200;
 const MAX_FAVORITE_EMOJIS = 100;
 const EMOJI_MIME_TYPES = new Set([
@@ -45,6 +45,7 @@ export const forServer = query({
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
     return {
+      emojiLimit: (await serverBenefits()).emojiSlots,
       canManage:
         can(access.permissions, PERMISSIONS.MANAGE_EMOJIS) ||
         can(access.permissions, PERMISSIONS.MANAGE_SERVER),
@@ -80,7 +81,7 @@ export const available = query({
         const rows = await ctx.db
           .query("serverEmojis")
           .withIndex("by_server", (q) => q.eq("serverId", membership.serverId))
-          .take(MAX_SERVER_EMOJIS);
+          .take(200);
         return await Promise.all(
           rows.map(async (emoji) => ({
             id: emoji._id as string,
@@ -227,9 +228,10 @@ export const create = mutation({
       .query("serverEmojis")
       .withIndex("by_server", (q) => q.eq("serverId", serverId))
       .collect();
-    if (existing.length >= MAX_SERVER_EMOJIS) {
+    const emojiLimit = (await serverBenefits()).emojiSlots;
+    if (existing.length >= emojiLimit) {
       throw new Error(
-        `A server can have up to ${MAX_SERVER_EMOJIS} custom emojis.`,
+        `This server can have up to ${emojiLimit} custom emojis.`,
       );
     }
     if (existing.some((emoji) => emoji.name === clean)) {

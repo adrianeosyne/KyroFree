@@ -23,6 +23,13 @@ flowchart LR
 
 Vercel deploys the frontend and `api/` functions. Convex functions and schema are deployed separately. Git pushes alone do not update the Convex backend.
 
+The advanced expansion adds owner-scoped messaging state, saved-version
+documents/tasks, community pages, social privacy and LFG data through additive
+Convex schemas. Scheduler jobs recheck send permissions, expire content and
+perform retention/deletion in bounded batches. See
+[advanced feature/API and deployment documentation](advanced-features.md) and
+[the implementation report](advanced-expansion-report.md) for scope and limits.
+
 ## Frontend
 
 - **React 19.2**, **TypeScript 5.9**, **Vite 7.3**. `src/main.tsx` creates the React root, Convex client, authentication provider, router, error boundaries, toast provider, and development-only Freebuff toolbar. Vite emits static assets into `dist/`.

@@ -46,12 +46,14 @@ import { cn } from "@/lib/utils";
 import { useUiStore } from "@/lib/store";
 import { CreateCommunityDialog, InviteDialog } from "@/components/app/dialogs";
 import { hasPermission, PERMISSIONS } from "@/lib/permissions";
+import { VerifiedCommunityIcon } from "./VerifiedCommunityBadge";
 
 function RailButton({
   label,
   active,
   unread,
   mentions,
+  verified,
   onClick,
   to,
   children,
@@ -62,6 +64,7 @@ function RailButton({
   active: boolean;
   unread?: boolean;
   mentions?: number;
+  verified?: boolean;
   onClick?: () => void;
   to?: string;
   children: React.ReactNode;
@@ -86,6 +89,9 @@ function RailButton({
         <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-bold text-white ring-2 ring-rail">
           {mentions > 99 ? "99+" : mentions}
         </span>
+      )}
+      {verified && (
+        <VerifiedCommunityIcon className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-rail ring-2 ring-rail" />
       )}
       {(!mentions || mentions === 0) && unread && (
         <span className="absolute -left-1 top-1/2 h-2 w-1 -translate-y-1/2 rounded-full bg-foreground" />
@@ -123,7 +129,10 @@ function RailButton({
           trigger
         )}
       </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side="right">
+        {label}
+        {verified ? " · Verified Community" : ""}
+      </TooltipContent>
     </Tooltip>
   );
 
@@ -234,6 +243,7 @@ export function ServerRail({ activeServerId }: { activeServerId?: string }) {
               active={activeServerId === server.id}
               unread={server.unread && !server.muted}
               mentions={server.mentions}
+              verified={server.verified}
               to={`/dashboard/s/${server.id}`}
               contextMenu={
                 <ContextMenuContent className="w-56">
@@ -436,8 +446,8 @@ function DiscoverDialog({
         <DialogHeader>
           <DialogTitle>Explore communities</DialogTitle>
           <DialogDescription>
-            Public Kyro communities you can join right now — all free, no
-            invites required.
+            Join public Kyro communities for free, without an invite. Optional
+            Premium adds enhanced sharing and customization.
           </DialogDescription>
         </DialogHeader>
         <Input

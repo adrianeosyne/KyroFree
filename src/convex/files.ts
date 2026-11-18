@@ -13,7 +13,6 @@ import type { MutationCtx } from "./functions";
 import { requireActiveUser } from "./lib";
 import { limit, ownerApp, auditBot } from "./botLib";
 import {
-  MAX_UPLOAD_BYTES,
   uploadByStorageId,
   deleteUnclaimedUpload,
   deleteClaimedUpload,
@@ -21,6 +20,9 @@ import {
 import { allowedFilename, cleanFilename } from "../lib/filePolicy";
 import { authorizeFile, fileUrl } from "./fileAccess";
 import { recordUsage } from "./botAnalytics";
+import { contextualUploadLimit } from "./premiumBenefits";
+import { uploadLimit } from "../lib/entitlements";
+import { isAllowedUploadType } from "./uploadSecurity";
 
 export function storageQuota() {
   const value = Number(process.env.KYRO_STORAGE_QUOTA_BYTES);
@@ -37,15 +39,18 @@ export async function reserveUpload(
     channelId?: Id<"channels">;
   },
 ) {
+  const owner = await ctx.db.get(ownerId);
+  if (!owner || owner.deletedAt) throw new Error("That account no longer exists.");
+  const maximumBytes = await contextualUploadLimit(ctx, owner, data.channelId);
   if (
     !Number.isSafeInteger(data.size) ||
     data.size <= 0 ||
-    data.size > MAX_UPLOAD_BYTES ||
+    data.size > maximumBytes ||
     !/^[a-f0-9]{64}$/.test(data.sha256) ||
     !allowedFilename(data.name, process.env.KYRO_UPLOAD_EXTENSIONS)
   )
     throw new Error(
-      "Choose a supported file of at most 10 MiB with a SHA-256 digest.",
+      `Choose a supported file of at most ${maximumBytes / 1024 / 1024} MiB with a SHA-256 digest.`,
     );
   if (!(await limit(ctx, `uploads:${ownerId}`, 20)))
     throw new Error("Upload rate limit reached. Wait a minute.");
@@ -79,21 +84,26 @@ export async function reserveUpload(
   return {
     uploadId,
     uploadUrl: await ctx.storage.generateUploadUrl(),
-    maximumBytes: MAX_UPLOAD_BYTES,
+    maximumBytes,
     expiresAt: Date.now() + 15 * 60000,
   };
 }
 export const generateUploadUrl = mutation({
   args: {
-    name: v.string(),
-    size: v.number(),
-    sha256: v.string(),
+    name: v.optional(v.string()),
+    size: v.optional(v.number()),
+    sha256: v.optional(v.string()),
     applicationId: v.optional(v.id("botApplications")),
+    channelId: v.optional(v.id("channels")),
   },
   handler: async (ctx, args) => {
     const { id } = await requireActiveUser(ctx);
+    if (args.name === undefined && args.size === undefined && args.sha256 === undefined && !args.applicationId && !args.channelId)
+      return ctx.storage.generateUploadUrl();
+    if (args.name === undefined || args.size === undefined || args.sha256 === undefined)
+      throw new Error("Provide a filename, size and SHA-256 digest to reserve an upload.");
     if (args.applicationId) await ownerApp(ctx, args.applicationId);
-    return reserveUpload(ctx, id, args);
+    return reserveUpload(ctx, id, { ...args, name: args.name, size: args.size, sha256: args.sha256 });
   },
 });
 export async function registerReservedUpload(
@@ -145,11 +155,30 @@ export const registerUpload = mutation({
   args: {
     storageId: v.id("_storage"),
     name: v.string(),
-    uploadId: v.id("uploadTickets"),
+    uploadId: v.optional(v.id("uploadTickets")),
+    channelId: v.optional(v.id("channels")),
   },
   handler: async (ctx, args) => {
-    const { id } = await requireActiveUser(ctx);
-    return registerReservedUpload(ctx, id, args.storageId, args.uploadId);
+    const { id, user } = await requireActiveUser(ctx);
+    if (args.uploadId)
+      return registerReservedUpload(ctx, id, args.storageId, args.uploadId);
+    // Preserve older deployed clients during rollout. Existing ownership and
+    // storage metadata remain authoritative for the legacy registration path.
+    const existing = await uploadByStorageId(ctx, args.storageId);
+    if (existing) {
+      if (existing.ownerId !== id) throw new Error("That upload belongs to another account.");
+      if (existing.status && existing.status !== "verified") throw new Error("That upload has not passed file verification.");
+      return { storageId: existing.storageId, name: existing.name, size: existing.size, mimeType: existing.mimeType };
+    }
+    const metadata = await ctx.db.system.get("_storage", args.storageId);
+    if (!metadata) throw new Error("That upload no longer exists.");
+    const maximumBytes = await contextualUploadLimit(ctx, user, args.channelId);
+    const mimeType = metadata.contentType ?? "application/octet-stream";
+    if (metadata.size > maximumBytes || !isAllowedUploadType(mimeType))
+      throw new Error(metadata.size > maximumBytes ? "That file exceeds your current upload limit." : "That file type is not allowed.");
+    const name = cleanFilename(args.name);
+    await ctx.db.insert("uploads", { storageId: args.storageId, ownerId: id, name, size: metadata.size, mimeType, createdAt: Date.now(), ...(args.channelId ? { channelId: args.channelId } : {}) });
+    return { storageId: args.storageId, name, size: metadata.size, mimeType };
   },
 });
 export const verificationJob = internalQuery({
@@ -163,6 +192,9 @@ export const verificationJob = internalQuery({
       !["verifying", "complete"].includes(ticket.status)
     )
       throw new Error("Upload reservation is unavailable.");
+    const owner = await ctx.db.get(ticket.ownerId);
+    if (!owner || owner.deletedAt || ticket.size > await contextualUploadLimit(ctx, owner, ticket.channelId))
+      throw new Error("That file exceeds your current upload limit.");
     return ticket;
   },
 });
@@ -197,6 +229,9 @@ export const finishVerification = internalMutation({
       };
     if (ticket.status !== "verifying" || ticket.expiresAt < Date.now())
       throw new Error("Reservation expired.");
+    const owner = await ctx.db.get(ticket.ownerId);
+    if (!args.error && (!owner || owner.deletedAt || ticket.size > await contextualUploadLimit(ctx, owner, ticket.channelId)))
+      throw new Error("That file exceeds your current upload limit.");
     await ctx.db.patch(ticket._id, {
       status: args.error ? "rejected" : "complete",
     });
@@ -338,7 +373,7 @@ export const list = query({
 export const usage = query({
   args: {},
   handler: async (ctx) => {
-    const { id } = await requireActiveUser(ctx);
+    const { id, user } = await requireActiveUser(ctx);
     const files = await ctx.db
       .query("uploads")
       .withIndex("by_owner", (q) => q.eq("ownerId", id))
@@ -347,7 +382,7 @@ export const usage = query({
       bytes: files.reduce((sum, f) => sum + f.size, 0),
       files: files.length,
       quotaBytes: storageQuota(),
-      maximumBytes: MAX_UPLOAD_BYTES,
+      maximumBytes: uploadLimit(user),
     };
   },
 });
@@ -386,6 +421,14 @@ export const cancel = mutation({
         status: "rejected",
         expiresAt: Date.now(),
       });
+  },
+});
+/** Cancelled uploads from older clients keep their existing cleanup endpoint. */
+export const discard = mutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => {
+    const { id } = await requireActiveUser(ctx);
+    await deleteUnclaimedUpload(ctx, id, storageId);
   },
 });
 export const removeAttachment = mutation({

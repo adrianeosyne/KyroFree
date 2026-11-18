@@ -7,6 +7,12 @@ import {
 
 const crons = cronJobs();
 crons.interval(
+  "apply personal data retention",
+  { hours: 1 },
+  makeFunctionReference<"mutation">("privacyControls:applyRetention"),
+  {},
+);
+crons.interval(
   "clean developer telemetry",
   { hours: 1 },
   makeFunctionReference<"mutation">("botAnalytics:cleanup"),
@@ -16,6 +22,12 @@ crons.interval(
   "clean upload reservations",
   { hours: 1 },
   makeFunctionReference<"mutation">("files:cleanup"),
+  {},
+);
+crons.interval(
+  "reconcile Premium warnings and expiry",
+  { minutes: 5 },
+  makeFunctionReference<"mutation">("premium:reconcileExpirations"),
   {},
 );
 crons.interval(

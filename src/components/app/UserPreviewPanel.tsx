@@ -82,7 +82,10 @@ export function UserPreviewPanel() {
             : undefined
         }
       >
-        <ProfileDecorationLayer decorationId={user?.profileDecoration} />
+        <ProfileDecorationLayer
+          decorationId={user?.profileDecoration}
+          imageUrl={user?.profileDecorationUrl}
+        />
         <button
           type="button"
           aria-label="Close preview"

@@ -1,3 +1,6 @@
+import { TrustReviewQueue } from "./TrustReviews";
+import { PremiumAdmin } from "./PremiumSettings";
+import { DecorationReview } from "./DecorationStudio";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import type {
   DefaultFunctionArgs,
@@ -40,9 +43,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BUG_CATEGORY_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { ServerVerificationAdmin } from "./ServerVerificationAdmin";
 
 type AdminTab =
+  | "creatorReviews"
+  | "premium"
+  | "decorations"
   | "overview"
+  | "servers"
   | "badges"
   | "reports"
   | "bugs"
@@ -53,7 +61,11 @@ type AdminTab =
   | "ips";
 
 const TABS: { id: AdminTab; label: string; icon: typeof ShieldCheck }[] = [
+  { id: "creatorReviews", label: "Creator & bot reviews", icon: Check },
+  { id: "premium", label: "Premium", icon: ShieldCheck },
+  { id: "decorations", label: "Decorations", icon: Check },
   { id: "overview", label: "Overview", icon: ShieldCheck },
+  { id: "servers", label: "Servers", icon: Globe },
   { id: "ips", label: "IP detector", icon: Globe },
   { id: "badges", label: "Badges", icon: Shield },
   { id: "reports", label: "Reports", icon: AlertTriangle },
@@ -133,6 +145,7 @@ function timeAgo(timestamp: number): string {
 export function AdminPortal() {
   const { isAuthenticated } = useConvexAuth();
   const data = useQuery(api.admin.overview, isAuthenticated ? {} : "skip");
+  const me = useQuery(api.users.me, isAuthenticated ? {} : "skip");
   // The badge and the Bugs tab read the same query result, so the indicator
   // can never advertise reports the tab refuses to show.
   const bugs = useQuery(api.bugReports.list, data?.allowed ? {} : "skip");
@@ -173,7 +186,10 @@ export function AdminPortal() {
         ).length;
   // The IP detector is a two-person tool, stricter than staff access.
   const visibleTabs = TABS.filter(
-    (entry) => entry.id !== "ips" || data.canViewIps,
+    (entry) =>
+      (entry.id !== "ips" || data.canViewIps) &&
+      (entry.id !== "premium" || me?.isFounder) &&
+      (entry.id !== "decorations" || me?.isPlatformStaff),
   );
 
   return (
@@ -248,7 +264,13 @@ export function AdminPortal() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {tab === "premium" && me?.isFounder && <PremiumAdmin />}
+        {tab === "decorations" && me?.isPlatformStaff && <DecorationReview />}
+        {tab === "creatorReviews" && <TrustReviewQueue />}
         {tab === "overview" && <OverviewTab data={data} openBugs={openBugs} />}
+        {tab === "servers" && (
+          <ServerVerificationAdmin canVerify={data.me.isFounder} />
+        )}
         {tab === "ips" && data.canViewIps && <IpDetectorTab />}
         {tab === "badges" && (
           <BadgesTab

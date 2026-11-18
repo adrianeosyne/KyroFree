@@ -1,3 +1,4 @@
+import { CommunityHubDialog } from "./CommunityHub";
 import { useMutation, useQuery } from "convex/react";
 import {
   Bell,
@@ -24,6 +25,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  MessageCircle,
 } from "@/components/icons";
 import { useMemo, useState } from "react";
 import {
@@ -78,7 +80,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
+    <div className="kyro-sidebar flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -112,6 +114,10 @@ function ServerSection({ serverId }: { serverId: string }) {
     api.channels.list,
     canEnter ? { serverId: serverId as Id<"servers"> } : "skip",
   );
+  const lobby = useQuery(
+    api.lobby.status,
+    canEnter ? { serverId: serverId as Id<"servers"> } : "skip",
+  );
   const createCategory = useMutation(api.channels.createCategory);
   const leave = useMutation(api.servers.leave);
   const setMuted = useMutation(api.servers.setMuted);
@@ -119,6 +125,9 @@ function ServerSection({ serverId }: { serverId: string }) {
   const navigate = useNavigate();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [hubSection, setHubSection] = useState<"events" | "tickets" | null>(
+    null,
+  );
   const [nicknameOpen, setNicknameOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const activeTextChannel = useMatch("/dashboard/s/:serverId/c/:channelId");
@@ -191,6 +200,14 @@ function ServerSection({ serverId }: { serverId: string }) {
 
   return (
     <>
+      {lobby?.enabled && (
+        <NavLink
+          to={`/dashboard/s/${serverId}/lobby`}
+          className="m-3 flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm font-semibold text-primary"
+        >
+          ✦ Lobby
+        </NavLink>
+      )}
       <div
         className={cn(
           "sticky top-0 z-10 overflow-hidden border-b border-border/70 bg-sidebar",
@@ -279,6 +296,16 @@ function ServerSection({ serverId }: { serverId: string }) {
                 }}
               >
                 <Copy className="size-4" /> Copy server ID
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setHubSection("events")}>
+                <Users className="size-4" />
+                Events
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/dashboard/s/${serverId}/knowledge`)}><BookOpen className="size-4" />Wiki and suggestions</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/dashboard/s/${serverId}/gaming`)}><Users className="size-4" />Party Finder</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setHubSection("tickets")}>
+                <MessageCircle className="size-4" />
+                Support tickets
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setNicknameOpen(true)}>
                 <Pencil className="size-4" /> Change nickname
@@ -428,6 +455,13 @@ function ServerSection({ serverId }: { serverId: string }) {
         onOpenChange={setCreateOpen}
         categories={listing.categories}
       />
+      {hubSection && (
+        <CommunityHubDialog
+          serverId={serverId}
+          section={hubSection}
+          onClose={() => setHubSection(null)}
+        />
+      )}
       <NicknameDialog
         serverId={serverId}
         currentNickname={server.nickname ?? ""}
@@ -828,6 +862,8 @@ function HomeSection() {
         <Compass className="size-4" />
         Discover
       </Link>
+      <NavLink to="/dashboard/social" className={({ isActive }) => cn("mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sidebar-accent/60", isActive ? "bg-primary/12 font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}><Users className="size-4" />Around Kyro</NavLink>
+      <NavLink to="/dashboard/library" className={({ isActive }) => cn("mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sidebar-accent/60", isActive ? "bg-primary/12 font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}><BookOpen className="size-4" />Your library</NavLink>
       <NavLink
         to="/dashboard/bots"
         className={({ isActive }) =>

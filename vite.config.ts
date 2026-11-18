@@ -3,10 +3,14 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { defineConfig } from "vite";
+
+const webBuild = randomUUID();
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __KYRO_WEB_BUILD__: JSON.stringify(webBuild) },
   plugins: [
     react(),
     vlyPlugin(),
@@ -36,6 +40,16 @@ export default defineConfig({
           )
             response.setHeader("Access-Control-Allow-Origin", "*");
           next();
+        });
+      },
+    },
+    {
+      name: "desktop-web-version",
+      generateBundle() {
+        this.emitFile({
+          type: "asset",
+          fileName: "desktop-version.json",
+          source: JSON.stringify({ build: webBuild }),
         });
       },
     },

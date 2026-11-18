@@ -109,6 +109,7 @@ export async function inspectFile(
     if (!type) throw new Error("UNSUPPORTED_FILE");
     const aliases: Record<string, string[]> = {
       "image/jpeg": ["image/jpeg"],
+      "image/apng": ["image/apng", "image/png"],
       "audio/wav": ["audio/wav", "audio/x-wav"],
       "audio/mp4": ["audio/mp4", "video/mp4", "audio/x-m4a"],
       "audio/ogg": ["audio/ogg", "application/ogg", "audio/opus"],

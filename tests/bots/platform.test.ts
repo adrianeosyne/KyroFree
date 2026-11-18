@@ -824,6 +824,28 @@ describe("persistent bot platform", () => {
       category: "Utilities",
       permissions: app.permissions,
     });
+    expect(await f.owner.query(api.botApplications.directory, {})).toHaveLength(
+      0,
+    );
+    const reviewerId = await f.t.run((ctx) =>
+      ctx.db.insert("users", {
+        name: "Directory reviewer",
+        username: "directory_reviewer",
+        role: "admin",
+      }),
+    );
+    const reviewer = f.t.withIdentity({ subject: reviewerId });
+    const queue = await reviewer.query(api.trustReviews.queue, {
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    const pending = queue.page.find(
+      (row) => row.applicationId === f.applicationId,
+    )!;
+    await reviewer.mutation(api.trustReviews.review, {
+      requestId: pending._id,
+      approve: true,
+      note: "Bot behavior and listing information checked.",
+    });
     expect(
       await f.owner.query(api.botApplications.directory, {
         category: "Utilities",

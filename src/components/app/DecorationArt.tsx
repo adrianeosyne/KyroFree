@@ -7,12 +7,33 @@ const HEART =
 
 export function AvatarDecorationArt({
   decorationId,
+  imageUrl,
   className,
 }: {
   decorationId?: string | null;
+  imageUrl?: string | null;
   className?: string;
 }) {
-  const item = findAvatarDecoration(decorationId);
+  const preset = findAvatarDecoration(decorationId);
+  const item = preset
+    ? {
+        ...preset,
+        variant:
+          (preset.variant % 5) + (Math.floor(preset.variant / 5) % 10) * 0.08,
+      }
+    : null;
+  if (imageUrl && decorationId?.startsWith("community:"))
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute left-1/2 top-1/2 z-20 size-[138%] -translate-x-1/2 -translate-y-1/2 object-contain",
+          className,
+        )}
+      />
+    );
   if (!item) return null;
   const [a, b] = item.colours;
   const shift = item.variant * 3;
@@ -204,12 +225,38 @@ export function AvatarDecorationArt({
 
 export function ProfileDecorationLayer({
   decorationId,
+  imageUrl,
   className,
 }: {
   decorationId?: string | null;
+  imageUrl?: string | null;
   className?: string;
 }) {
   const item = findProfileDecoration(decorationId);
+  if (imageUrl && decorationId?.startsWith("community:"))
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[1] size-full rounded-[inherit] object-cover",
+          className,
+        )}
+      />
+    );
+  if (imageUrl && decorationId?.startsWith("community:"))
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-0 z-[1] size-full rounded-[inherit] object-cover",
+          className,
+        )}
+      />
+    );
   if (!item) return null;
   const [a, b] = item.colours;
   const points = Array.from({ length: 16 }, (_, index) => ({

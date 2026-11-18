@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, query } from "./functions";
@@ -37,6 +38,7 @@ async function sourcePermissions(
   }
   const channel = await ctx.db.get(sourceId as Id<"channels">);
   if (!channel) throw new Error("That channel no longer exists.");
+  await requirePremiumChannel(ctx, channel, userId);
   const access = await requireServerAccess(ctx, channel.serverId, userId);
   const defaultRole = await ctx.db
     .query("serverRoles")
@@ -73,6 +75,12 @@ async function requireThreadAccess(
 ): Promise<ThreadAccess> {
   const thread = await ctx.db.get(threadId);
   if (!thread) throw new Error("That thread no longer exists.");
+  const parent = await ctx.db.get(thread.parentMessageId);
+  if (
+    !parent ||
+    (parent.expiresAt !== undefined && parent.expiresAt <= Date.now())
+  )
+    throw new Error("That thread no longer exists.");
   const permissions = await sourcePermissions(
     ctx,
     userId,
@@ -87,7 +95,11 @@ export const openForMessage = mutation({
   handler: async (ctx, { messageId }) => {
     const { id } = await requireActiveUser(ctx);
     const message = await ctx.db.get(messageId);
-    if (!message) throw new Error("That message no longer exists.");
+    if (
+      !message ||
+      (message.expiresAt !== undefined && message.expiresAt <= Date.now())
+    )
+      throw new Error("That message no longer exists.");
     const permissions = await sourcePermissions(
       ctx,
       id,

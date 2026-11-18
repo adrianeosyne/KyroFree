@@ -82,6 +82,7 @@ export async function authorizeFile(
     const message = await ctx.db.get(targetId);
     if (
       !message ||
+      (message.expiresAt !== undefined && message.expiresAt <= Date.now()) ||
       !message.attachments?.some((a) => a.storageId === storageId)
     )
       throw new Error("Attachment unavailable.");

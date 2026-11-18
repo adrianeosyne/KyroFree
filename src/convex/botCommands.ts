@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { v } from "convex/values";
 import { mutation, query } from "./functions";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -112,6 +113,7 @@ export async function humanChannel(ctx: Ctx, channelId: Id<"channels">) {
   const { id } = await requireActiveUser(ctx);
   const channel = await ctx.db.get(channelId);
   if (!channel) botError(404, "NOT_FOUND", "Channel not found.");
+  await requirePremiumChannel(ctx, channel, id);
   const access = await requireServerAccess(ctx, channel.serverId, id);
   const roles = await ctx.db
     .query("serverRoles")

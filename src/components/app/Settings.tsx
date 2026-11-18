@@ -1,4 +1,13 @@
-import { useAction, useMutation, useQuery } from "convex/react";
+import {
+  AccountFreeze,
+  SecurityActivity,
+  RetentionSettings,
+} from "./PrivacyControls";
+import { WorkspaceStudio } from "./WorkspaceStudio";
+import { PremiumSettings } from "./PremiumSettings";
+import { DecorationStudio } from "./DecorationStudio";
+import { useAction, useConvex, useMutation, useQuery } from "convex/react";
+import { exportDatasets } from "@/lib/dataExport";
 import type {
   DefaultFunctionArgs,
   FunctionReference,
@@ -100,6 +109,9 @@ import {
 type ProfileLink = { label: string; url: string };
 
 type TabId =
+  | "premium"
+  | "workshop"
+  | "studio"
   | "account"
   | "profile"
   | "appearance"
@@ -122,6 +134,32 @@ const TABS: {
   description: string;
   keywords: string;
 }[] = [
+  {
+    id: "studio",
+    label: "Workspace Studio",
+    icon: Palette,
+    group: "App settings",
+    description: "Design your entire Kyro workspace with Premium.",
+    keywords:
+      "premium background animated gif panels fonts typography gaming cursors upload layout full customize",
+  },
+  {
+    id: "premium",
+    label: "Premium",
+    icon: Sparkles,
+    group: "Your account",
+    description:
+      "More room to play and create. Explore Premium and current offers.",
+    keywords: "payment gift subscription badge 1440p 60fps 200mb",
+  },
+  {
+    id: "workshop",
+    label: "Decoration Workshop",
+    icon: Palette,
+    group: "Your account",
+    description: "Share your original artwork with the Kyro community.",
+    keywords: "upload submit artwork animated gif community moderation",
+  },
   {
     id: "account",
     label: "My Account",
@@ -153,7 +191,7 @@ const TABS: {
     icon: Monitor,
     group: "Your account",
     description: "Keep track of where you’re signed in.",
-    keywords: "security logout revoke",
+    keywords: "security logout revoke freeze activity",
   },
   {
     id: "appearance",
@@ -209,7 +247,8 @@ const TABS: {
     icon: Download,
     group: "Resources",
     description: "Your data belongs to you. Export it or manage your account.",
-    keywords: "export download delete account",
+    keywords:
+      "export download delete account retention drafts schedule history notifications",
   },
   {
     id: "files",
@@ -410,6 +449,9 @@ function SettingsContent({ initialTab }: { initialTab: string }) {
               <AccountTab onEditProfile={() => setTab("profile")} />
             )}
             {tab === "profile" && <ProfileTab />}
+            {tab === "premium" && <PremiumSettings />}
+            {tab === "workshop" && <DecorationStudio />}
+            {tab === "studio" && <WorkspaceStudio />}
             {tab === "appearance" && <AppearanceTab />}
             {tab === "chat" && <ChatSettings />}
             {tab === "voice" && <VoiceSettings />}
@@ -417,8 +459,19 @@ function SettingsContent({ initialTab }: { initialTab: string }) {
             {tab === "accessibility" && <AccessibilitySettings />}
             {tab === "keybinds" && <KeybindSettings />}
             {tab === "privacy" && <PrivacyTab />}
-            {tab === "security" && <SessionsTab />}
-            {tab === "data" && <DataTab />}
+            {tab === "security" && (
+              <>
+                <SessionsTab />
+                <AccountFreeze />
+                <SecurityActivity />
+              </>
+            )}
+            {tab === "data" && (
+              <>
+                <DataTab />
+                <RetentionSettings />
+              </>
+            )}
             {tab === "files" && <DeveloperAssets />}
             {tab === "help" && (
               <SettingsHelp>
@@ -1710,6 +1763,8 @@ function ProfileTab() {
   );
   const [linksBusy, setLinksBusy] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [themeSearch, setThemeSearch] = useState("");
+  const [frameSearch, setFrameSearch] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [nameStyleOpen, setNameStyleOpen] = useState(false);
@@ -1944,7 +1999,10 @@ function ProfileTab() {
               className="flex w-full items-center gap-4 p-4 text-left transition-colors hover:bg-panel/60 sm:p-5"
             >
               <span className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-primary/40 via-panel to-background ring-1 ring-border/70">
-                <ProfileDecorationLayer decorationId={me.profileDecoration} />
+                <ProfileDecorationLayer
+                  decorationId={me.profileDecoration}
+                  imageUrl={me.profileDecorationUrl}
+                />
                 <span className="relative z-10 flex size-full items-end p-2 text-[9px] font-bold">
                   Profile
                 </span>
@@ -2206,7 +2264,14 @@ function ProfileTab() {
           <p className="mb-3 text-xs text-muted-foreground">
             Colours your profile card and its banner when you have no picture.
           </p>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+          <Input
+            aria-label="Search profile themes"
+            placeholder="Search 200 profile themes"
+            value={themeSearch}
+            onChange={(e) => setThemeSearch(e.target.value)}
+            className="mb-3"
+          />
+          <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
             <button
               type="button"
               onClick={() => {
@@ -2236,7 +2301,9 @@ function ProfileTab() {
               </span>
               None
             </button>
-            {PROFILE_THEMES.map((theme) => {
+            {PROFILE_THEMES.filter((theme) =>
+              theme.label.toLowerCase().includes(themeSearch.toLowerCase()),
+            ).map((theme) => {
               const active =
                 (themeSel === undefined ? me.profileTheme : themeSel) ===
                 theme.id;
@@ -2283,6 +2350,13 @@ function ProfileTab() {
             Give your profile a fresh look — a frame around your picture.
             Built-in ones are free.
           </p>
+          <Input
+            aria-label="Search avatar frames"
+            placeholder="Search 200 avatar frames"
+            value={frameSearch}
+            onChange={(e) => setFrameSearch(e.target.value)}
+            className="mb-3"
+          />
           <div className="flex flex-wrap items-start gap-6">
             <div className="flex flex-col items-center gap-2">
               <UserAvatar
@@ -2303,7 +2377,7 @@ function ProfileTab() {
                 })()}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto p-1 sm:grid-cols-4">
               <button
                 type="button"
                 onClick={() => {
@@ -2334,7 +2408,9 @@ function ProfileTab() {
                 </span>
                 None
               </button>
-              {AVATAR_FRAMES.map((frame) => {
+              {AVATAR_FRAMES.filter((frame) =>
+                frame.label.toLowerCase().includes(frameSearch.toLowerCase()),
+              ).map((frame) => {
                 const active =
                   (frameSel === undefined ? me.avatarFrame : frameSel) ===
                   frame.id;
@@ -2626,7 +2702,7 @@ function ProfilePreviewPane({
   const linkRows = links ?? me.links;
 
   return (
-    <div>
+    <div role="region" aria-label="Profile preview">
       <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
         Preview
       </p>
@@ -2641,7 +2717,10 @@ function ProfilePreviewPane({
             : undefined
         }
       >
-        <ProfileDecorationLayer decorationId={me.profileDecoration} />
+        <ProfileDecorationLayer
+          decorationId={me.profileDecoration}
+          imageUrl={me.profileDecorationUrl}
+        />
         {/* Banner: current picture, else the chosen colour theme. */}
         <div
           className={cn(
@@ -2983,7 +3062,7 @@ function AppearanceTab() {
 
       <Section
         title="Desktop & mobile app"
-        description="Download Kyro for Windows or install the web app through your browser."
+        description="Download Kyro for Android or Windows, or install the web app through your browser."
       >
         <InstallAppButton />
       </Section>
@@ -3456,6 +3535,7 @@ function TwoFactorSettings() {
 }
 
 function DataTab() {
+  const client = useConvex();
   const exportData = useMutation(api.users.exportData);
   const deleteAccount = useMutation(api.users.deleteAccount);
   const [busy, setBusy] = useState(false);
@@ -3465,9 +3545,30 @@ function DataTab() {
     setBusy(true);
     try {
       const payload = await exportData();
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json",
-      });
+      const advanced: Record<string, unknown[]> = {};
+      for (const dataset of exportDatasets) {
+        advanced[dataset] = [];
+        let cursor: string | null = null;
+        for (;;) {
+          const result: {
+            page: Record<string, unknown>[];
+            isDone: boolean;
+            continueCursor: string;
+          } = await client.query(api.dataPortability.personalPage, {
+            dataset,
+            paginationOpts: { cursor, numItems: 10 },
+          });
+          advanced[dataset].push(...result.page);
+          if (result.isDone) break;
+          cursor = result.continueCursor;
+        }
+      }
+      const blob = new Blob(
+        [JSON.stringify({ ...payload, advanced }, null, 2)],
+        {
+          type: "application/json",
+        },
+      );
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -3486,7 +3587,7 @@ function DataTab() {
     <>
       <Section
         title="Export your data"
-        description="Download everything Kyro stores about your account as JSON."
+        description="Download your profile and account data as JSON, including your saved messages, drafts, notes, tasks and social activity. The legacy message export includes up to 5,000 authored messages and 1,000 notifications."
       >
         <Button variant="outline" onClick={download} disabled={busy}>
           {busy ? (

@@ -2,11 +2,18 @@ import { useEffect } from "react";
 import { Link, useLocation } from "react-router";
 import {
   LEGAL_POLICIES,
-  LEGAL_UPDATED,
+  LEGAL_POLICY_UPDATED,
   type LegalPolicy,
 } from "@/lib/legalContent";
+import {
+  COPYRIGHT_OWNER,
+  LEGAL_POLICY_VERSIONS,
+  type RegistrationPolicies,
+} from "@/lib/legalPolicies";
+import { PremiumPrice } from "@/components/PremiumPrice";
 
 function LegalPage({ policy }: { policy: LegalPolicy }) {
+  const updated = LEGAL_POLICY_UPDATED[policy.slug];
   const { hash } = useLocation();
 
   useEffect(() => {
@@ -53,10 +60,12 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
       >
         <h1 className="text-3xl font-bold tracking-tight">{policy.title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Last updated{" "}
-          <time dateTime={LEGAL_UPDATED.date}>{LEGAL_UPDATED.label}</time>
+          Last updated <time dateTime={updated.date}>{updated.label}</time>
           <span aria-hidden="true"> · </span>
           {policy.sections.length} explained sections
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Policy version {LEGAL_POLICY_VERSIONS[policy.slug]}
         </p>
         <p className="mt-6 text-sm leading-7 text-muted-foreground sm:text-base">
           {policy.intro}
@@ -145,14 +154,16 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
             Keep passwords and recovery codes private.
           </p>
           <p className="mt-3">
-            Kyro is free for everyone, with no paid tiers or paywalled features.
+            Kyro offers free core features and optional Premium for{" "}
+            <PremiumPrice suffix=" per month" showOfferLabel />, with manual
+            payment and founder approval.
           </p>
         </aside>
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-4 text-sm text-muted-foreground print:hidden">
           <p>
-            © {new Date().getFullYear()} Kyro. Rights in member content remain
-            with their owners.
+            © {new Date().getFullYear()} {COPYRIGHT_OWNER}. Rights in member
+            content remain with their owners.
           </p>
           <a href="#legal-top" className="shrink-0 hover:text-foreground">
             Back to top ↑
@@ -160,6 +171,53 @@ function LegalPage({ policy }: { policy: LegalPolicy }) {
         </div>
       </main>
     </div>
+  );
+}
+
+/** Signup reviews use the same content and versions as the public policy pages. */
+export function LegalPolicyContent({
+  policy,
+  snapshot,
+}: {
+  policy: LegalPolicy["slug"];
+  snapshot?: RegistrationPolicies;
+}) {
+  const document = (snapshot?.policies ?? LEGAL_POLICIES).find(
+    (item) => item.slug === policy,
+  )!;
+  const updated = (snapshot?.updated ?? LEGAL_POLICY_UPDATED)[policy];
+  const version = (snapshot?.versions ?? LEGAL_POLICY_VERSIONS)[policy];
+  return (
+    <article className="space-y-6 text-sm leading-6">
+      <div>
+        <h2 className="text-xl font-bold">{document.title}</h2>
+        <p className="mt-1 text-muted-foreground">
+          Last updated {updated.label} · Version {version}
+        </p>
+        <p className="mt-3 text-muted-foreground">{document.intro}</p>
+      </div>
+      {document.sections.map((section, index) => (
+        <section key={section.heading}>
+          <h3 className="font-semibold">
+            {index + 1}. {section.heading}
+          </h3>
+          {section.body.map((paragraph) => (
+            <p key={paragraph} className="mt-3 text-muted-foreground">
+              {paragraph}
+            </p>
+          ))}
+        </section>
+      ))}
+      <p>
+        © {new Date().getFullYear()} {COPYRIGHT_OWNER}. Policy enquiries:{" "}
+        <a
+          href="mailto:support@kyro-chat.cyou"
+          className="text-primary underline"
+        >
+          support@kyro-chat.cyou
+        </a>
+      </p>
+    </article>
   );
 }
 

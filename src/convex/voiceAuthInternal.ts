@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./functions";
@@ -32,6 +33,7 @@ async function channelAccess(
   if (!channel || channel.kind !== "voice") {
     throw new Error("That voice channel no longer exists.");
   }
+  await requirePremiumChannel(ctx, channel, userId);
   const access = await getServerAccess(ctx, channel.serverId, userId);
   if (!access) throw new Error("You are not a member of this community.");
   const defaultRole = await ctx.db
@@ -81,7 +83,7 @@ export const createJoinTicket = internalMutation({
   handler: async (ctx, args) => {
     await cleanExpired(ctx);
     const user = await ctx.db.get(args.userId);
-    if (!user || user.deletedAt !== undefined || !user.username) {
+    if (!user || user.deletedAt !== undefined || user.frozenAt !== undefined || !user.username) {
       throw new Error("That Kyro account cannot join voice.");
     }
     if (await activeSiteBan(ctx, args.userId)) {

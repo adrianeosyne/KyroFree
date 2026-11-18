@@ -53,7 +53,7 @@ describe("database I/O regressions", () => {
       communities: 0,
       onlineMembers: 1,
     });
-    vi.setSystemTime(now + 211_000);
+    vi.setSystemTime(now + 361_000);
     expect(await t.mutation(internal.presence.expire, {})).toEqual({
       expired: 1,
     });

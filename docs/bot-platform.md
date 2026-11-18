@@ -208,7 +208,7 @@ Private responses are stored on the interaction and queried only for the invokin
 
 API authentication is limited to **120 requests per minute per application**, including reads, polling and failed authorized operations. The authorization counter commits separately from resource mutations. Bots may send **five messages per five seconds**, and channel slow mode applies. JSON bodies are ≤64 KiB. Users may invoke ten commands/minute and submit five bot reports/hour. Limits use the backend clock; do not rely on the UI to enforce them.
 
-Current product caps: 20 applications/owner, 100 installations/application, 100 commands/application. Directory search considers the newest 500 discoverable applications and returns at most 100. Analytics count distinct member IDs from at most 5000 memberships per installed server, so users reached is bounded for very large servers. Mass mentions inspect at most 1000 memberships. These bounds are capacity controls, not claims of unlimited scale.
+Current product caps: 2 applications/free owner or 10 with active Premium, 100 installations/application, 100 commands/application. Directory search considers the newest 500 discoverable applications and returns at most 100. Analytics count distinct member IDs from at most 5000 memberships per installed server, so users reached is bounded for very large servers. Mass mentions inspect at most 1000 memberships. These bounds are capacity controls, not claims of unlimited scale.
 
 ## Events and signed webhooks
 
@@ -294,3 +294,7 @@ node scripts/bot-browser-smoke.mjs
 `--configure-auth` generates fresh local auth/webhook keys; use it only when setting up the disposable deployment. The live harness reads `.convex/local/default/config.json`, creates two actual password accounts, signs in normally, and exercises REST/SDK/database flows. It writes ignored `.env.bots-browser.local` credentials for the browser harness. Screenshots are stored in ignored `test-results/`. Run the browser check soon after the live harness because private responses expire after 15 minutes.
 
 Automated coverage includes ownership, grants/revocation, channel denies, role delegation, token/rate behavior, messages/embeds/edits/reactions/polls/uploads, typed private interactions, AutoMod/slow mode, notification privacy, suspension, event leases/retries and SDK/webhook verification. Existing email/voice suites remain part of regression validation. Production LiveKit/SMTP and delivery to a real public webhook require their respective configured services and are not simulated as deployed by these tests.
+
+## Account freeze and temporary messages
+
+Freezing an application owner account disables its bot authentication until the owner unfreezes it. New voice tickets are also denied. Temporary message history and downloads check the original expiry time; bots must handle an unavailable message instead of assuming its ID is permanent. Credentials, installations, Premium and ownership remain unchanged by freeze. See [advanced features](advanced-features.md).

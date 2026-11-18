@@ -1,7 +1,237 @@
 /* DO NOT CHANGE */
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./workspaceFonts.css";
 @custom-variant dark (&:is(.dark *));
+
+.mobile-download-inline,
+.mobile-download-floating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in oklab, var(--primary) 22%, var(--border));
+  border-radius: 20px;
+  background: var(--panel);
+  color: var(--foreground);
+}
+.mobile-download-inline {
+  flex-shrink: 0;
+  margin: 8px 12px;
+}
+.mobile-download-floating {
+  position: fixed;
+  z-index: 70;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(calc(100% - 24px), 480px);
+  transform: translateX(-50%);
+  box-shadow: 0 12px 50px #00000035;
+}
+@media (max-width: 767px) {
+  .mobile-app-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(64px + env(safe-area-inset-top));
+    background: var(--background);
+  }
+  .mobile-dock {
+    margin: 8px 12px max(10px, env(safe-area-inset-bottom));
+    padding: 5px;
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    background: color-mix(in oklab, var(--panel) 97%, transparent);
+    box-shadow: 0 5px 24px #00000010;
+  }
+  .mobile-friends > header {
+    display: none;
+  }
+  .mobile-friends .friends-welcome {
+    margin-bottom: 20px;
+    padding: 22px 20px;
+    border-radius: 24px;
+  }
+  .mobile-friends .friends-welcome > .relative {
+    max-width: 100%;
+  }
+  .mobile-friends .friends-orbit {
+    display: none;
+  }
+  .mobile-friends [aria-label="Friend filters"] {
+    border: 0;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+  .mobile-friends [aria-label="Friend filters"] button {
+    min-height: 44px;
+    border-radius: 14px;
+  }
+  .mobile-chats input,
+  .kyro-app-shell input:not([type="checkbox"]):not([type="range"]),
+  .kyro-app-shell textarea {
+    font-size: 16px;
+  }
+  .mobile-composer {
+    padding-inline: 10px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+  .mobile-composer textarea {
+    min-height: 44px;
+  }
+  .mobile-composer button,
+  .mobile-composer label[title="Attach files"] {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .mobile-chat-header {
+    padding-top: env(safe-area-inset-top);
+    height: calc(64px + env(safe-area-inset-top));
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html[data-custom-cursor="true"] body {
+    cursor: var(
+      --kyro-cursor-default,
+      url("/cursors/kyro-default.svg") 4 3,
+      auto
+    );
+  }
+  html[data-custom-cursor="true"]
+    :is(a, button, [role="button"], summary, select, .cursor-pointer):not(
+      :disabled
+    ):not([aria-disabled="true"]) {
+    cursor: var(
+      --kyro-cursor-pointer,
+      url("/cursors/kyro-pointer.svg") 4 3,
+      pointer
+    );
+  }
+  html[data-custom-cursor="true"]
+    :is(
+      textarea,
+      input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(
+          [type="range"]
+        ):not([type="button"]):not([type="submit"]):not([type="color"]),
+      [contenteditable="true"],
+      .cursor-text
+    ) {
+    cursor: text;
+  }
+}
+
+.kyro-loading {
+  position: relative;
+  isolation: isolate;
+}
+.kyro-loading-halo {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(640px, 110vw);
+  height: min(640px, 110vw);
+  transform: translate(-50%, -58%);
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--primary) 13%, transparent),
+    transparent 66%
+  );
+}
+.kyro-loading-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border: 1px solid color-mix(in oklab, var(--primary) 28%, transparent);
+  border-radius: 28px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in oklab, var(--primary) 15%, var(--panel)),
+    var(--panel)
+  );
+  box-shadow: 0 20px 65px color-mix(in oklab, var(--primary) 15%, transparent);
+}
+.kyro-loading-orbit {
+  position: absolute;
+  inset: -20px;
+  border: 1px solid color-mix(in oklab, var(--primary) 13%, transparent);
+  border-top: 2px solid var(--primary);
+  border-radius: 50%;
+  animation: kyro-loading-spin 2.4s linear infinite;
+}
+.kyro-loading-orbit::after {
+  content: "";
+  position: absolute;
+  top: 16px;
+  right: 14px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary);
+}
+.kyro-loading-content {
+  animation: kyro-page-in 360ms ease-out both;
+}
+.kyro-loading-dots {
+  display: flex;
+  gap: 7px;
+}
+.kyro-loading-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: kyro-loading-dot 1.4s ease-in-out infinite;
+}
+.kyro-loading-dots span:nth-child(2) {
+  animation-delay: 160ms;
+}
+.kyro-loading-dots span:nth-child(3) {
+  animation-delay: 320ms;
+}
+.kyro-page-enter {
+  animation: kyro-page-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.kyro-view-enter {
+  animation: kyro-page-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.kyro-attachment-card {
+  animation: kyro-page-in 180ms ease-out both;
+}
+.kyro-attachment-image {
+  transition: transform 180ms ease;
+}
+.kyro-attachment-preview:hover .kyro-attachment-image {
+  transform: scale(1.025);
+}
+@keyframes kyro-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes kyro-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes kyro-loading-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
 
 .chat-text {
   font-size: var(--chat-font-size, 14px);
@@ -777,4 +1007,78 @@ html[data-tint] body {
         0%,
       transparent 40%
     );
+}
+
+/* Premium styles are applied only after the authenticated entitlement resolves. */
+html[data-workspace="true"] {
+  --background: var(--workspace-background);
+  --panel: color-mix(
+    in srgb,
+    var(--workspace-panel) calc(var(--workspace-panelOpacity) * 1%),
+    transparent
+  );
+  --primary: var(--workspace-accent) !important;
+  --brand: var(--workspace-accent) !important;
+  --foreground: var(--workspace-text);
+  --surface: color-mix(
+    in srgb,
+    var(--workspace-panel) calc(var(--workspace-panelOpacity) * 1%),
+    transparent
+  );
+  --sidebar: var(--workspace-panel);
+}
+html[data-workspace="true"] body {
+  font-family: var(--workspace-font);
+}
+html[data-workspace="true"] .kyro-app-shell {
+  font-family: var(--workspace-font);
+  filter: contrast(calc(var(--workspace-contrast) * 1%));
+}
+html[data-workspace="true"] .kyro-app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--workspace-image);
+  background-size: var(--workspace-backgroundFit);
+  background-position: var(--workspace-backgroundPosition);
+  opacity: calc(var(--workspace-backgroundOpacity) * 0.01);
+  filter: blur(calc(var(--workspace-backgroundBlur) * 1px));
+  z-index: 0;
+}
+html[data-workspace="true"] .kyro-app-shell .bg-panel {
+  border-radius: calc(var(--workspace-radius) * 1px);
+  border-width: calc(var(--workspace-borderWidth) * 1px);
+  box-shadow: 0 4px calc(var(--workspace-shadow) * 1px) #0002;
+}
+html[data-workspace="true"] .kyro-app-shell .message-row {
+  padding-block: calc(var(--workspace-spacing) * 0.025px);
+}
+@media (min-width: 768px) {
+  html[data-workspace="true"] .kyro-app-shell .kyro-sidebar {
+    width: calc(var(--workspace-sidebarWidth) * 1px);
+  }
+}
+
+html[data-workspace="true"] .kyro-chat-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--workspace-image);
+  background-size: var(--workspace-backgroundFit);
+  background-position: var(--workspace-backgroundPosition);
+  opacity: calc(var(--workspace-backgroundOpacity) * 0.01);
+  filter: blur(calc(var(--workspace-backgroundBlur) * 1px));
+}
+html[data-workspace="true"] .kyro-chat-surface {
+  background: var(--workspace-background);
+}
+html[data-workspace="true"] .kyro-chat-surface > .bg-panel {
+  background-color: color-mix(in srgb, var(--workspace-panel) 85%, transparent);
+}
+
+html[data-chat-backgrounds="false"] .kyro-chat-surface::before {
+  display: none;
 }

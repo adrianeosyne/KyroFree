@@ -1,0 +1,20 @@
+import { v } from "convex/values";
+export const workspaceValidator = v.object({
+  background: v.string(),
+  panel: v.string(),
+  accent: v.string(),
+  text: v.string(),
+  radius: v.number(),
+  sidebarWidth: v.number(),
+  panelOpacity: v.number(),
+  backgroundOpacity: v.number(),
+  backgroundBlur: v.number(),
+  font: v.string(),
+  cursor: v.optional(v.string()),
+  spacing: v.number(),
+  borderWidth: v.number(),
+  shadow: v.number(),
+  backgroundPosition: v.string(),
+  backgroundFit: v.string(),
+  contrast: v.number(),
+});

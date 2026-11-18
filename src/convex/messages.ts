@@ -1,7 +1,11 @@
+import { messageLimit } from "../lib/entitlements";
 import { v } from "convex/values";
 import { fileUrl } from "./fileAccess";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, query } from "./functions";
+import { mutation, query, type MutationCtx } from "./functions";
+import { makeFunctionReference } from "convex/server";
+import { lifetime } from "./advancedValidation";
+import { activeSiteBan } from "./lib";
 import { CUSTOM_EMOJI_TOKEN, customEmojiIds } from "../lib/emoji";
 import {
   channelPermissions,
@@ -18,7 +22,6 @@ import {
   logAudit,
   markRead,
   MAX_ATTACHMENTS,
-  MAX_MESSAGE_LENGTH,
   notify,
   visiblePresence,
   isBlockedBetween,
@@ -33,6 +36,9 @@ import {
 import { deleteMessageData } from "./cleanup";
 import { claimUpload, requireOwnedUpload } from "./uploadSecurity";
 import { evaluateAutomod, recordAutomodEvent } from "./automod";
+import { requirePremiumChannel } from "./premiumBenefits";
+import { hasPremium } from "../lib/entitlements";
+import { isPlatformStaff } from "./lib";
 
 export type ContainerType = "channel" | "conversation";
 
@@ -50,7 +56,7 @@ type ReadAccess =
   | { kind: "conversation"; conversation: Doc<"conversations"> };
 
 /** Read access to a channel or conversation, or a thrown error. */
-async function requireReadAccess(
+export async function requireReadAccess(
   ctx: Ctx,
   userId: Id<"users">,
   containerType: ContainerType,
@@ -59,6 +65,7 @@ async function requireReadAccess(
   if (containerType === "channel") {
     const channel = await ctx.db.get(containerId as Id<"channels">);
     if (!channel) throw new Error("That channel no longer exists.");
+    await requirePremiumChannel(ctx, channel, userId);
     const access = await requireServerAccess(ctx, channel.serverId, userId);
     const defaultRole = await ctx.db
       .query("serverRoles")
@@ -182,7 +189,11 @@ export const list = query({
         )
         .order("desc")
         .take(take * 2 + 1)
-    ).filter((message) => !blocked.has(message.authorId));
+    ).filter(
+      (message) =>
+        !blocked.has(message.authorId) &&
+        (!message.expiresAt || message.expiresAt > Date.now()),
+    );
 
     const hasMore = rows.length > take;
     const page = hasMore ? rows.slice(0, take) : rows;
@@ -205,6 +216,7 @@ export const list = query({
     replyDocs.forEach((doc, index) => {
       if (
         doc &&
+        (!doc.expiresAt || doc.expiresAt > Date.now()) &&
         doc.containerType === containerType &&
         doc.containerId === containerId &&
         !blocked.has(doc.authorId)
@@ -361,6 +373,9 @@ export const list = query({
           callDurationMs: message.callDurationMs ?? null,
           createdAt: message.createdAt,
           editedAt: message.editedAt ?? null,
+          revision: message.revision ?? 0,
+          expiresAt: message.expiresAt ?? null,
+          forwardedFrom: message.forwardedFrom ?? null,
           pinnedAt: message.pinnedAt ?? null,
           clientId: message.clientId ?? null,
           author: authors.get(message.authorId) ?? null,
@@ -379,6 +394,7 @@ export const list = query({
             ? {
                 id: reply._id,
                 excerpt: roleMentionExcerpt(reply.content).slice(0, 160),
+                expiresAt: reply.expiresAt ?? null,
                 author: replyAuthors.get(reply.authorId) ?? null,
                 botName:
                   reply.kind === "bot_response"
@@ -440,348 +456,488 @@ export const list = query({
   },
 });
 
-export const send = mutation({
-  args: {
-    containerType: v.union(v.literal("channel"), v.literal("conversation")),
-    containerId: v.string(),
-    content: v.string(),
-    clientId: v.optional(v.string()),
-    replyToId: v.optional(v.id("messages")),
-    attachments: v.optional(
-      v.array(
-        v.object({
-          storageId: v.id("_storage"),
-          name: v.string(),
-          size: v.number(),
-          mimeType: v.string(),
-        }),
-      ),
+export const sendArgs = {
+  containerType: v.union(v.literal("channel"), v.literal("conversation")),
+  containerId: v.string(),
+  content: v.string(),
+  clientId: v.optional(v.string()),
+  replyToId: v.optional(v.id("messages")),
+  attachments: v.optional(
+    v.array(
+      v.object({
+        storageId: v.id("_storage"),
+        name: v.string(),
+        size: v.number(),
+        mimeType: v.string(),
+      }),
     ),
+  ),
+  lifetimeSeconds: v.optional(v.number()),
+};
+export type SendArgs = {
+  containerType: ContainerType;
+  containerId: string;
+  content: string;
+  clientId?: string;
+  replyToId?: Id<"messages">;
+  lifetimeSeconds?: number;
+  attachments?: {
+    storageId: Id<"_storage">;
+    name: string;
+    size: number;
+    mimeType: string;
+  }[];
+};
+
+export async function sendMessage(
+  ctx: MutationCtx,
+  args: SendArgs,
+  authorId?: Id<"users">,
+  forwardedFrom?: {
+    messageId: Id<"messages">;
+    authorId: Id<"users">;
+    authorName: string;
   },
-  handler: async (ctx, args) => {
-    const { id: userId, user } = await requireProfile(ctx);
-    const accountLevel = await restrictionLevel(ctx, userId);
-    if (accountLevel >= 3) {
-      throw new Error("Your account is suspended while staff review it.");
-    }
-    if (accountLevel >= 2) {
-      throw new Error(
-        "Your account is limited — you can't send messages right now.",
-      );
-    }
-    const content = args.content.trim();
-    const requestedRoleMentions = parseRoleMentionIds(content);
-    const attachmentInputs = args.attachments ?? [];
-    if (content.length > MAX_MESSAGE_LENGTH) {
-      throw new Error(
-        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
-      );
-    }
-    if (attachmentInputs.length > MAX_ATTACHMENTS) {
-      throw new Error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
-    }
-    if (!content && attachmentInputs.length === 0) {
-      throw new Error("Write something or attach a file.");
-    }
-    if (args.clientId && args.clientId.length > 100) {
-      throw new Error("That message identifier is not valid.");
-    }
-
-    const access = await requireReadAccess(
-      ctx,
-      userId,
-      args.containerType,
-      args.containerId,
+) {
+  const identity = authorId
+    ? { id: authorId, user: await ctx.db.get(authorId) }
+    : await requireProfile(ctx);
+  const { id: userId, user } = identity;
+  if (
+    !user ||
+    user.deletedAt !== undefined ||
+    user.frozenAt !== undefined ||
+    !user.username ||
+    user.botApplicationId ||
+    (authorId && (await activeSiteBan(ctx, authorId)))
+  )
+    throw new Error("This account cannot send messages.");
+  lifetime(args.lifetimeSeconds);
+  const accountLevel = await restrictionLevel(ctx, userId);
+  if (accountLevel >= 3) {
+    throw new Error("Your account is suspended while staff review it.");
+  }
+  if (accountLevel >= 2) {
+    throw new Error(
+      "Your account is limited — you can't send messages right now.",
     );
-    await requireUsableCustomEmojis(ctx, userId, content);
+  }
+  const content = args.content.trim();
+  const requestedRoleMentions = parseRoleMentionIds(content);
+  const attachmentInputs = args.attachments ?? [];
+  if (content.length > messageLimit(user)) {
+    throw new Error(
+      `Messages are limited to ${messageLimit(user)} characters.`,
+    );
+  }
+  if (attachmentInputs.length > MAX_ATTACHMENTS) {
+    throw new Error(`You can attach up to ${MAX_ATTACHMENTS} files.`);
+  }
+  if (!content && attachmentInputs.length === 0) {
+    throw new Error("Write something or attach a file.");
+  }
+  if (args.clientId && args.clientId.length > 100) {
+    throw new Error("That message identifier is not valid.");
+  }
 
-    // Authorization comes before idempotency so a leaked container/client id
-    // never acts as an existence oracle. A client id is also scoped to author.
-    if (args.clientId) {
-      const existing = await ctx.db
+  const access = await requireReadAccess(
+    ctx,
+    userId,
+    args.containerType,
+    args.containerId,
+  );
+  await requireUsableCustomEmojis(ctx, userId, content);
+
+  // Authorization comes before idempotency so a leaked container/client id
+  // never acts as an existence oracle. A client id is also scoped to author.
+  if (args.clientId) {
+    const existing = await ctx.db
+      .query("messages")
+      .withIndex("by_container_client", (q) =>
+        q.eq("containerId", args.containerId).eq("clientId", args.clientId!),
+      )
+      .unique();
+    if (existing) {
+      if (
+        existing.authorId !== userId ||
+        existing.containerType !== args.containerType
+      ) {
+        throw new Error("That message identifier is already in use.");
+      }
+      return { messageId: existing._id, deduped: true, blocked: null };
+    }
+  }
+
+  const ownedUploads = await Promise.all(
+    attachmentInputs.map((attachment) =>
+      requireOwnedUpload(ctx, userId, attachment.storageId, {
+        channelId: access.kind === "channel" ? access.channel._id : undefined,
+      }),
+    ),
+  );
+  const attachments = ownedUploads.map((upload) => ({
+    storageId: upload.storageId,
+    name: upload.name,
+    size: upload.size,
+    mimeType: upload.mimeType,
+  }));
+
+  let permissions: string[] = [];
+  const mentionedRoles: Doc<"serverRoles">[] = [];
+  let mutedServer = false;
+  let serverId: Id<"servers"> | undefined;
+  let dmConversation: Doc<"conversations"> | null = null;
+  if (access.kind === "channel") {
+    permissions = access.permissions;
+    serverId = access.server._id;
+    mutedServer = access.member.muted === true;
+    const channel = access.channel;
+    if (
+      attachments.length &&
+      access.server.isPlatformHome &&
+      channel.name !== "media" &&
+      !hasPremium(user) &&
+      !isPlatformStaff(user)
+    )
+      throw new Error(
+        "Free members can share files in #media in Kyro HQ. Premium members can share across HQ.",
+      );
+
+    for (const rawRoleId of requestedRoleMentions) {
+      const roleId = ctx.db.normalizeId("serverRoles", rawRoleId);
+      const role = roleId ? await ctx.db.get(roleId) : null;
+      if (!role || role.serverId !== access.server._id || role.isDefault) {
+        throw new Error("That role mention is no longer available.");
+      }
+      if (
+        !role.mentionable &&
+        !can(permissions, PERMISSIONS.MENTION_EVERYONE)
+      ) {
+        throw new Error(`The @${role.name} role is not mentionable.`);
+      }
+      mentionedRoles.push(role);
+    }
+
+    const timeoutUntil = access.member.communicationDisabledUntil ?? 0;
+    if (
+      timeoutUntil > Date.now() &&
+      access.server.ownerId !== userId &&
+      !can(permissions, PERMISSIONS.MANAGE_MESSAGES)
+    ) {
+      throw new Error(
+        `You're timed out in this community until ${new Date(timeoutUntil).toUTCString()}.`,
+      );
+    }
+
+    if (channel.readOnly && !can(permissions, PERMISSIONS.MANAGE_MESSAGES)) {
+      throw new Error("This channel is read-only.");
+    }
+    const lockedNow =
+      access.server.locked === true &&
+      (access.server.lockedUntil === undefined ||
+        access.server.lockedUntil > Date.now());
+    if (lockedNow && !can(permissions, PERMISSIONS.MANAGE_MESSAGES)) {
+      throw new Error(
+        "This community is locked — only staff can post right now.",
+      );
+    }
+    if (
+      access.server.rulesChannelId !== undefined &&
+      channel._id === access.server.rulesChannelId &&
+      access.server.ownerId !== userId &&
+      !can(permissions, PERMISSIONS.MANAGE_SERVER)
+    ) {
+      throw new Error(
+        "Only people who can manage this server can post in the rules channel.",
+      );
+    }
+    const verification = access.server.verificationLevel ?? "none";
+    if (verification !== "none") {
+      const thresholds = {
+        low: 5 * 60 * 1000,
+        medium: 60 * 60 * 1000,
+        high: 24 * 60 * 60 * 1000,
+      } as const;
+      const exempt =
+        access.server.ownerId === userId ||
+        access.member.roleIds.length > 0 ||
+        can(permissions, PERMISSIONS.MANAGE_MESSAGES);
+      const accountAge = Date.now() - (user.createdAt ?? Date.now());
+      if (!exempt && accountAge < thresholds[verification]) {
+        throw new Error(
+          verification === "low"
+            ? "This community needs accounts that are at least 5 minutes old to talk."
+            : verification === "medium"
+              ? "This community needs accounts that are at least 1 hour old to talk."
+              : "This community needs accounts that are at least 1 day old to talk.",
+        );
+      }
+    }
+    if (!can(permissions, PERMISSIONS.SEND_MESSAGES)) {
+      throw new Error("You don't have permission to send messages here.");
+    }
+    if (channel.slowMode && channel.slowMode > 0) {
+      const recent = await ctx.db
         .query("messages")
-        .withIndex("by_container_client", (q) =>
-          q.eq("containerId", args.containerId).eq("clientId", args.clientId!),
-        )
-        .unique();
-      if (existing) {
-        if (
-          existing.authorId !== userId ||
-          existing.containerType !== args.containerType
-        ) {
-          throw new Error("That message identifier is already in use.");
-        }
-        return { messageId: existing._id, deduped: true, blocked: null };
-      }
-    }
-
-    const ownedUploads = await Promise.all(
-      attachmentInputs.map((attachment) =>
-        requireOwnedUpload(ctx, userId, attachment.storageId),
-      ),
-    );
-    const attachments = ownedUploads.map((upload) => ({
-      storageId: upload.storageId,
-      name: upload.name,
-      size: upload.size,
-      mimeType: upload.mimeType,
-    }));
-
-    let permissions: string[] = [];
-    const mentionedRoles: Doc<"serverRoles">[] = [];
-    let mutedServer = false;
-    let serverId: Id<"servers"> | undefined;
-    let dmConversation: Doc<"conversations"> | null = null;
-    if (access.kind === "channel") {
-      permissions = access.permissions;
-      serverId = access.server._id;
-      mutedServer = access.member.muted === true;
-      const channel = access.channel;
-
-      for (const rawRoleId of requestedRoleMentions) {
-        const roleId = ctx.db.normalizeId("serverRoles", rawRoleId);
-        const role = roleId ? await ctx.db.get(roleId) : null;
-        if (!role || role.serverId !== access.server._id || role.isDefault) {
-          throw new Error("That role mention is no longer available.");
-        }
-        if (
-          !role.mentionable &&
-          !can(permissions, PERMISSIONS.MENTION_EVERYONE)
-        ) {
-          throw new Error(`The @${role.name} role is not mentionable.`);
-        }
-        mentionedRoles.push(role);
-      }
-
-      const timeoutUntil = access.member.communicationDisabledUntil ?? 0;
-      if (
-        timeoutUntil > Date.now() &&
-        access.server.ownerId !== userId &&
-        !can(permissions, PERMISSIONS.MANAGE_MESSAGES)
-      ) {
-        throw new Error(
-          `You're timed out in this community until ${new Date(timeoutUntil).toUTCString()}.`,
-        );
-      }
-
-      if (channel.readOnly && !can(permissions, PERMISSIONS.MANAGE_MESSAGES)) {
-        throw new Error("This channel is read-only.");
-      }
-      const lockedNow =
-        access.server.locked === true &&
-        (access.server.lockedUntil === undefined ||
-          access.server.lockedUntil > Date.now());
-      if (lockedNow && !can(permissions, PERMISSIONS.MANAGE_MESSAGES)) {
-        throw new Error(
-          "This community is locked — only staff can post right now.",
-        );
-      }
-      if (
-        access.server.rulesChannelId !== undefined &&
-        channel._id === access.server.rulesChannelId &&
-        access.server.ownerId !== userId &&
-        !can(permissions, PERMISSIONS.MANAGE_SERVER)
-      ) {
-        throw new Error(
-          "Only people who can manage this server can post in the rules channel.",
-        );
-      }
-      const verification = access.server.verificationLevel ?? "none";
-      if (verification !== "none") {
-        const thresholds = {
-          low: 5 * 60 * 1000,
-          medium: 60 * 60 * 1000,
-          high: 24 * 60 * 60 * 1000,
-        } as const;
-        const exempt =
-          access.server.ownerId === userId ||
-          access.member.roleIds.length > 0 ||
-          can(permissions, PERMISSIONS.MANAGE_MESSAGES);
-        const accountAge = Date.now() - (user.createdAt ?? Date.now());
-        if (!exempt && accountAge < thresholds[verification]) {
+        .withIndex("by_container", (q) => q.eq("containerId", args.containerId))
+        .order("desc")
+        .take(30);
+      const mine = recent.find((message) => message.authorId === userId);
+      if (mine) {
+        const waitMs = channel.slowMode * 1000 - (Date.now() - mine.createdAt);
+        if (waitMs > 0) {
           throw new Error(
-            verification === "low"
-              ? "This community needs accounts that are at least 5 minutes old to talk."
-              : verification === "medium"
-                ? "This community needs accounts that are at least 1 hour old to talk."
-                : "This community needs accounts that are at least 1 day old to talk.",
+            `Slow mode is on — wait ${Math.ceil(waitMs / 1000)}s before posting again.`,
           );
         }
       }
-      if (!can(permissions, PERMISSIONS.SEND_MESSAGES)) {
-        throw new Error("You don't have permission to send messages here.");
-      }
-      if (channel.slowMode && channel.slowMode > 0) {
-        const recent = await ctx.db
-          .query("messages")
-          .withIndex("by_container", (q) =>
-            q.eq("containerId", args.containerId),
-          )
-          .order("desc")
-          .take(30);
-        const mine = recent.find((message) => message.authorId === userId);
-        if (mine) {
-          const waitMs =
-            channel.slowMode * 1000 - (Date.now() - mine.createdAt);
-          if (waitMs > 0) {
-            throw new Error(
-              `Slow mode is on — wait ${Math.ceil(waitMs / 1000)}s before posting again.`,
-            );
-          }
-        }
-      }
-      const automod = await evaluateAutomod(ctx, {
-        server: access.server,
-        channel,
-        member: access.member,
-        permissions,
+    }
+    const automod = await evaluateAutomod(ctx, {
+      server: access.server,
+      channel,
+      member: access.member,
+      permissions,
+      userId,
+      content,
+    });
+    if (automod) {
+      await recordAutomodEvent(ctx, {
+        serverId: access.server._id,
+        channelId: channel._id,
         userId,
+        rule: automod.rule,
         content,
       });
-      if (automod) {
-        await recordAutomodEvent(ctx, {
-          serverId: access.server._id,
-          channelId: channel._id,
-          userId,
-          rule: automod.rule,
-          content,
-        });
-        // Do not throw here: Convex rolls back every write in a mutation that
-        // throws, including the AutoMod activity row above. Returning the
-        // block result commits the event while still keeping the message out
-        // of the channel.
-        return {
-          messageId: null,
-          deduped: false,
-          blocked: automod.reason,
-        };
-      }
+      // Do not throw here: Convex rolls back every write in a mutation that
+      // throws, including the AutoMod activity row above. Returning the
+      // block result commits the event while still keeping the message out
+      // of the channel.
+      return {
+        messageId: null,
+        deduped: false,
+        blocked: automod.reason,
+      };
+    }
+  } else {
+    if (requestedRoleMentions.length > 0) {
+      throw new Error("Role mentions can only be used in community channels.");
+    }
+    dmConversation = access.conversation;
+    if (
+      dmConversation.type === "dm" &&
+      dmConversation.participantIds.length === 2
+    ) {
+      const other = dmConversation.participantIds.find((id) => id !== userId)!;
+      const check = await canSendDirectMessage(ctx, userId, other);
+      if (!check.ok) throw new Error(check.reason);
     } else {
-      if (requestedRoleMentions.length > 0) {
-        throw new Error(
-          "Role mentions can only be used in community channels.",
-        );
-      }
-      dmConversation = access.conversation;
-      if (
-        dmConversation.type === "dm" &&
-        dmConversation.participantIds.length === 2
-      ) {
-        const other = dmConversation.participantIds.find(
-          (id) => id !== userId,
-        )!;
-        const check = await canSendDirectMessage(ctx, userId, other);
-        if (!check.ok) throw new Error(check.reason);
-      } else {
-        for (const participantId of dmConversation.participantIds) {
-          if (
-            participantId !== userId &&
-            (await isBlockedBetween(ctx, userId, participantId))
-          ) {
-            throw new Error(
-              "You can't post in a group containing someone you blocked or who blocked you.",
-            );
-          }
+      for (const participantId of dmConversation.participantIds) {
+        if (
+          participantId !== userId &&
+          (await isBlockedBetween(ctx, userId, participantId))
+        ) {
+          throw new Error(
+            "You can't post in a group containing someone you blocked or who blocked you.",
+          );
         }
       }
     }
+  }
 
-    let replyToId: Id<"messages"> | undefined;
-    if (args.replyToId) {
-      const reply = await ctx.db.get(args.replyToId);
-      if (
-        !reply ||
-        reply.containerType !== args.containerType ||
-        reply.containerId !== args.containerId
-      ) {
-        throw new Error(
-          "You can only reply to a message in this conversation.",
-        );
-      }
-      replyToId = reply._id;
-    }
-
-    // Cheap abuse guard: at most 5 posts per 5 seconds per account.
-    const recentMine = await ctx.db
-      .query("messages")
-      .withIndex("by_author", (q) => q.eq("authorId", userId))
-      .order("desc")
-      .take(DEFAULT_RATE_WINDOW_MESSAGES);
-    const windowStart = Date.now() - SENDER_COOLDOWN_MS;
-    // Only rate-limit once the window is actually full. `every()` on an empty
-    // (or short) history is true, which would reject an account's first post.
+  let replyToId: Id<"messages"> | undefined;
+  if (args.replyToId) {
+    const reply = await ctx.db.get(args.replyToId);
     if (
-      recentMine.length >= DEFAULT_RATE_WINDOW_MESSAGES &&
-      recentMine.every((message) => message.createdAt > windowStart)
+      !reply ||
+      (reply.expiresAt !== undefined && reply.expiresAt <= Date.now()) ||
+      reply.containerType !== args.containerType ||
+      reply.containerId !== args.containerId
     ) {
-      throw new Error("You're sending messages too quickly. Take a breath.");
+      throw new Error("You can only reply to a message in this conversation.");
     }
+    replyToId = reply._id;
+  }
 
-    const messageId = await ctx.db.insert("messages", {
-      containerType: args.containerType,
-      containerId: args.containerId,
-      authorId: userId,
-      content,
-      createdAt: Date.now(),
-      replyToId,
-      clientId: args.clientId,
-      attachments: attachments.length > 0 ? attachments : undefined,
+  // Cheap abuse guard: at most 5 posts per 5 seconds per account.
+  const recentMine = await ctx.db
+    .query("messages")
+    .withIndex("by_author", (q) => q.eq("authorId", userId))
+    .order("desc")
+    .take(DEFAULT_RATE_WINDOW_MESSAGES);
+  const windowStart = Date.now() - SENDER_COOLDOWN_MS;
+  // Only rate-limit once the window is actually full. `every()` on an empty
+  // (or short) history is true, which would reject an account's first post.
+  if (
+    recentMine.length >= DEFAULT_RATE_WINDOW_MESSAGES &&
+    recentMine.every((message) => message.createdAt > windowStart)
+  ) {
+    throw new Error("You're sending messages too quickly. Take a breath.");
+  }
+
+  const messageId = await ctx.db.insert("messages", {
+    containerType: args.containerType,
+    containerId: args.containerId,
+    authorId: userId,
+    content,
+    createdAt: Date.now(),
+    expiresAt: args.lifetimeSeconds
+      ? Date.now() + args.lifetimeSeconds * 1000
+      : undefined,
+    forwardedFrom,
+    replyToId,
+    clientId: args.clientId,
+    attachments: attachments.length > 0 ? attachments : undefined,
+  });
+  if (args.lifetimeSeconds)
+    await ctx.scheduler.runAt(
+      Date.now() + args.lifetimeSeconds * 1000,
+      makeFunctionReference<"mutation">("advancedMessages:expire"),
+      { messageId },
+    );
+  for (const attachment of attachments) {
+    await claimUpload(ctx, userId, attachment.storageId, "message", messageId, {
+      channelId: access.kind === "channel" ? access.channel._id : undefined,
     });
-    for (const attachment of attachments) {
-      await claimUpload(
-        ctx,
-        userId,
-        attachment.storageId,
-        "message",
-        messageId,
+  }
+
+  if (args.containerType === "channel") {
+    await ctx.db.patch(args.containerId as Id<"channels">, {
+      lastMessageAt: Date.now(),
+      lastMessageSenderId: userId,
+    });
+  } else {
+    await ctx.db.patch(args.containerId as Id<"conversations">, {
+      lastMessageAt: Date.now(),
+      lastMessagePreview: content.slice(0, 140),
+      lastMessageSenderId: userId,
+      updatedAt: Date.now(),
+    });
+  }
+  await markRead(ctx, userId, args.containerId);
+
+  // Mentions and replies notify real people, never the sender.
+  const mentionedNames = new Set(
+    parseMentions(content).filter(
+      (name) => name !== "everyone" && name !== "here",
+    ),
+  );
+  const notified = new Set<string>();
+  const link = containerLink(args.containerType, args.containerId, serverId);
+
+  if (args.containerType === "channel") {
+    const mentionEveryone = /(^|\s)@everyone\b/i.test(content);
+    const mentionHere = /(^|\s)@here\b/i.test(content);
+    if (
+      (mentionEveryone || mentionHere) &&
+      !can(permissions, PERMISSIONS.MENTION_EVERYONE)
+    ) {
+      throw new Error(
+        "You don't have permission to mention @everyone or @here.",
       );
     }
 
-    if (args.containerType === "channel") {
-      await ctx.db.patch(args.containerId as Id<"channels">, {
-        lastMessageAt: Date.now(),
-        lastMessageSenderId: userId,
-      });
-    } else {
-      await ctx.db.patch(args.containerId as Id<"conversations">, {
-        lastMessageAt: Date.now(),
-        lastMessagePreview: content.slice(0, 140),
-        lastMessageSenderId: userId,
-        updatedAt: Date.now(),
+    if (mentionEveryone || mentionHere) {
+      const memberships = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId!))
+        .take(1000);
+      for (const membership of memberships) {
+        if (
+          membership.userId === userId ||
+          membership.muted ||
+          notified.has(membership.userId)
+        ) {
+          continue;
+        }
+        if (
+          (await channelNotificationLevel(
+            ctx,
+            membership.userId,
+            args.containerId as Id<"channels">,
+          )) === "none"
+        ) {
+          continue;
+        }
+        const target = await ctx.db.get(membership.userId);
+        if (!target || target.deletedAt !== undefined) continue;
+        if (access.kind === "channel") {
+          try {
+            await requirePremiumChannel(ctx, access.channel, target._id);
+          } catch {
+            continue;
+          }
+        }
+        if (mentionHere && visiblePresence(target, false) === "offline") {
+          continue;
+        }
+        notified.add(target._id);
+        await notify(ctx, {
+          userId: target._id,
+          type: "mention",
+          title: `${user.name ?? user.username} mentioned ${
+            mentionEveryone ? "@everyone" : "@here"
+          }`,
+          body: content.slice(0, 160),
+          actorId: userId,
+          link,
+          containerKey: args.containerId,
+          messageId,
+        });
+      }
+    }
+
+    for (const username of mentionedNames) {
+      const target = await getUserByUsername(ctx, username);
+      if (!target || target._id === userId || notified.has(target._id))
+        continue;
+      const membership = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server_user", (q) =>
+          q.eq("serverId", serverId!).eq("userId", target._id),
+        )
+        .unique();
+      if (!membership) continue;
+      if (membership.muted) continue;
+      if (
+        (await channelNotificationLevel(
+          ctx,
+          target._id,
+          args.containerId as Id<"channels">,
+        )) === "none"
+      ) {
+        continue;
+      }
+      notified.add(target._id);
+      await notify(ctx, {
+        userId: target._id,
+        type: "mention",
+        title: `${user.name ?? user.username} mentioned you`,
+        body: content.slice(0, 160),
+        actorId: userId,
+        link,
+        containerKey: args.containerId,
+        messageId,
       });
     }
-    await markRead(ctx, userId, args.containerId);
 
-    // Mentions and replies notify real people, never the sender.
-    const mentionedNames = new Set(
-      parseMentions(content).filter(
-        (name) => name !== "everyone" && name !== "here",
-      ),
-    );
-    const notified = new Set<string>();
-    const link = containerLink(args.containerType, args.containerId, serverId);
-
-    if (args.containerType === "channel") {
-      const mentionEveryone = /(^|\s)@everyone\b/i.test(content);
-      const mentionHere = /(^|\s)@here\b/i.test(content);
-      if (
-        (mentionEveryone || mentionHere) &&
-        !can(permissions, PERMISSIONS.MENTION_EVERYONE)
-      ) {
-        throw new Error(
-          "You don't have permission to mention @everyone or @here.",
-        );
-      }
-
-      if (mentionEveryone || mentionHere) {
-        const memberships = await ctx.db
-          .query("serverMembers")
-          .withIndex("by_server", (q) => q.eq("serverId", serverId!))
-          .take(1000);
+    if (mentionedRoles.length > 0) {
+      const memberships = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server", (q) => q.eq("serverId", serverId!))
+        .take(1000);
+      const roleMentionBody = mentionedRoles
+        .reduce(
+          (body, entry) =>
+            body.split(`<@&${entry._id}>`).join(`@${entry.name}`),
+          content,
+        )
+        .slice(0, 160);
+      for (const role of mentionedRoles) {
         for (const membership of memberships) {
           if (
             membership.userId === userId ||
             membership.muted ||
+            !membership.roleIds.includes(role._id) ||
             notified.has(membership.userId)
           ) {
             continue;
@@ -797,200 +953,150 @@ export const send = mutation({
           }
           const target = await ctx.db.get(membership.userId);
           if (!target || target.deletedAt !== undefined) continue;
-          if (mentionHere && visiblePresence(target, false) === "offline") {
-            continue;
+          if (access.kind === "channel") {
+            try {
+              await requirePremiumChannel(ctx, access.channel, target._id);
+            } catch {
+              continue;
+            }
           }
           notified.add(target._id);
           await notify(ctx, {
             userId: target._id,
             type: "mention",
-            title: `${user.name ?? user.username} mentioned ${
-              mentionEveryone ? "@everyone" : "@here"
-            }`,
-            body: content.slice(0, 160),
+            title: `${user.name ?? user.username} mentioned @${role.name}`,
+            body: roleMentionBody,
             actorId: userId,
             link,
             containerKey: args.containerId,
+            messageId,
           });
         }
       }
+    }
 
-      for (const username of mentionedNames) {
-        const target = await getUserByUsername(ctx, username);
-        if (!target || target._id === userId || notified.has(target._id))
-          continue;
-        const membership = await ctx.db
-          .query("serverMembers")
-          .withIndex("by_server_user", (q) =>
-            q.eq("serverId", serverId!).eq("userId", target._id),
-          )
-          .unique();
-        if (!membership) continue;
-        if (membership.muted) continue;
-        if (
-          (await channelNotificationLevel(
-            ctx,
-            target._id,
-            args.containerId as Id<"channels">,
-          )) === "none"
-        ) {
-          continue;
-        }
-        notified.add(target._id);
-        await notify(ctx, {
-          userId: target._id,
-          type: "mention",
-          title: `${user.name ?? user.username} mentioned you`,
-          body: content.slice(0, 160),
-          actorId: userId,
-          link,
-          containerKey: args.containerId,
-        });
-      }
-
-      if (mentionedRoles.length > 0) {
-        const memberships = await ctx.db
-          .query("serverMembers")
-          .withIndex("by_server", (q) => q.eq("serverId", serverId!))
-          .take(1000);
-        const roleMentionBody = mentionedRoles
-          .reduce(
-            (body, entry) =>
-              body.split(`<@&${entry._id}>`).join(`@${entry.name}`),
-            content,
-          )
-          .slice(0, 160);
-        for (const role of mentionedRoles) {
-          for (const membership of memberships) {
-            if (
-              membership.userId === userId ||
-              membership.muted ||
-              !membership.roleIds.includes(role._id) ||
-              notified.has(membership.userId)
-            ) {
-              continue;
-            }
-            if (
-              (await channelNotificationLevel(
-                ctx,
-                membership.userId,
-                args.containerId as Id<"channels">,
-              )) === "none"
-            ) {
-              continue;
-            }
-            const target = await ctx.db.get(membership.userId);
-            if (!target || target.deletedAt !== undefined) continue;
-            notified.add(target._id);
-            await notify(ctx, {
-              userId: target._id,
-              type: "mention",
-              title: `${user.name ?? user.username} mentioned @${role.name}`,
-              body: roleMentionBody,
-              actorId: userId,
-              link,
-              containerKey: args.containerId,
-            });
-          }
-        }
-      }
-
-      // Members who explicitly subscribed to every message receive a normal
-      // channel notification unless a mention above already notified them.
-      const everyMessageSettings = await ctx.db
-        .query("channelNotificationSettings")
-        .withIndex("by_channel_level", (q) =>
-          q
-            .eq("channelId", args.containerId as Id<"channels">)
-            .eq("level", "all"),
+    // Members who explicitly subscribed to every message receive a normal
+    // channel notification unless a mention above already notified them.
+    const everyMessageSettings = await ctx.db
+      .query("channelNotificationSettings")
+      .withIndex("by_channel_level", (q) =>
+        q
+          .eq("channelId", args.containerId as Id<"channels">)
+          .eq("level", "all"),
+      )
+      .take(500);
+    for (const setting of everyMessageSettings) {
+      if (setting.userId === userId || notified.has(setting.userId)) continue;
+      const membership = await ctx.db
+        .query("serverMembers")
+        .withIndex("by_server_user", (q) =>
+          q.eq("serverId", serverId!).eq("userId", setting.userId),
         )
-        .take(500);
-      for (const setting of everyMessageSettings) {
-        if (setting.userId === userId || notified.has(setting.userId)) continue;
-        const membership = await ctx.db
-          .query("serverMembers")
-          .withIndex("by_server_user", (q) =>
-            q.eq("serverId", serverId!).eq("userId", setting.userId),
-          )
-          .unique();
-        if (!membership || membership.muted) continue;
-        notified.add(setting.userId);
-        await notify(ctx, {
-          userId: setting.userId,
-          type: "system",
-          title: `${user.name ?? user.username} posted in a followed channel`,
-          body: content.slice(0, 160),
-          actorId: userId,
-          link,
-          containerKey: args.containerId,
-        });
-      }
-    } else if (dmConversation) {
-      for (const participantId of dmConversation.participantIds) {
-        const target = await ctx.db.get(participantId);
-        if (!target || !target.username) continue;
-        if (!mentionedNames.has(target.username.toLowerCase())) continue;
-        if (notified.has(target._id)) continue;
-        notified.add(target._id);
-        await notify(ctx, {
-          userId: target._id,
-          type: "mention",
-          title: `${user.name ?? user.username} mentioned you`,
-          body: content.slice(0, 160),
-          actorId: userId,
-          link,
-          containerKey: args.containerId,
-        });
-      }
-    }
-
-    if (replyToId) {
-      const replyTarget = await ctx.db.get(replyToId);
-      if (
-        replyTarget &&
-        replyTarget.containerId === args.containerId &&
-        replyTarget.kind !== "bot_response" &&
-        replyTarget.authorId !== userId &&
-        !notified.has(replyTarget.authorId)
-      ) {
-        const target = await ctx.db.get(replyTarget.authorId);
-        const allowed =
-          access.kind === "channel" ||
-          (target !== null &&
-            dmConversation !== null &&
-            dmConversation.participantIds.includes(replyTarget.authorId));
-        const targetChannelLevel =
-          access.kind === "channel" && target
-            ? await channelNotificationLevel(
-                ctx,
-                target._id,
-                args.containerId as Id<"channels">,
-              )
-            : "mentions";
-        if (allowed && !mutedServer && targetChannelLevel !== "none") {
-          await notify(ctx, {
-            userId: replyTarget.authorId,
-            type: "reply",
-            title: `${user.name ?? user.username} replied to you`,
-            body: content.slice(0, 160),
-            actorId: userId,
-            link,
-            containerKey: args.containerId,
-          });
+        .unique();
+      if (!membership || membership.muted) continue;
+      if (access.kind === "channel") {
+        try {
+          await requirePremiumChannel(ctx, access.channel, membership.userId);
+        } catch {
+          continue;
         }
       }
+      notified.add(setting.userId);
+      await notify(ctx, {
+        userId: setting.userId,
+        type: "system",
+        title: `${user.name ?? user.username} posted in a followed channel`,
+        body: content.slice(0, 160),
+        actorId: userId,
+        link,
+        containerKey: args.containerId,
+        messageId,
+      });
     }
+  } else if (dmConversation) {
+    for (const participantId of dmConversation.participantIds) {
+      const target = await ctx.db.get(participantId);
+      if (!target || !target.username) continue;
+      if (!mentionedNames.has(target.username.toLowerCase())) continue;
+      if (notified.has(target._id)) continue;
+      notified.add(target._id);
+      await notify(ctx, {
+        userId: target._id,
+        type: "mention",
+        title: `${user.name ?? user.username} mentioned you`,
+        body: content.slice(0, 160),
+        actorId: userId,
+        link,
+        containerKey: args.containerId,
+        messageId,
+      });
+    }
+  }
 
-    return { messageId, deduped: false, blocked: null };
-  },
+  if (replyToId) {
+    const replyTarget = await ctx.db.get(replyToId);
+    if (
+      replyTarget &&
+      replyTarget.containerId === args.containerId &&
+      replyTarget.kind !== "bot_response" &&
+      replyTarget.authorId !== userId &&
+      !notified.has(replyTarget.authorId)
+    ) {
+      const target = await ctx.db.get(replyTarget.authorId);
+      const allowed =
+        access.kind === "channel" ||
+        (target !== null &&
+          dmConversation !== null &&
+          dmConversation.participantIds.includes(replyTarget.authorId));
+      const targetChannelLevel =
+        access.kind === "channel" && target
+          ? await channelNotificationLevel(
+              ctx,
+              target._id,
+              args.containerId as Id<"channels">,
+            )
+          : "mentions";
+      if (allowed && !mutedServer && targetChannelLevel !== "none") {
+        await notify(ctx, {
+          userId: replyTarget.authorId,
+          type: "reply",
+          title: `${user.name ?? user.username} replied to you`,
+          body: content.slice(0, 160),
+          actorId: userId,
+          link,
+          containerKey: args.containerId,
+          messageId,
+        });
+      }
+    }
+  }
+
+  return { messageId, deduped: false, blocked: null };
+}
+
+export const send = mutation({
+  args: sendArgs,
+  handler: (ctx, args) => sendMessage(ctx, args),
 });
 
 export const edit = mutation({
-  args: { messageId: v.id("messages"), content: v.string() },
-  handler: async (ctx, { messageId, content }) => {
-    const { id: userId } = await requireActiveUser(ctx);
+  args: {
+    messageId: v.id("messages"),
+    content: v.string(),
+    expectedRevision: v.optional(v.number()),
+  },
+  handler: async (ctx, { messageId, content, expectedRevision }) => {
+    const { id: userId, user } = await requireActiveUser(ctx);
     const message = await ctx.db.get(messageId);
-    if (!message) throw new Error("That message no longer exists.");
+    if (!message || (message.expiresAt && message.expiresAt <= Date.now()))
+      throw new Error("That message no longer exists.");
+    if (
+      expectedRevision !== undefined &&
+      expectedRevision !== (message.revision ?? 0)
+    )
+      throw new Error(
+        "The message changed. Reopen its history before restoring.",
+      );
     if (message.kind === "bot_response") {
       throw new Error("Bot responses can't be edited.");
     }
@@ -1004,9 +1110,9 @@ export const edit = mutation({
       message.containerId,
     );
     const trimmed = content.trim();
-    if (trimmed.length > MAX_MESSAGE_LENGTH) {
+    if (trimmed.length > messageLimit(user)) {
       throw new Error(
-        `Messages are limited to ${MAX_MESSAGE_LENGTH} characters.`,
+        `Messages are limited to ${messageLimit(user)} characters.`,
       );
     }
     if (!trimmed) throw new Error("A message can't be empty.");
@@ -1041,7 +1147,24 @@ export const edit = mutation({
         "You don't have permission to mention @everyone or @here.",
       );
     }
-    await ctx.db.patch(messageId, { content: trimmed, editedAt: Date.now() });
+    if (trimmed === message.content) return;
+    const oldVersions = await ctx.db
+      .query("messageVersions")
+      .withIndex("by_message", (q) => q.eq("messageId", messageId))
+      .order("asc")
+      .take(50);
+    if (oldVersions.length >= 50) await ctx.db.delete(oldVersions[0]._id);
+    await ctx.db.insert("messageVersions", {
+      messageId,
+      content: message.content,
+      savedAt: Date.now(),
+      editorId: userId,
+    });
+    await ctx.db.patch(messageId, {
+      content: trimmed,
+      editedAt: Date.now(),
+      revision: (message.revision ?? 0) + 1,
+    });
   },
 });
 
@@ -1086,7 +1209,8 @@ export const toggleReaction = mutation({
       throw new Error("That reaction isn't valid.");
     }
     const message = await ctx.db.get(messageId);
-    if (!message) throw new Error("That message no longer exists.");
+    if (!message || (message.expiresAt && message.expiresAt <= Date.now()))
+      throw new Error("That message no longer exists.");
     await requireReadAccess(
       ctx,
       userId,
@@ -1122,7 +1246,8 @@ export const togglePin = mutation({
   handler: async (ctx, { messageId }) => {
     const { id: userId } = await requireActiveUser(ctx);
     const message = await ctx.db.get(messageId);
-    if (!message) throw new Error("That message no longer exists.");
+    if (!message || (message.expiresAt && message.expiresAt <= Date.now()))
+      throw new Error("That message no longer exists.");
     const access = await requireReadAccess(
       ctx,
       userId,
@@ -1149,7 +1274,8 @@ export const markUnread = mutation({
   handler: async (ctx, { messageId }) => {
     const { id: userId } = await requireUser(ctx);
     const message = await ctx.db.get(messageId);
-    if (!message) throw new Error("That message no longer exists.");
+    if (!message || (message.expiresAt && message.expiresAt <= Date.now()))
+      throw new Error("That message no longer exists.");
     await requireReadAccess(
       ctx,
       userId,

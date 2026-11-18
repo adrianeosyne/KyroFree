@@ -1,10 +1,12 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { mutation } from "./functions";
+import { requireReadAccess } from "./messages";
+import { hasPremium } from "../lib/entitlements";
+import { isPlatformStaff } from "./lib";
 import {
   requireActiveUser,
   requireConversationAccess,
-  requireServerAccess,
   requireUser,
   type Ctx,
 } from "./lib";
@@ -19,7 +21,7 @@ async function requireMessageAccess(
   if (message.containerType === "channel") {
     const channel = await ctx.db.get(message.containerId as Id<"channels">);
     if (!channel) throw new Error("That channel no longer exists.");
-    await requireServerAccess(ctx, channel.serverId, userId);
+    await requireReadAccess(ctx, userId, "channel", channel._id);
   } else {
     await requireConversationAccess(
       ctx,
@@ -43,8 +45,21 @@ export const attach = mutation({
     ctx,
     { messageId, question, options, multiple, durationMinutes },
   ) => {
-    const { id } = await requireActiveUser(ctx);
+    const { id, user } = await requireActiveUser(ctx);
     const message = await requireMessageAccess(ctx, id, messageId);
+    if (message.containerType === "channel") {
+      const channel = await ctx.db.get(message.containerId as Id<"channels">);
+      const server = channel ? await ctx.db.get(channel.serverId) : null;
+      if (
+        server?.isPlatformHome &&
+        !hasPremium(user) &&
+        !user.verified &&
+        !isPlatformStaff(user)
+      )
+        throw new Error(
+          "Polls in Kyro HQ require creator verification or active Premium.",
+        );
+    }
     if (message.authorId !== id) {
       throw new Error("You can only attach a poll to your own message.");
     }

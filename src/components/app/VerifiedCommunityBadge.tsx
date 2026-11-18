@@ -5,6 +5,25 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+export function VerifiedCommunityIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        fill="#5865f2"
+        d="m12 1.8 2.05 1.67 2.61-.35.99 2.44 2.44.99-.35 2.61L21.4 12l-1.66 2.84.35 2.61-2.44.99-.99 2.44-2.61-.35L12 22.2l-2.05-1.67-2.61.35-.99-2.44-2.44-.99.35-2.61L2.6 12l1.66-2.84-.35-2.61 2.44-.99.99-2.44 2.61.35L12 1.8Z"
+      />
+      <path
+        fill="none"
+        stroke="white"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.25"
+        d="m8 12.1 2.45 2.35L16.3 8.8"
+      />
+    </svg>
+  );
+}
+
 /** Discord-style verified-community seal with the requested hover label. */
 export function VerifiedCommunityBadge({ className }: { className?: string }) {
   return (
@@ -18,24 +37,7 @@ export function VerifiedCommunityBadge({ className }: { className?: string }) {
             className,
           )}
         >
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-            className="size-full drop-shadow-[0_1px_2px_rgba(0,0,0,.35)]"
-          >
-            <path
-              fill="#5865f2"
-              d="m12 1.8 2.05 1.67 2.61-.35.99 2.44 2.44.99-.35 2.61L21.4 12l-1.66 2.84.35 2.61-2.44.99-.99 2.44-2.61-.35L12 22.2l-2.05-1.67-2.61.35-.99-2.44-2.44-.99.35-2.61L2.6 12l1.66-2.84-.35-2.61 2.44-.99.99-2.44 2.61.35L12 1.8Z"
-            />
-            <path
-              fill="none"
-              stroke="white"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2.25"
-              d="m8 12.1 2.45 2.35L16.3 8.8"
-            />
-          </svg>
+          <VerifiedCommunityIcon className="size-full drop-shadow-[0_1px_2px_rgba(0,0,0,.35)]" />
         </span>
       </TooltipTrigger>
       <TooltipContent

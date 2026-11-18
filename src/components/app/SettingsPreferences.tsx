@@ -1,3 +1,4 @@
+import { NotificationSoundUpload } from "./NotificationSoundUpload";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -77,6 +78,7 @@ function PreferenceToggle({
 export function ChatSettings() {
   const sendOnEnter = useUiStore((state) => state.sendOnEnter);
   const chatFontSize = useUiStore((state) => state.chatFontSize);
+  const timestampFormat = useUiStore((state) => state.timestampFormat);
   const setPreference = useUiStore((state) => state.setPreference);
   return (
     <>
@@ -101,6 +103,36 @@ export function ChatSettings() {
           title="Show image and GIF previews"
           description="Display images from direct links in chat. Turn off to show the links instead."
         />
+        <PreferenceToggle
+          preference="chatBackgrounds"
+          title="Show personal backgrounds in chats"
+          description="Use your Workspace Studio image behind conversations. Turn off for a plain chat surface."
+        />
+      </SettingsGroup>
+      <SettingsGroup title="Reading messages">
+        <PreferenceToggle
+          preference="groupMessages"
+          title="Group consecutive messages"
+          description="Combine messages from the same person. Turn off to show their name and time on each message."
+        />
+        <label className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+          <span className="text-sm font-medium">Timestamp format</span>
+          <select
+            aria-label="Chat timestamp format"
+            value={timestampFormat}
+            onChange={(e) =>
+              setPreference(
+                "timestampFormat",
+                e.target.value as Preferences["timestampFormat"],
+              )
+            }
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="locale">Device default</option>
+            <option value="12h">12-hour clock</option>
+            <option value="24h">24-hour clock</option>
+          </select>
+        </label>
       </SettingsGroup>
       <SettingsGroup
         title="Message text size"
@@ -164,6 +196,7 @@ export function NotificationSettings() {
   const setPreference = useUiStore((state) => state.setPreference);
   return (
     <>
+      <NotificationSoundUpload />
       <SettingsGroup
         title="Stay in the loop"
         description="Choose what makes a sound. These preferences are saved on this device."
@@ -238,6 +271,11 @@ export function AccessibilitySettings() {
           preference="underlineLinks"
           title="Always underline links"
           description="Make links easier to identify without relying on colour."
+        />
+        <PreferenceToggle
+          preference="customCursor"
+          title="Use the Kyro cursor"
+          description="A custom pointer for mouse and trackpad users. Turn off to use your system cursor."
         />
       </SettingsGroup>
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">

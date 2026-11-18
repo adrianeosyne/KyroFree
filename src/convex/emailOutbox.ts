@@ -17,6 +17,7 @@ import {
 export type EmailTemplate =
   | "password_reset"
   | "email_verification"
+  | "two_factor_recovery"
   | "temporary_ban"
   | "permanent_ban"
   | "warning"
@@ -35,6 +36,30 @@ const RETRY_DELAYS = [
 ];
 
 async function codeDeliveryIssue(ctx: MutationCtx, row: Doc<"emailOutbox">) {
+  if (row.template === "two_factor_recovery") {
+    const prefix = "two-factor-recovery:";
+    const id = row.eventKey.startsWith(prefix)
+      ? ctx.db.normalizeId(
+          "accountRecoveryTokens",
+          row.eventKey.slice(prefix.length),
+        )
+      : null;
+    const token = id ? await ctx.db.get(id) : null;
+    if (!token || token.email !== row.to || token.consumedAt)
+      return "CODE_SUPERSEDED";
+    if (token.expiresAt <= Date.now()) return "CODE_EXPIRED";
+    const [user, security] = await Promise.all([
+      ctx.db.get(token.userId),
+      ctx.db.get(token.securityId),
+    ]);
+    return !user ||
+      user.deletedAt ||
+      user.email !== token.email ||
+      !security?.twoFactorEnabled ||
+      security.userId !== token.userId
+      ? "CODE_SUPERSEDED"
+      : null;
+  }
   if (
     row.template !== "password_reset" &&
     row.template !== "email_verification"
@@ -183,7 +208,11 @@ export const markSent = internalMutation({
       status: "sent",
       providerMessageId: providerMessageId.slice(0, 300),
       sentAt: now,
-      ...(["password_reset", "email_verification"].includes(row.template)
+      ...([
+        "password_reset",
+        "email_verification",
+        "two_factor_recovery",
+      ].includes(row.template)
         ? { payload: "{}" }
         : {}),
       lockedAt: undefined,
@@ -271,7 +300,17 @@ export const cleanupExpiredRecords = internalMutation({
       .query("emailVerificationRequests")
       .withIndex("by_created", (q) => q.lt("createdAt", now - 60 * 60_000))
       .take(200);
+    const recoveryTokens = await ctx.db
+      .query("accountRecoveryTokens")
+      .withIndex("by_expiry", (q) => q.lt("expiresAt", now))
+      .take(200);
+    const recoveryHistory = await ctx.db
+      .query("accountRecoveryRequests")
+      .withIndex("by_created", (q) => q.lt("createdAt", now - 60 * 60_000))
+      .take(200);
     const rows = [
+      ...recoveryTokens,
+      ...recoveryHistory,
       ...resetCodes,
       ...verificationCodes,
       ...resetHistory,

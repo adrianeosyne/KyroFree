@@ -84,6 +84,28 @@ try {
     "PASS: packaged startup, renderer isolation and persistent profile",
   );
 
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].close(),
+  );
+  assert.equal(app.windows().length, 1);
+  assert.equal(
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].isVisible(),
+    ),
+    false,
+  );
+  assert.equal(
+    await page.evaluate(() => localStorage.getItem("kyro-desktop-smoke")),
+    "persisted",
+  );
+  assert.equal(
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()[0].webContents.getBackgroundThrottling(),
+    ),
+    false,
+  );
+  console.log("PASS: close keeps the renderer and session running in the tray");
+
   // Real deployment redirects the apex to www; this was the startup failure.
   await app.evaluate(async ({ BrowserWindow }) => {
     await BrowserWindow.getAllWindows()[0].loadURL(

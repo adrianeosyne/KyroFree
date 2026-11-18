@@ -237,7 +237,7 @@ export function BotApiDocumentation() {
       </div>
       <a
         className="inline-block text-sm text-indigo-300 underline"
-        href="https://github.com/adrianeosyne/KyroFree/blob/main/docs/bot-platform.md"
+        href="/docs"
         target="_blank"
         rel="noreferrer"
       >

@@ -47,7 +47,7 @@ const SECTIONS: { id: Section; label: string }[] = [
 ];
 
 /**
- * Global search (⌘K): people, messages and public communities, scoped to what
+ * Global search (âŒ˜K): people, messages and public communities, scoped to what
  * this account can actually reach.
  */
 export function SearchOverlay({
@@ -96,15 +96,16 @@ export function SearchOverlay({
   };
 
   const openMessage = (hit: {
+    messageId: string;
     containerType: string;
     containerId: string;
     serverId: string | null;
   }) => {
     if (hit.containerType === "channel") {
       if (!hit.serverId) return;
-      navigate(`/dashboard/s/${hit.serverId}/c/${hit.containerId}`);
+      navigate(`/dashboard/s/${hit.serverId}/c/${hit.containerId}?message=${hit.messageId}`);
     } else {
-      navigate(`/dashboard/dm/${hit.containerId}`);
+      navigate(`/dashboard/dm/${hit.containerId}?message=${hit.messageId}`);
     }
     close();
   };
@@ -270,6 +271,7 @@ export function SearchOverlay({
                   type="button"
                   onClick={() =>
                     openMessage({
+                      messageId: hit.message.id,
                       containerType: hit.message.containerType,
                       containerId: hit.message.containerId,
                       serverId: hit.serverId,

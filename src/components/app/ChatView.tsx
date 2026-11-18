@@ -1,10 +1,20 @@
+import { ConversationTools } from "./ConversationTools";
+import { NotebookPen } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
-import { Bell, Check, Hash, Loader2, MessagesSquare } from "@/components/icons";
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  Hash,
+  Loader2,
+  MessagesSquare,
+} from "@/components/icons";
 import { useEffect, useState, type ReactNode } from "react";
-import { Navigate, useSearchParams } from "react-router";
+import { Navigate, useNavigate, useSearchParams } from "react-router";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
 import { Composer, type MentionRole } from "@/components/app/Composer";
+import { AppLoading } from "@/components/AppLoading";
 import { MemberList } from "@/components/app/MemberList";
 import {
   MessageList,
@@ -107,12 +117,14 @@ function ChatSurface({
     containerId,
   });
   const [reply, setReply] = useState<ReplyTarget | null>(null);
+  const navigate = useNavigate();
   const [report, setReport] = useState<{
     reportedUserId?: string;
     messageId?: string;
     targetLabel?: string;
   } | null>(null);
-  const [, setParams] = useSearchParams();
+  const [toolParams, setParams] = useSearchParams();
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   // Tapping a participant in a DM opens their full profile preview —
   // banner, bio, badges and mutual friends/communities.
@@ -133,8 +145,24 @@ function ChatSurface({
   const typers = (typing ?? []).map((user) => user.name);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="kyro-chat-surface relative isolate flex h-full min-h-0 flex-col bg-background">
       <div className="flex min-h-16 shrink-0 flex-wrap items-center gap-2.5 border-b border-border/70 bg-background px-4 py-2.5 sm:h-16 sm:flex-nowrap sm:px-6 sm:py-0">
+        <button
+          type="button"
+          aria-label={
+            containerType === "conversation"
+              ? "Back to messages"
+              : "Back to channels"
+          }
+          className="grid size-11 shrink-0 place-items-center rounded-2xl text-muted-foreground active:bg-panel md:hidden"
+          onClick={() =>
+            containerType === "conversation"
+              ? navigate("/dashboard/chats")
+              : useUiStore.getState().setMobileNav(true)
+          }
+        >
+          <ArrowLeft className="size-5" />
+        </button>
         <div className="flex min-w-0 flex-1 basis-full items-center gap-2.5 sm:basis-auto">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {icon}
@@ -181,6 +209,15 @@ function ChatSurface({
             <ChannelNotificationControl channelId={containerId} />
           )}
           <WorkspaceActions showMemberToggle={containerType === "channel"} />
+          <button
+            type="button"
+            title="Conversation workspace"
+            aria-label="Conversation workspace"
+            className="grid size-9 place-items-center rounded-lg hover:bg-muted"
+            onClick={() => setToolsOpen(true)}
+          >
+            <NotebookPen className="size-4" />
+          </button>
           {headerAction}
         </div>
       </div>
@@ -241,6 +278,21 @@ function ChatSurface({
         </>
       ) : null}
 
+      {(toolsOpen || toolParams.get("tools")) && (
+        <ConversationTools
+          scope={{ containerType, containerId }}
+          members={mentionUsers}
+          initialTab={toolParams.get("tools") ?? undefined}
+          onClose={() => {
+            setToolsOpen(false);
+            setParams((previous) => {
+              const next = new URLSearchParams(previous);
+              next.delete("tools");
+              return next;
+            });
+          }}
+        />
+      )}
       <ReportDialog
         open={report !== null}
         onOpenChange={(open: boolean) => {
@@ -455,7 +507,7 @@ export function DirectChat({ conversationId }: { conversationId: string }) {
   const me = useQuery(api.users.me);
 
   if (conversation === undefined) {
-    return <CenteredNote>Loading conversation…</CenteredNote>;
+    return <AppLoading fullScreen={false} label="Loading your conversation" />;
   }
   if (conversation === null) {
     return (

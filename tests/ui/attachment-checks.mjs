@@ -413,7 +413,7 @@ export async function checkAttachments(page, context) {
         buffer: body,
       });
       const pending = page.getByLabel("Pending attachments", { exact: true });
-      await expect(pending.getByText(/Ready$/)).toBeVisible();
+      await expect(pending.getByText("Ready to send", { exact: true })).toBeVisible();
       const currentUpload = uploaded.at(-1);
       await page
         .getByRole("textbox", { name: "Message", exact: true })
@@ -480,7 +480,7 @@ export async function checkAttachments(page, context) {
         mimeType: "text/plain",
         buffer: Buffer.from("Cancel this completed upload"),
       });
-      await expect(pending.getByText(/Ready$/)).toBeVisible();
+      await expect(pending.getByText("Ready to send", { exact: true })).toBeVisible();
       const canceledId = uploaded.at(-1).storageId;
       await page
         .getByRole("button", {
@@ -518,7 +518,7 @@ export async function checkAttachments(page, context) {
           exact: true,
         })
         .click();
-      await expect(pending.getByText(/Ready$/)).toBeVisible();
+      await expect(pending.getByText("Ready to send", { exact: true })).toBeVisible();
       await expect(pending.getByRole("alert")).toHaveCount(0);
       const retriedId = uploaded.at(-1).storageId;
       await pending

@@ -8,7 +8,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Lock } from "@/components/icons";
+import { Lock } from "@/components/icons";
+import { AppLoading } from "@/components/AppLoading";
 import type { ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router";
 
@@ -41,9 +42,10 @@ export function RequireAuth({
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </main>
+      <AppLoading
+        label="Opening your space"
+        description="Connecting to your account and your conversations."
+      />
     );
   }
 
@@ -64,7 +66,9 @@ export function RequireAuth({
                 <Lock className="size-5 text-muted-foreground" />
               </div>
             </div>
-            <CardTitle className="text-xl">{title}</CardTitle>
+            <CardTitle className="text-xl">
+              <h1>{title}</h1>
+            </CardTitle>
             <CardDescription>{description}</CardDescription>
           </CardHeader>
           <CardContent className="text-center text-sm text-muted-foreground">

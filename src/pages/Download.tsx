@@ -1,247 +1,299 @@
+import { useSyncExternalStore } from "react";
 import { Link } from "react-router";
-import { motion, useReducedMotion } from "framer-motion";
 import {
-  Download as DownloadIcon,
   ArrowRight,
+  Download,
   Check,
-  Headphones,
   MessageCircle,
-  MonitorSmartphone,
+  Headphones,
+  Smartphone,
+  Monitor,
+  Code,
 } from "@/components/icons";
 import { KyroMark, KyroWordmark } from "@/components/KyroMark";
-import { DESKTOP_VERSION, WINDOWS_DOWNLOAD_URL } from "@/lib/desktop";
+import {
+  ANDROID_DOWNLOAD_URL,
+  ANDROID_SOURCE_URL,
+  ANDROID_VERSION,
+  mobilePlatform,
+} from "@/lib/mobile";
+import {
+  DESKTOP_SOURCE_URL,
+  DESKTOP_VERSION,
+  WINDOWS_DOWNLOAD_URL,
+} from "@/lib/desktop";
+import {
+  getInstallState,
+  requestAppInstall,
+  subscribeInstallState,
+} from "@/lib/installApp";
 
 export default function DownloadPage() {
-  const reducedMotion = useReducedMotion();
+  const platform = mobilePlatform();
+  const { installed, prompt } = useSyncExternalStore(
+    subscribeInstallState,
+    getInstallState,
+    getInstallState,
+  );
   return (
     <div className="min-h-screen overflow-x-clip bg-[#111318] text-white">
       <header className="border-b border-white/10">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-5 sm:px-8">
+        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-3 px-5 sm:px-8">
           <Link to="/" aria-label="Kyro home">
             <KyroWordmark />
           </Link>
           <Link
             to="/dashboard"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold hover:bg-white/5"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-white/15 px-4 text-xs font-semibold sm:text-sm"
           >
             Open in browser <ArrowRight className="size-4" />
           </Link>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-5 pb-20 pt-14 sm:px-8 sm:pt-24">
-        <div className="grid items-center gap-14 lg:grid-cols-[1fr_1.05fr]">
-          <motion.div
-            initial={reducedMotion ? false : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-          >
-            <p className="mb-5 text-xs font-bold uppercase tracking-[.22em] text-indigo-300">
-              KYRO FOR WINDOWS
+      <main className="mx-auto max-w-6xl px-5 pb-20 pt-12 sm:px-8 sm:pt-20">
+        <div className="grid items-center gap-12 lg:grid-cols-2">
+          <div>
+            <p className="mb-4 text-xs font-bold uppercase tracking-[.22em] text-violet-300">
+              YOUR PEOPLE. WITH YOU.
             </p>
-            <h1 className="text-5xl font-black leading-[1.02] tracking-[-.045em] sm:text-6xl">
-              Your people.
+            <h1 className="text-5xl font-extrabold leading-[1.04] tracking-[-.05em] sm:text-6xl">
+              Good company.
               <br />
-              One click away.
+              <span className="text-violet-300">Anywhere.</span>
             </h1>
-            <p className="mt-6 max-w-md text-base leading-7 text-[#A0A6B5]">
-              Give your communities a home on your desktop. Chat, join voice,
-              and share your screen in a window of your own.
+            <p className="mt-6 max-w-md text-base leading-7 text-slate-400">
+              Keep your conversations close. Pick up a chat, drop into your
+              community, and meet your people in voice.
             </p>
             <a
-              href={WINDOWS_DOWNLOAD_URL}
-              className="mt-8 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#5865F2] px-6 py-4 font-bold shadow-lg shadow-indigo-950/40 transition hover:bg-[#6875ff] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-indigo-300 sm:w-auto"
+              href={
+                platform === "android"
+                  ? ANDROID_DOWNLOAD_URL
+                  : platform === "ios"
+                    ? "#web-app"
+                    : WINDOWS_DOWNLOAD_URL
+              }
+              className="mt-7 inline-flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-violet-400 px-6 font-bold text-[#171320] transition hover:bg-violet-300 sm:w-auto"
             >
-              <DownloadIcon className="size-5" />
-              Download for Windows
+              <Download className="size-5" />
+              {platform === "android"
+                ? "Download Kyro for Android"
+                : platform === "ios"
+                  ? "Add Kyro to your phone"
+                  : "Download for Windows"}
             </a>
-            <p className="mt-3 text-xs text-[#A0A6B5]">
-              Windows 10 / 11 · 64-bit (x64) · Version {DESKTOP_VERSION}
-            </p>
-            <p className="mt-2 max-w-md text-xs leading-5 text-[#A0A6B5]">
-              The download opens on MediaFire. No GitHub account is needed.
-            </p>
-            <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-300">
+            <div className="mt-5 flex flex-wrap gap-4 text-xs text-slate-400">
               {[
                 "Free to download",
                 "Your existing account",
-                "Desktop & Start menu shortcuts",
+                "Public source code",
               ].map((text) => (
-                <span key={text} className="flex items-center gap-2">
-                  <Check className="size-4 text-indigo-300" />
+                <span key={text} className="flex items-center gap-1.5">
+                  <Check className="size-4 text-violet-300" />
                   {text}
                 </span>
               ))}
             </div>
-          </motion.div>
-          <motion.div
-            initial={reducedMotion ? false : { opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="relative"
+          </div>
+          <div
+            className="relative mx-auto w-full max-w-[310px]"
+            aria-label="Preview of Kyro on Android"
           >
-            <div className="pointer-events-none absolute -inset-6 rounded-full bg-indigo-500/10 blur-3xl" />
-            <div
-              className="relative overflow-hidden rounded-2xl border border-white/15 bg-[#1B1E27] shadow-2xl shadow-black/40"
-              aria-label="Preview of Kyro on Windows"
-            >
-              <div className="flex h-11 items-center gap-2 border-b border-white/10 bg-[#15171e] px-4">
-                <KyroMark className="size-5" />
-                <span className="text-xs font-semibold text-slate-300">
-                  Kyro
-                </span>
-                <div
-                  className="ml-auto flex gap-5 text-sm text-slate-500"
-                  aria-hidden
-                >
-                  <span>−</span>
-                  <span>□</span>
-                  <span>×</span>
-                </div>
+            <div className="pointer-events-none absolute -inset-10 rounded-full bg-violet-400/10 blur-3xl" />
+            <div className="relative overflow-hidden rounded-[40px] border-[7px] border-[#292933] bg-[#17171f] p-5 shadow-2xl shadow-black/40">
+              <div className="mx-auto mb-7 h-2 w-20 rounded-full bg-[#09090e]" />
+              <div className="flex items-center gap-2 text-xl font-extrabold">
+                <KyroMark className="size-7" />
+                kyro<span className="text-violet-300">.</span>
               </div>
-              <div className="flex min-h-[310px] sm:min-h-[360px]">
-                <div className="flex w-14 shrink-0 flex-col items-center gap-3 bg-[#111318] py-4 sm:w-16">
-                  <span className="grid size-10 place-items-center rounded-xl bg-indigo-500">
-                    <KyroMark className="size-7" />
+              <p className="mt-6 text-[9px] font-bold uppercase tracking-[.2em] text-violet-300">
+                Pick up where you left off
+              </p>
+              <p className="mt-1 text-[30px] font-extrabold tracking-tight">
+                Messages<span className="text-violet-300">.</span>
+              </p>
+              <div className="mt-4 rounded-2xl bg-white/5 px-4 py-3 text-[11px] text-slate-500">
+                Find a conversation
+              </div>
+              <div className="mt-5 flex gap-4">
+                {["M", "L", "S"].map((initial, index) => (
+                  <span
+                    key={initial}
+                    className="grid size-11 place-items-center rounded-full border border-violet-300/25 bg-violet-300/10 text-sm font-bold"
+                    style={{ color: ["#d8b4fe", "#6ee7b7", "#f9a8d4"][index] }}
+                  >
+                    {initial}
                   </span>
-                  <span className="grid size-10 place-items-center rounded-2xl bg-purple-400/15 text-purple-200">
-                    ✦
-                  </span>
-                  <span className="grid size-10 place-items-center rounded-2xl bg-emerald-400/15 text-emerald-200">
-                    ☕
-                  </span>
-                </div>
-                <div className="hidden w-32 shrink-0 border-r border-white/5 bg-[#171a22] p-3 text-xs sm:block">
-                  <p className="mb-5 font-bold">After hours</p>
-                  <p className="rounded-md bg-indigo-400/10 p-2 text-indigo-200">
-                    # the-lounge
-                  </p>
-                  <p className="p-2 text-slate-500"># good-finds</p>
-                  <p className="mt-5 flex items-center gap-2 text-slate-400">
-                    <Headphones className="size-3" />
-                    The couch
-                  </p>
-                  <p className="mt-2 pl-5 text-[10px] text-emerald-300">
-                    Voice connected
-                  </p>
-                </div>
-                <div className="min-w-0 flex-1 p-4 sm:p-5">
-                  <p className="border-b border-white/5 pb-4 text-sm font-semibold">
-                    # the-lounge
-                  </p>
-                  <div className="mt-8 space-y-6">
-                    {[
-                      {
-                        name: "nova",
-                        initial: "N",
-                        text: "Anyone up for a game?",
-                        color: "bg-indigo-400/20 text-indigo-200",
-                      },
-                      {
-                        name: "mika",
-                        initial: "M",
-                        text: "Already in voice. Come hang out.",
-                        color: "bg-pink-400/20 text-pink-200",
-                      },
-                    ].map((message) => (
-                      <div key={message.name} className="flex gap-3">
-                        <span
-                          className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${message.color}`}
-                        >
-                          {message.initial}
-                        </span>
-                        <div>
-                          <p className="text-xs font-semibold">
-                            {message.name}
-                          </p>
-                          <p className="mt-1 text-xs leading-5 text-slate-400">
-                            {message.text}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                ))}
+              </div>
+              <div className="mt-5 space-y-2">
+                {[
+                  { name: "Maya", text: "See you in a bit!", initial: "M" },
+                  { name: "Leo", text: "Anyone up for a game?", initial: "L" },
+                  {
+                    name: "Your people",
+                    text: "3 friends are around now",
+                    initial: "✦",
+                  },
+                ].map((chat) => (
+                  <div
+                    key={chat.name}
+                    className="flex items-center gap-3 rounded-2xl bg-white/5 p-3"
+                  >
+                    <span className="grid size-9 place-items-center rounded-xl bg-violet-300/10 text-xs text-violet-200">
+                      {chat.initial}
+                    </span>
+                    <span>
+                      <strong className="text-xs">{chat.name}</strong>
+                      <span className="mt-1 block text-[10px] text-slate-400">
+                        {chat.text}
+                      </span>
+                    </span>
                   </div>
-                  <div className="mt-10 rounded-lg border border-white/5 bg-white/5 p-3 text-[11px] text-slate-500">
-                    Message #the-lounge
-                  </div>
-                </div>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-around rounded-2xl bg-[#242430] px-2 py-3 text-[9px] text-slate-400">
+                <span>Home</span>
+                <span className="font-bold text-violet-300">Chats</span>
+                <span>Servers</span>
+                <span>Inbox</span>
+                <span>You</span>
               </div>
             </div>
-            <p className="mt-3 text-center text-xs text-slate-500">
-              Same Kyro. A little closer.
-            </p>
-          </motion.div>
+          </div>
         </div>
-        <section className="mt-20 grid gap-5 border-t border-white/10 pt-12 sm:grid-cols-3">
-          {[
-            {
-              icon: MessageCircle,
-              title: "Stay signed in",
-              text: "Your account and conversations are ready when you reopen Kyro.",
-            },
-            {
-              icon: Headphones,
-              title: "Meet in voice",
-              text: "Give Kyro microphone access when you join a call. Share a screen or a specific window.",
-            },
-            {
-              icon: MonitorSmartphone,
-              title: "Make room for your people",
-              text: "Pin Kyro to your taskbar and keep your communities beside everything else you do.",
-            },
-          ].map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-xl border border-white/5 bg-[#1B1E27] p-6"
+        <section
+          className="mt-16 grid gap-4 md:grid-cols-3"
+          aria-label="Choose your Kyro app"
+        >
+          <article
+            id="android"
+            className="scroll-mt-6 rounded-3xl border border-violet-300/25 bg-violet-300/5 p-6"
+          >
+            <Smartphone className="mb-5 size-7 text-violet-300" />
+            <h2 className="text-xl font-bold">Kyro for Android</h2>
+            <p className="mt-2 text-xs text-slate-400">
+              Android 10+ · Version {ANDROID_VERSION}
+            </p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              Your chats and communities, with Android navigation, file uploads,
+              voice and camera access.
+            </p>
+            <a
+              href={ANDROID_DOWNLOAD_URL}
+              className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-400 px-4 text-sm font-bold text-[#171320]"
             >
-              <feature.icon className="mb-5 size-6 text-indigo-300" />
-              <h2 className="font-semibold">{feature.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#A0A6B5]">
-                {feature.text}
+              <Download className="size-4" />
+              Download Android APK
+            </a>
+            <a
+              href={ANDROID_SOURCE_URL}
+              className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-violet-300"
+            >
+              <Code className="size-4" />
+              View Android source
+            </a>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Open the APK and allow your browser to install Kyro when Android
+              asks. Downloaded from our GitHub release.
+            </p>
+          </article>
+          <article className="rounded-3xl border border-white/10 bg-white/[.025] p-6">
+            <Monitor className="mb-5 size-7 text-violet-300" />
+            <h2 className="text-xl font-bold">Kyro for Windows</h2>
+            <p className="mt-2 text-xs text-slate-400">
+              Windows 10 / 11 · x64 · Version {DESKTOP_VERSION}
+            </p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              A dedicated window for your people. Automatic updates and a place
+              in your system tray.
+            </p>
+            <a
+              href={WINDOWS_DOWNLOAD_URL}
+              className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-bold"
+            >
+              <Download className="size-4" />
+              Download for Windows
+            </a>
+            <a
+              href={DESKTOP_SOURCE_URL}
+              className="mt-4 inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-violet-300"
+            >
+              <Code className="size-4" />
+              View Windows source
+            </a>
+          </article>
+          <article
+            id="web-app"
+            className="scroll-mt-6 rounded-3xl border border-white/10 bg-white/[.025] p-6"
+          >
+            <MessageCircle className="mb-5 size-7 text-violet-300" />
+            <h2 className="text-xl font-bold">Kyro in your browser</h2>
+            <p className="mt-2 text-xs text-slate-400">
+              Phones, tablets and computers
+            </p>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              {installed
+                ? "Your Kyro web app is installed. Open it from your home screen."
+                : platform === "ios"
+                  ? "In Safari, tap Share, then Add to Home Screen. Kyro opens in its own window."
+                  : "Use your browser's Install app or Add to Home Screen action for a home-screen shortcut."}
+            </p>
+            {prompt && !installed ? (
+              <button
+                type="button"
+                onClick={() => void requestAppInstall()}
+                className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-bold"
+              >
+                <Download className="size-4" />
+                Install web app
+              </button>
+            ) : (
+              <Link
+                to="/dashboard"
+                className="mt-5 flex min-h-12 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 text-sm font-bold"
+              >
+                Open Kyro
+                <ArrowRight className="size-4" />
+              </Link>
+            )}
+          </article>
+        </section>
+        <section className="mt-12 grid gap-6 border-t border-white/10 pt-9 sm:grid-cols-2">
+          <div className="flex gap-4">
+            <Headphones className="size-6 shrink-0 text-violet-300" />
+            <div>
+              <h2 className="font-semibold">Meet in voice</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Allow microphone or camera access when you start a call. Keep
+                the Android app open while you're talking.
               </p>
             </div>
-          ))}
-        </section>
-        <section className="mt-12 rounded-xl border border-white/10 p-6 sm:p-8">
-          <h2 className="text-lg font-semibold">
-            From download to your first conversation.
-          </h2>
-          <ol className="mt-5 grid gap-5 text-sm sm:grid-cols-3">
-            {[
-              "Download and open the Kyro installer.",
-              "Choose where to install Kyro and add your shortcuts.",
-              "Open Kyro and sign in with your existing account, or create one.",
-            ].map((step, index) => (
-              <li key={step} className="flex gap-3">
-                <span className="grid size-7 shrink-0 place-items-center rounded-full bg-indigo-400/10 font-bold text-indigo-300">
-                  {index + 1}
-                </span>
-                <span className="pt-1 leading-6 text-slate-300">{step}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-6 border-t border-white/5 pt-5 text-xs leading-6 text-[#A0A6B5]">
-            Internet connection required. This first release is not code signed,
-            so Windows may identify the publisher as unknown. Download only from
-            the download linked on this page.
-          </p>
+          </div>
+          <div className="flex gap-4">
+            <Code className="size-6 shrink-0 text-violet-300" />
+            <div>
+              <h2 className="font-semibold">Source you can inspect</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                The app, web interface and backend source live together in{" "}
+                <a
+                  href="https://github.com/adrianeosyne/KyroFree"
+                  className="text-violet-300 underline underline-offset-4"
+                >
+                  our public GitHub repository
+                </a>
+                .
+              </p>
+            </div>
+          </div>
         </section>
       </main>
-      <footer className="border-t border-white/10 px-5 py-7 text-center text-xs text-[#A0A6B5]">
-        <Link to="/privacy" className="hover:text-white">
-          Privacy
-        </Link>
-        <span className="mx-4">·</span>
-        <Link to="/terms" className="hover:text-white">
-          Terms
-        </Link>
-        <span className="mx-4">·</span>
-        <Link to="/copyright" className="hover:text-white">
-          Copyright
-        </Link>
-        <span className="mx-4">·</span>
-        <Link to="/" className="hover:text-white">
-          Kyro home
-        </Link>
+      <footer className="border-t border-white/10 px-5 py-6 text-center text-xs text-slate-500">
+        <Link to="/terms">Terms</Link>
+        <span className="px-3">·</span>
+        <Link to="/privacy">Privacy</Link>
+        <span className="px-3">·</span>
+        <Link to="/">Kyro home</Link>
       </footer>
     </div>
   );

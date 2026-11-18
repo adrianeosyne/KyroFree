@@ -1,3 +1,4 @@
+import { requirePremiumChannel } from "./premiumBenefits";
 import { v } from "convex/values";
 import { mutation, query } from "./functions";
 import type { Id } from "./_generated/dataModel";
@@ -43,6 +44,7 @@ async function commandChannelAccess(
 ) {
   const channel = await ctx.db.get(channelId);
   if (!channel) throw new Error("That channel no longer exists.");
+  await requirePremiumChannel(ctx, channel, userId);
   const access = await requireServerAccess(ctx, channel.serverId, userId);
   const defaultRole = await ctx.db
     .query("serverRoles")
