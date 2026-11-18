@@ -421,7 +421,8 @@ export function PremiumAdmin() {
   const updateSubscription = useMutation(api.premium.updateSubscription);
   const [grantDays, setGrantDays] = useState(30);
   const [userId, setUserId] = useState("");
-  const [tier, setTier] = useState<PremiumBadgeTier | "automatic">("Premium");
+  const [tier, setTier] = useState<PremiumBadgeTier | "automatic">("automatic");
+  const now = useNow();
   const member = useQuery(
     api.premium.memberStatus,
     userId ? { userId: userId as Id<"users"> } : "skip",
@@ -458,9 +459,11 @@ export function PremiumAdmin() {
           <p className="mt-3 text-sm" role="status">
             {member === undefined
               ? "Loading member's Premium…"
-              : hasPremium(member)
-                ? `Current badge tier: ${premiumTier(member).name}. Premium ends ${new Date(member.premiumUntil!).toLocaleDateString()}.`
-                : "This member has no active Premium."}
+              : !now
+                ? "Loading member's Premium…"
+                : hasPremium(member, now)
+                  ? `Current badge tier: ${premiumTier(member, now).name}${member.premiumBadgeTier ? " (assigned)" : " (automatic)"}. Premium ends ${new Date(member.premiumUntil!).toLocaleDateString()}.`
+                  : "This member has no active Premium."}
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
@@ -520,17 +523,19 @@ export function PremiumAdmin() {
             }
             className="mt-2 block w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           >
+            <option value="automatic">Automatic (based on streak)</option>
             {PREMIUM_TIERS.map((entry) => (
               <option key={entry.name} value={entry.name}>
                 {entry.name}
               </option>
             ))}
-            <option value="automatic">Automatic (based on streak)</option>
           </select>
           <p className="my-2 text-xs text-muted-foreground">
-            Assigning a tier activates one month of Premium if the member has
-            none. Active members keep their current expiry date. Removing
-            Premium also clears the assigned tier.
+            Automatic tiers advance with the member's continuous Premium streak.
+            An assigned tier stays fixed until you restore automatic
+            progression. Assigning a tier activates one month of Premium if the
+            member has none; active members keep their expiry date. Removing
+            Premium clears the assigned tier.
           </p>
           <Button
             disabled={busy || !userId || member === undefined}

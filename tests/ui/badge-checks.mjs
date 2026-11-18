@@ -41,6 +41,7 @@ export async function checkBadges(page) {
     dispatchEvent(new PopStateEvent("popstate"));
   });
   await page.getByRole("button", { name: "Premium", exact: true }).click();
+  await expect(page.getByLabel("Premium badge tier")).toHaveValue("automatic");
   await expect(
     page.getByRole("button", { name: "Remove Premium", exact: true }),
   ).toBeDisabled();
@@ -91,7 +92,7 @@ export async function checkBadges(page) {
   );
   await expect(
     page.getByRole("status").filter({ hasText: "Current badge tier:" }),
-  ).toContainText("Celestial");
+  ).toContainText("Celestial (assigned)");
   await page.getByLabel("Premium badge tier").selectOption("automatic");
   await page
     .getByRole("button", { name: "Use automatic badge tier", exact: true })

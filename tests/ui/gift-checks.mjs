@@ -47,6 +47,16 @@ export async function checkGiftExperience(page) {
       container.locator(
         '[aria-label="Profile badges"] [aria-label^="Premium · Glacier:"]',
       ),
+    ).toHaveCount(0);
+    await expect(
+      container.locator(
+        '[aria-label="Profile badges"] [aria-label^="Verified:"]',
+      ),
+    ).toHaveCount(1);
+    await expect(
+      container.locator(
+        '[aria-label="Profile badges"] [aria-label^="Big Gifter:"]',
+      ),
     ).toHaveCount(1);
     await expect(
       container.locator('.display-name [aria-label^="Premium · Glacier:"]'),
@@ -63,7 +73,9 @@ export async function checkGiftExperience(page) {
   await expect(
     page.getByRole("heading", { name: "My Profile", exact: true }),
   ).toBeVisible();
-  await assertSelectedTier(page.getByRole("region", { name: "Profile preview" }));
+  await assertSelectedTier(
+    page.getByRole("region", { name: "Profile preview" }),
+  );
   await page.screenshot({
     path: "test-results/premium-selected-tier-profile.png",
     animations: "disabled",

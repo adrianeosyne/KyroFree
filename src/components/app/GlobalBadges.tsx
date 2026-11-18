@@ -5,6 +5,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useNow } from "@/hooks/use-now";
+import { hasPremium } from "@/lib/entitlements";
 import { useId, type ReactNode } from "react";
 import {
   getGifterBadgeTier,
@@ -292,13 +294,19 @@ export function PremiumBadge({
   user: PremiumBadgeUser;
   compact?: boolean;
 }) {
-  if (!user.badges?.includes("premium")) return null;
-  const tier = getPremiumBadgeTier(user);
+  const now = useNow();
+  if (
+    !now ||
+    !user.badges?.includes("premium") ||
+    (user.premiumUntil !== undefined && !hasPremium(user, now))
+  )
+    return null;
+  const tier = getPremiumBadgeTier(user, now);
   const label = tier.name === "Premium" ? "Premium" : `Premium · ${tier.name}`;
   return (
     <BadgeTip
       label={label}
-      blurb={getPremiumSinceText(user) ?? "Premium membership badge"}
+      blurb={getPremiumSinceText(user, now) ?? "Premium membership badge"}
     >
       <span
         className={cn(
@@ -402,6 +410,7 @@ export function InlineBadge({
 /**
  * Compact profile badge capsule. Every earned badge uses the same deep-navy,
  * blue-violet visual family and stays separate from community roles.
+ * Premium's tier is shown separately beside the display name.
  */
 export function BadgeTray({
   badges,
@@ -417,7 +426,9 @@ export function BadgeTray({
   className?: string;
   user?: PremiumBadgeUser;
 }) {
-  const ordered = BADGE_PRIORITY.filter((badge) => badges.includes(badge));
+  const ordered = BADGE_PRIORITY.filter(
+    (badge) => badge !== "premium" && badges.includes(badge),
+  );
   const lead =
     primaryBadge &&
     primaryBadge !== "none" &&
@@ -452,18 +463,8 @@ export function BadgeTray({
       ) : null}
       {display.map((badge) => {
         const meta = GLOBAL_BADGE_META[badge];
-        const tier =
-          badge === "premium" && user ? getPremiumBadgeTier(user) : null;
-        const label =
-          tier && tier.name !== "Premium"
-            ? `${meta.label} · ${tier.name}`
-            : meta.label;
-        const blurb =
-          badge === "premium" && user
-            ? (getPremiumSinceText(user) ?? meta.blurb)
-            : meta.blurb;
         return (
-          <BadgeTip key={badge} label={label} blurb={blurb}>
+          <BadgeTip key={badge} label={meta.label} blurb={meta.blurb}>
             <span className="flex size-7 items-center justify-center rounded-lg transition-colors hover:bg-indigo-300/10">
               <GlobalBadgeIcon badge={badge} className="size-5" user={user} />
             </span>

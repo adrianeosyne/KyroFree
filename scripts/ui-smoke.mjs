@@ -17,6 +17,7 @@ import { checkMediaAndMobile } from "../tests/ui/media-mobile-checks.mjs";
 import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
 import { checkAdminPortal } from "../tests/ui/admin-portal-checks.mjs";
 import { checkBadgeVisibility } from "../tests/ui/badge-visibility-checks.mjs";
+import { checkPremiumMilestones } from "../tests/ui/premium-milestone-checks.mjs";
 import { checkAttachments } from "../tests/ui/attachment-checks.mjs";
 import { checkMobile } from "../tests/ui/mobile-checks.mjs";
 
@@ -231,12 +232,29 @@ if (process.argv.includes("--attachments")) {
   }
   process.exit(0);
 }
+if (process.argv.includes("--premium-milestones")) {
+  try {
+    await checkPremiumMilestones(browser);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
 if (process.argv.includes("--profile-badges")) {
   try {
     await page.goto("http://127.0.0.1:5187/dashboard");
     await checkProfileBadges(page);
     await checkBadgeVisibility(page);
+    await checkPremiumMilestones(browser);
     assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/profile-badges-failure.png" });
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
+    throw error;
   } finally {
     await browser.close();
     await server.close();
@@ -267,6 +285,7 @@ try {
     await checkSettings(page, context);
     await checkProfileBadges(page);
     await checkBadgeVisibility(page);
+    await checkPremiumMilestones(browser);
     await checkAdminPortal(page);
     await checkAttachments(page, context);
     await checkReleasePromotion(browser);

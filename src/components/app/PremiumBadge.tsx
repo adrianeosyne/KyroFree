@@ -12,6 +12,9 @@ import {
 import { cn } from "@/lib/utils";
 import { useId } from "react";
 import { BadgeTip } from "./BadgeTip";
+import { useNow } from "@/hooks/use-now";
+import { hasPremium } from "@/lib/entitlements";
+import { getPremiumSinceText } from "@/lib/premium-badges";
 export function PremiumBadge({
   user,
   compact = false,
@@ -19,12 +22,12 @@ export function PremiumBadge({
   user: PremiumHistory;
   compact?: boolean;
 }) {
-  if (!user.badges?.includes("premium")) return null;
-  const tier = premiumTier(user),
-    days = premiumDays(user);
-  const since = user.premiumSince
-    ? `Premium since ${new Date(user.premiumSince).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}`
-    : "Premium member";
+  const now = useNow();
+  if (!now || !user.badges?.includes("premium") || !hasPremium(user, now))
+    return null;
+  const tier = premiumTier(user, now),
+    days = premiumDays(user, now);
+  const since = getPremiumSinceText(user, now) ?? "Premium member";
   return (
     <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>

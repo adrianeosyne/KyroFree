@@ -78,7 +78,10 @@ export type PremiumHistory = {
   badges?: readonly string[];
 };
 export function premiumDays(user: PremiumHistory, now = Date.now()) {
-  return hasPremium(user, now) && user.premiumStreakSince
+  return hasPremium(user, now) &&
+    typeof user.premiumStreakSince === "number" &&
+    Number.isFinite(user.premiumStreakSince) &&
+    user.premiumStreakSince > 0
     ? Math.max(0, Math.floor((now - user.premiumStreakSince) / DAY_MS))
     : 0;
 }

@@ -63,10 +63,14 @@ export async function checkBadgeVisibility(page) {
       .getByRole("button", { name: "My Profile", exact: true })
       .click();
     const tray = dialog.getByLabel("Profile badges", { exact: true });
+    await expect(tray.locator('[aria-label^="Premium"]')).toHaveCount(0);
     await expect(
-      tray.getByLabel("Premium · Radiant: A Premium member of Kyro.", {
-        exact: true,
-      }),
+      dialog
+        .locator(".display-name")
+        .getByLabel("Premium · Radiant: Premium membership badge", {
+          exact: true,
+        })
+        .first(),
     ).toBeVisible();
     await expect(
       tray.getByLabel(
@@ -163,15 +167,19 @@ export async function checkBadgeVisibility(page) {
       .getByRole("navigation", { name: "Settings sections" })
       .getByRole("button", { name: "My Profile", exact: true })
       .click();
-    const tray = dialog
-      .getByLabel("Profile badges", { exact: true })
-      .getByLabel(`Premium · Radiant: ${sinceText}`, { exact: true });
-    await expect(tray).toBeVisible();
-    await tray.hover();
+    await expect(
+      dialog.getByLabel("Profile badges", { exact: true }),
+    ).toHaveCount(0);
+    const profileBadge = dialog
+      .locator(".display-name")
+      .getByLabel(`Premium · Radiant: ${sinceText}`, { exact: true })
+      .first();
+    await expect(profileBadge).toBeVisible();
+    await profileBadge.hover();
     await expect(page.getByRole("tooltip")).toContainText(sinceText);
     await page.mouse.move(0, 0, { steps: 8 });
     await expect(page.getByRole("tooltip")).toHaveCount(0);
-    await tray.focus();
+    await profileBadge.focus();
     await expect(page.getByRole("tooltip")).toContainText(sinceText);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("tooltip")).toHaveCount(0);
