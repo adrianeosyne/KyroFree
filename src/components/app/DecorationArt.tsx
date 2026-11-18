@@ -29,7 +29,7 @@ export function AvatarDecorationArt({
         alt=""
         aria-hidden
         className={cn(
-          "pointer-events-none absolute left-1/2 top-1/2 z-20 size-[138%] -translate-x-1/2 -translate-y-1/2 object-contain",
+          "avatar-decoration-art pointer-events-none absolute left-1/2 top-1/2 z-20 size-[138%] max-w-none -translate-x-1/2 -translate-y-1/2 object-contain",
           className,
         )}
       />

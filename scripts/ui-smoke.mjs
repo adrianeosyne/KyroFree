@@ -18,6 +18,7 @@ import { checkProfileBadges } from "../tests/ui/profile-badge-checks.mjs";
 import { checkAdminPortal } from "../tests/ui/admin-portal-checks.mjs";
 import { checkBadgeVisibility } from "../tests/ui/badge-visibility-checks.mjs";
 import { checkPremiumMilestones } from "../tests/ui/premium-milestone-checks.mjs";
+import { checkSidebarAvatarLayout } from "../tests/ui/sidebar-avatar-checks.mjs";
 import { checkAttachments } from "../tests/ui/attachment-checks.mjs";
 import { checkMobile } from "../tests/ui/mobile-checks.mjs";
 
@@ -232,6 +233,15 @@ if (process.argv.includes("--attachments")) {
   }
   process.exit(0);
 }
+if (process.argv.includes("--sidebar-avatar")) {
+  try {
+    await checkSidebarAvatarLayout(browser);
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
 if (process.argv.includes("--premium-milestones")) {
   try {
     await checkPremiumMilestones(browser);
@@ -286,6 +296,7 @@ try {
     await checkProfileBadges(page);
     await checkBadgeVisibility(page);
     await checkPremiumMilestones(browser);
+    await checkSidebarAvatarLayout(browser);
     await checkAdminPortal(page);
     await checkAttachments(page, context);
     await checkReleasePromotion(browser);

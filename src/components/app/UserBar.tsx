@@ -103,21 +103,23 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
           click before the chat box accepted focus. */}
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <button className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left hover:bg-sidebar-accent/80">
+          <button className="flex w-full items-center gap-2 rounded-xl px-1.5 py-2 text-left hover:bg-sidebar-accent/80">
             <UserAvatar user={me} size="sm" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1.5">
                 <StyledDisplayName
                   user={me}
-                  className="truncate text-sm leading-tight"
+                  className="flex-1 flex-wrap gap-y-0.5 truncate text-sm leading-tight"
                 />
+              </span>
+              <span className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-xs leading-tight text-muted-foreground">
+                  {me.customStatus || `@${me.username ?? "new"}`}
+                </span>
                 {me.serverTag && (
                   <ServerTagChip tag={me.serverTag} ownerName={me.name} />
                 )}
                 <DeviceBadge device={me.device} />
-              </span>
-              <span className="block truncate text-xs leading-tight text-muted-foreground">
-                {me.customStatus || `@${me.username ?? "new"}`}
               </span>
             </span>
             <Settings className="size-4 shrink-0 text-muted-foreground" />
@@ -152,7 +154,7 @@ export function UserBar({ onOpenSettings }: { onOpenSettings?: () => void }) {
                 next.set("user", me.id);
                 setParams(next, { replace: false });
               }}
-              className="-mt-9 block rounded-full bg-popover p-1 ring-1 ring-border"
+              className="-mt-9 inline-flex rounded-full bg-popover p-1 ring-1 ring-border"
             >
               <UserAvatar user={me} size="lg" />
             </button>

@@ -4,7 +4,7 @@ export const WORKSPACE_DEFAULTS = {
   accent: "#9580ff",
   text: "#eef0ff",
   radius: 14,
-  sidebarWidth: 240,
+  sidebarWidth: 272,
   panelOpacity: 95,
   backgroundOpacity: 18,
   backgroundBlur: 0,

@@ -80,7 +80,7 @@ export function Sidebar({
   onOpenSettings?: () => void;
 }) {
   return (
-    <div className="kyro-sidebar flex h-full w-[calc(92vw-76px)] max-w-[264px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[264px]">
+    <div className="kyro-sidebar flex h-full w-[calc(92vw-76px)] max-w-[296px] shrink-0 flex-col border-r border-border/70 bg-sidebar md:w-[296px] md:max-w-none">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {activeServerId ? (
           <ServerSection serverId={activeServerId} />
@@ -1101,7 +1101,7 @@ function HomeSection() {
                       <StyledDisplayName
                         user={other}
                         name={label}
-                        className="truncate"
+                        className="flex-1 truncate"
                       />
                     </span>
                   ) : (

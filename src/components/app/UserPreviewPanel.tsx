@@ -116,7 +116,7 @@ export function UserPreviewPanel() {
 
             <div className="relative z-10 -mt-11 flex min-h-0 flex-1 flex-col px-5 pb-5">
               <div className="flex items-end justify-between gap-3">
-                <span className="w-fit rounded-full bg-popover p-1 ring-1 ring-border">
+                <span className="inline-flex w-fit rounded-full bg-popover p-1 ring-1 ring-border">
                   <UserAvatar user={user} size="xl" />
                 </span>
                 <BadgeTray
