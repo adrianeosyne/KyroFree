@@ -2,6 +2,10 @@ import { socialGamingTables } from "./socialGamingSchema";
 import { attentionTables } from "./attentionSchema";
 import { releaseTables } from "./releaseSchema";
 import { competitionTables } from "./competitionSchema";
+import { communityGrowthTables } from "./communityGrowthSchema";
+import { securityExpansionTables } from "./securityExpansionSchema";
+import { socialGalleryTables } from "./socialGallerySchema";
+import { whiteboardTables } from "./whiteboardSchema";
 import { workspaceValidator } from "./workspaceSchema";
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
@@ -47,6 +51,10 @@ const schema = defineSchema(
     ...attentionTables,
     ...releaseTables,
     ...competitionTables,
+    ...communityGrowthTables,
+    ...securityExpansionTables,
+    ...socialGalleryTables,
+    ...whiteboardTables,
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({
@@ -705,7 +713,13 @@ const schema = defineSchema(
     /** One row per message in a channel *or* a direct-message conversation. */
     messages: defineTable({
       expiresAt: v.optional(v.number()),
-      forwardedFrom: v.optional(v.object({ messageId: v.id("messages"), authorId: v.id("users"), authorName: v.string() })),
+      forwardedFrom: v.optional(
+        v.object({
+          messageId: v.id("messages"),
+          authorId: v.id("users"),
+          authorName: v.string(),
+        }),
+      ),
       components: v.optional(v.array(v.any())),
       embeds: v.optional(
         v.array(
@@ -870,6 +884,7 @@ const schema = defineSchema(
           v.literal("workspace_background_poster"),
           v.literal("workspace_cursor"),
           v.literal("server_emoji"),
+          v.literal("social_sticker"),
           v.literal("bot_icon"),
           v.literal("bot_banner"),
           v.literal("application_asset"),

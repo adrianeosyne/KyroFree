@@ -1,6 +1,8 @@
 import { checkCommunity, checkOffline } from "../tests/ui/community-checks.mjs";
 import { checkAdvanced } from "../tests/ui/advanced-checks.mjs";
 import { checkExpansion } from "../tests/ui/expansion-checks.mjs";
+import { checkGrowth } from "../tests/ui/growth-checks.mjs";
+import { checkWorkspace } from "../tests/ui/collaboration-expansion-checks.mjs";
 import { checkFeatures } from "../tests/ui/feature-checks.mjs";
 import { checkReleasePromotion } from "../tests/ui/premium-release-checks.mjs";
 import { createServer } from "vite";
@@ -55,7 +57,12 @@ const server = await createServer({
       process.argv.includes("--managed-files") ? "managed" : "legacy",
     ),
   },
-  server: { host: "127.0.0.1", port: 5187, strictPort: true, preTransformRequests: false },
+  server: {
+    host: "127.0.0.1",
+    port: 5187,
+    strictPort: true,
+    preTransformRequests: false,
+  },
   optimizeDeps: {
     entries: ["tests/ui/index.html"],
     include: [
@@ -97,10 +104,55 @@ await context.route(/^https?:\/\/(?!127\.0\.0\.1:5187)/, (route) =>
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+if (process.argv.includes("--workspace")) {
+  try {
+    await checkWorkspace(page);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/workspace-failure.png" });
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
+if (process.argv.includes("--growth")) {
+  try {
+    await checkGrowth(page);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/growth-failure.png" });
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
+  process.exit(0);
+}
 if (process.argv.includes("--expansion")) {
-  try { await checkExpansion(page); assert.deepEqual(errors, []); }
-  catch (error) { await page.screenshot({ path: "test-results/expansion-failure.png" }); console.error(errors, (await page.locator("body").innerText()).slice(-2200)); throw error; }
-  finally { await browser.close(); await server.close(); }
+  try {
+    await checkExpansion(page);
+    assert.deepEqual(errors, []);
+  } catch (error) {
+    await page.screenshot({ path: "test-results/expansion-failure.png" });
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
   process.exit(0);
 }
 if (process.argv.includes("--community")) {
@@ -109,7 +161,10 @@ if (process.argv.includes("--community")) {
     assert.deepEqual(errors, []);
   } catch (error) {
     await page.screenshot({ path: "test-results/community-failure.png" });
-    console.error(errors, (await page.locator("body").innerText()).slice(-2200));
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
     throw error;
   } finally {
     await browser.close();
@@ -123,7 +178,10 @@ if (process.argv.includes("--advanced")) {
     assert.deepEqual(errors, []);
   } catch (error) {
     await page.screenshot({ path: "test-results/advanced-failure.png" });
-    console.error(errors, (await page.locator("body").innerText()).slice(-2200));
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
     throw error;
   } finally {
     await browser.close();
@@ -133,13 +191,26 @@ if (process.argv.includes("--advanced")) {
 }
 if (process.argv.includes("--features")) {
   try {
-    await page.goto("http://127.0.0.1:5187/dashboard", { waitUntil: "domcontentloaded", timeout: 120000 });
-    await expect(page.getByRole("heading", { name: /Good to see you/ })).toBeVisible({ timeout: 120000 });
-    await checkFeatures(page); assert.deepEqual(errors, []);
+    await page.goto("http://127.0.0.1:5187/dashboard", {
+      waitUntil: "domcontentloaded",
+      timeout: 120000,
+    });
+    await expect(
+      page.getByRole("heading", { name: /Good to see you/ }),
+    ).toBeVisible({ timeout: 120000 });
+    await checkFeatures(page);
+    assert.deepEqual(errors, []);
   } catch (error) {
     await page.screenshot({ path: "test-results/feature-failure.png" });
-    console.error(errors, (await page.locator("body").innerText()).slice(-2200)); throw error;
-  } finally { await browser.close(); await server.close(); }
+    console.error(
+      errors,
+      (await page.locator("body").innerText()).slice(-2200),
+    );
+    throw error;
+  } finally {
+    await browser.close();
+    await server.close();
+  }
   process.exit(0);
 }
 if (process.argv.includes("--attachments")) {
@@ -319,7 +390,9 @@ try {
     "Keep this draft while I look around",
   );
   await page.evaluate(() => window.setFixtureConnection(false));
-  const connectionBanner = page.getByRole("status").filter({ hasText: "Reconnecting to Kyro" });
+  const connectionBanner = page
+    .getByRole("status")
+    .filter({ hasText: "Reconnecting to Kyro" });
   await expect(connectionBanner).toBeVisible({
     timeout: 10000,
   });

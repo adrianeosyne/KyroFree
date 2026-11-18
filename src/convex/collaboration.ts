@@ -321,6 +321,7 @@ export const createTask = mutation({
     title: v.string(),
     description: v.string(),
     assigneeId: v.optional(v.id("users")),
+    startsAt: v.optional(v.number()),
     dueAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
   },
@@ -346,6 +347,16 @@ export const createTask = mutation({
       futureTime(args.dueAt, "Deadline", 60_000);
       timezone(args.timezone ?? "UTC");
     }
+    if (
+      args.startsAt !== undefined &&
+      (!Number.isSafeInteger(args.startsAt) ||
+        args.startsAt < Date.now() - 366 * 86400000 ||
+        args.startsAt > Date.now() + 366 * 86400000 ||
+        (args.dueAt !== undefined && args.startsAt > args.dueAt))
+    )
+      throw new Error(
+        "Choose a start within one year and before the deadline.",
+      );
     const rows = args.containerType
       ? await ctx.db
           .query("workTasks")
@@ -417,6 +428,60 @@ export const updateTask = mutation({
     });
   },
 });
+export const scheduleTask = mutation({
+  args: {
+    id: v.id("workTasks"),
+    startsAt: v.union(v.number(), v.null()),
+    dueAt: v.union(v.number(), v.null()),
+    timezone: v.string(),
+    expectedRevision: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { id } = await requireActiveUser(ctx),
+      task = await ctx.db.get(args.id);
+    if (!task) throw new Error("Task not found.");
+    if (task.containerType && task.containerId)
+      await requireWriteScope(ctx, id, {
+        containerType: task.containerType,
+        containerId: task.containerId,
+      });
+    else if (task.userId !== id) throw new Error("Task not found.");
+    revision(task.revision, args.expectedRevision);
+    timezone(args.timezone);
+    if (args.dueAt !== null) futureTime(args.dueAt, "Deadline", 60_000);
+    if (
+      args.startsAt !== null &&
+      (!Number.isSafeInteger(args.startsAt) ||
+        args.startsAt < Date.now() - 366 * 86400000 ||
+        args.startsAt > Date.now() + 366 * 86400000 ||
+        (args.dueAt !== null && args.startsAt > args.dueAt))
+    )
+      throw new Error(
+        "Choose a start within one year and before the deadline.",
+      );
+    if (task.reminderJobId) {
+      const pending = await ctx.db.system.get(task.reminderJobId);
+      if (pending?.state.kind === "pending")
+        await ctx.scheduler.cancel(task.reminderJobId);
+    }
+    const reminderJobId =
+      args.dueAt !== null
+        ? await ctx.scheduler.runAt(
+            args.dueAt,
+            makeFunctionReference<"mutation">("collaboration:taskReminder"),
+            { id: task._id },
+          )
+        : undefined;
+    await ctx.db.patch(task._id, {
+      startsAt: args.startsAt ?? undefined,
+      dueAt: args.dueAt ?? undefined,
+      timezone: args.timezone,
+      reminderJobId,
+      revision: task.revision + 1,
+      updatedAt: Date.now(),
+    });
+  },
+});
 export const removeTask = mutation({
   args: { id: v.id("workTasks") },
   handler: async (ctx, args) => {
@@ -452,6 +517,7 @@ export const taskReminder = internalMutation({
       !task ||
       task.status === "done" ||
       !task.dueAt ||
+      task.remindedDueAt === task.dueAt ||
       task.dueAt > Date.now()
     )
       return;
@@ -479,5 +545,6 @@ export const taskReminder = internalMutation({
       link,
       containerKey: task.containerId,
     });
+    await ctx.db.patch(task._id, { remindedDueAt: task.dueAt });
   },
 });

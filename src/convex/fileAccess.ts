@@ -5,11 +5,13 @@ import {
   activeSiteBan,
   requireConversationAccess,
   requireServerAccess,
+  isBlockedBetween,
 } from "./lib";
 import { channelPermissions, hasPermission } from "../lib/permissions";
 import type { Id } from "./_generated/dataModel";
 import { activeBot, botChannel, ownerApp } from "./botLib";
 import { uploadByStorageId } from "./uploadSecurity";
+import { collectionAccess } from "./socialVisibility";
 
 function signature(payload: string) {
   const key = process.env.KYRO_FILE_SIGNING_SECRET;
@@ -137,6 +139,21 @@ export async function authorizeFile(
     return upload;
   }
   if (!upload) throw new Error("File unavailable.");
+  if (upload.claimType === "social_sticker" && upload.claimId) {
+    const itemId = ctx.db.normalizeId("socialCollectionItems", upload.claimId),
+      item = itemId && (await ctx.db.get(itemId));
+    if (!item || item.storageId !== storageId)
+      throw new Error("Sticker unavailable.");
+    await collectionAccess(ctx, viewerId, item.collectionId);
+    const creator = await ctx.db.get(item.userId);
+    if (
+      !creator ||
+      creator.deletedAt !== undefined ||
+      (await isBlockedBetween(ctx, viewerId, item.userId))
+    )
+      throw new Error("Sticker unavailable.");
+    return upload;
+  }
   if (upload.ownerId !== viewerId) {
     if (!upload.applicationId) throw new Error("File unavailable.");
     const app = await ctx.db.get(upload.applicationId);

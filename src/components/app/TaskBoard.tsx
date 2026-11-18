@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useMutation, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
+import type { FunctionReturnType } from "convex/server";
+import { useBotTask } from "./BotPlatformShared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +34,164 @@ export type CollaborationScope = {
   containerType: "channel" | "conversation";
   containerId: string;
 };
+type TimelineTask = FunctionReturnType<
+  typeof api.collaboration.tasks
+>["page"][number];
+function TaskTimeline({
+  tasks,
+  onSchedule,
+}: {
+  tasks: TimelineTask[];
+  onSchedule: (task: TimelineTask) => void;
+}) {
+  const dated = tasks
+    .filter((t) => t.startsAt !== undefined || t.dueAt !== undefined)
+    .sort((a, b) => (a.startsAt ?? a.dueAt!) - (b.startsAt ?? b.dueAt!));
+  if (!dated.length)
+    return (
+      <EmptyState>
+        Set planned starts or deadlines to see your task timeline.
+      </EmptyState>
+    );
+  const minimum = Math.min(...dated.map((t) => t.startsAt ?? t.dueAt!)),
+    maximum = Math.max(
+      minimum + 86400000,
+      ...dated.map((t) => t.dueAt ?? t.startsAt!),
+    ),
+    span = maximum - minimum;
+  return (
+    <section className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Timeline of loaded tasks · {new Date(minimum).toLocaleDateString()} –{" "}
+        {new Date(maximum).toLocaleDateString()}. Tasks with only a start or
+        deadline appear as milestones.
+      </p>
+      {dated.map((task) => {
+        const start = task.startsAt ?? task.dueAt!,
+          end = task.dueAt ?? start;
+        return (
+          <article key={task._id} className="space-y-2 rounded-lg border p-3">
+            <div className="flex flex-wrap justify-between gap-2">
+              <h3 className="text-sm font-semibold">{task.title}</h3>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onSchedule(task)}
+              >
+                Edit task dates
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {task.startsAt !== undefined &&
+                `Start ${displayInstant(task.startsAt, task.timezone)}`}
+              {task.startsAt !== undefined && task.dueAt !== undefined && " · "}
+              {task.dueAt !== undefined &&
+                `Due ${displayInstant(task.dueAt, task.timezone)}`}{" "}
+              · {task.status}
+            </p>
+            <div
+              className="relative h-4 overflow-hidden rounded bg-muted"
+              role="img"
+              aria-label={`${task.title} timeline`}
+            >
+              <div
+                className={`absolute inset-y-0 rounded ${task.status === "done" ? "bg-green-600" : task.status === "doing" ? "bg-primary" : "bg-slate-500"}`}
+                style={{
+                  left: `${Math.min(98, ((start - minimum) / span) * 100)}%`,
+                  width: `${Math.max(2, ((end - start) / span) * 100)}%`,
+                }}
+              />
+            </div>
+          </article>
+        );
+      })}
+      <p className="text-xs text-muted-foreground">
+        {tasks.length - dated.length} loaded tasks have no planned dates.
+      </p>
+    </section>
+  );
+}
+function ScheduleTask({
+  task,
+  onClose,
+}: {
+  task: TimelineTask;
+  onClose: () => void;
+}) {
+  const schedule = useMutation(api.collaboration.scheduleTask),
+    work = useBotTask();
+  const [zone, setZone] = useState(task.timezone ?? deviceTimezone()),
+    [start, setStart] = useState(
+      task.startsAt !== undefined
+        ? zonedInput(task.startsAt, task.timezone ?? deviceTimezone())
+        : "",
+    ),
+    [due, setDue] = useState(
+      task.dueAt !== undefined
+        ? zonedInput(task.dueAt, task.timezone ?? deviceTimezone())
+        : "",
+    );
+  return (
+    <Dialog open onOpenChange={(open) => !open && !work.busy && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit task dates</DialogTitle>
+          <DialogDescription>
+            {task.title}. Leave a date empty to clear it. A deadline must be in
+            the future.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void work.run(async () => {
+              await schedule({
+                id: task._id,
+                startsAt: start ? zonedInstant(start, zone) : null,
+                dueAt: due ? zonedInstant(due, zone) : null,
+                timezone: zone,
+                expectedRevision: task.revision,
+              });
+              onClose();
+            }, "Task dates saved");
+          }}
+        >
+          <Label className="block space-y-2">
+            Planned start
+            <Input
+              aria-label="Task planned start"
+              type="datetime-local"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </Label>
+          <Label className="block space-y-2">
+            Deadline
+            <Input
+              aria-label="Task deadline"
+              type="datetime-local"
+              value={due}
+              onChange={(e) => setDue(e.target.value)}
+            />
+          </Label>
+          <Label className="block space-y-2">
+            Timezone
+            <Input
+              aria-label="Task date timezone"
+              required
+              value={zone}
+              onChange={(e) => setZone(e.target.value)}
+            />
+          </Label>
+          <Button type="submit" disabled={work.busy}>
+            Save task dates
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 export function TaskBoard({
   scope,
   members = [],
@@ -47,6 +207,10 @@ export function TaskBoard({
   const update = useMutation(api.collaboration.updateTask);
   const remove = useMutation(api.collaboration.removeTask);
   const [createOpen, setCreateOpen] = useState(false);
+  const [view, setView] = useState("board"),
+    [scheduling, setScheduling] = useState<
+      FunctionReturnType<typeof api.collaboration.tasks>["page"][number] | null
+    >(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   return (
     <div className="space-y-4">
@@ -61,8 +225,26 @@ export function TaskBoard({
           New task
         </Button>
       </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          variant={view === "board" ? "default" : "outline"}
+          onClick={() => setView("board")}
+        >
+          Board view
+        </Button>
+        <Button
+          size="sm"
+          variant={view === "timeline" ? "default" : "outline"}
+          onClick={() => setView("timeline")}
+        >
+          Timeline view
+        </Button>
+      </div>
       {status === "LoadingFirstPage" ? (
         <LoadingRows />
+      ) : view === "timeline" ? (
+        <TaskTimeline tasks={results} onSchedule={setScheduling} />
       ) : (
         <div className="grid gap-4 lg:grid-cols-3">
           {(["todo", "doing", "done"] as const).map((column) => (
@@ -112,6 +294,13 @@ export function TaskBoard({
                           Due {displayInstant(task.dueAt, task.timezone)}
                         </p>
                       )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setScheduling(task)}
+                      >
+                        Edit task dates
+                      </Button>
                       <div className="flex flex-wrap items-center justify-between gap-1">
                         <select
                           aria-label={`Status of ${task.title}`}
@@ -169,6 +358,9 @@ export function TaskBoard({
           onClose={() => setCreateOpen(false)}
         />
       )}
+      {scheduling && (
+        <ScheduleTask task={scheduling} onClose={() => setScheduling(null)} />
+      )}
     </div>
   );
 }
@@ -186,6 +378,10 @@ function CreateTask({
   const [description, setDescription] = useState("");
   const [assignee, setAssignee] = useState("");
   const [hasDeadline, setHasDeadline] = useState(false);
+  const [hasStart, setHasStart] = useState(false),
+    [startTime, setStartTime] = useState(() =>
+      zonedInput(Date.now(), deviceTimezone()),
+    );
   const [timezone, setTimezone] = useState(deviceTimezone);
   const [time, setTime] = useState(() =>
     zonedInput(Date.now() + 86400000, deviceTimezone()),
@@ -241,6 +437,25 @@ function CreateTask({
         <Label className="flex items-center gap-2">
           <input
             type="checkbox"
+            checked={hasStart}
+            onChange={(e) => setHasStart(e.target.checked)}
+          />
+          Set a planned start
+        </Label>
+        {hasStart && (
+          <Label className="block space-y-2">
+            Planned start
+            <Input
+              aria-label="Task planned start"
+              type="datetime-local"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </Label>
+        )}
+        <Label className="flex items-center gap-2">
+          <input
+            type="checkbox"
             checked={hasDeadline}
             onChange={(e) => setHasDeadline(e.target.checked)}
           />
@@ -264,6 +479,9 @@ function CreateTask({
                 title,
                 description,
                 assigneeId: assignee ? (assignee as Id<"users">) : undefined,
+                startsAt: hasStart
+                  ? zonedInstant(startTime, timezone)
+                  : undefined,
                 dueAt: hasDeadline ? zonedInstant(time, timezone) : undefined,
                 timezone: hasDeadline ? timezone : undefined,
               });

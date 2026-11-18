@@ -53,11 +53,9 @@ history and retains the documented legacy message/notification limits.
 - **Voice/video:** captions/subtitles, stages and speaker/audience lifecycle,
   raise hands, breakout rooms, dedicated meetings/attendance, equalizer/effects,
   virtual backgrounds/blur and new pop-out flows.
-- **Communities:** new achievements/quests, partnership management, historical
-  retention/growth analytics, full configuration version history, resource
-  library beyond wiki pages, custom domains and verified backup restoration.
-- **Social:** dedicated portfolios, sticker collections, shared social
-  collections and further creator/profile activity controls.
+- **Communities:** custom domains and expanded backup coverage beyond configuration.
+- **Social:** further creator/profile activity controls beyond the delivered
+  post, portfolio and shared-collection visibility settings.
 - **Gaming:** external game stats, playtime/achievements,
   Minecraft/game-server and game-library integrations,
   overlay/detection and streaming integration.
@@ -65,10 +63,10 @@ history and retains the documented legacy message/notification limits.
   WebSocket transport and additional extension/plugin interfaces.
 - **Security:** WebAuthn passkey ceremony/provider, trusted-device approval,
   suspicious-login notifications, additional phishing/impersonation protection,
-  permission-change notifications, moderation appeals and audited E2EE/key
+  permission-change notifications and audited E2EE/key
   verification for direct/group conversations.
 - **Productivity/platform:** file versioning, live collaborative code editor,
-  whiteboard, project timelines and additional team activity; new split-screen,
+  and additional team activity; new split-screen,
   multi-window/media pop-outs, notification grouping,
   Discord-export import and broader cache/offline sync.
 
@@ -207,3 +205,72 @@ dev by Convex) before the production Vercel project `kyro-free`, serving
 `kyro-chat.cyou`. Use `npx convex dev --once` for this configured deployment;
 `convex deploy` would select a different production deployment. The final
 delivery response records the actual deployed status and source commit.
+
+## Community, appeals, gallery and workspace continuation
+
+Community tools are available at `/dashboard/s/:serverId/growth`. Members can
+join quests, claim achievements, search resources and view active partnerships.
+Managers can define immutable targets, manage resources and bilateral proposals,
+inspect observed daily growth/retention and review configuration history.
+Earned rewards remain visible after a goal is archived. Analytics starts with
+observed events and retains up to 365 days; the chart shows the latest 31 UTC
+days. It does not invent historical activity or count bot posts.
+
+Configuration history coalesces configuration changes and retains up to 30
+fingerprinted snapshots. Owners can import validated configuration backups of
+the same community and restore reviewed state after confirming the current
+name. Restoration checks a current-state fingerprint, protects system roles
+and the official Premium lounge, recreates missing configuration resources,
+preserves messages/members/extra channels and saves pre-restore state.
+Snapshots include roles, categories, channels, AutoMod and lobby settings,
+exclude private content and media, and have bounded resource/size limits.
+Oversized or legacy-invalid configurations remain usable but cannot be captured
+until corrected; managers can verify capture through the history UI.
+
+`/dashboard/appeals` provides personal moderation cases and one appeal per
+unresolved warning/timeout/kick/ban. Removed or banned community members can
+appeal their own cases. Private moderator notes are excluded. Authorized
+reviewers decide in Community tools, with current permissions, hierarchy and
+revision checks. Acceptance resolves the original action, preserves newer bans
+and timeouts, and does not automatically rejoin kicked members.
+
+Around Kyro includes portfolios with per-project privacy and shared collections
+of HTTPS links, live references to social posts and verified uploaded stickers.
+Invitations require acceptance; viewer/editor grants can be revoked. Collection
+reads recheck original post visibility/expiry and blocks. Sticker downloads
+recheck collection membership and blocking using the existing signed file
+service. Upload ownership, existing upload limits and storage quotas remain.
+
+Conversation workspaces include whiteboards with strokes, rectangles and notes,
+object-level revisions, current member/editor authorization and SVG download.
+Completed drawings synchronize through Convex; different objects can be edited
+concurrently, while conflicting changes to the same object require review.
+Whiteboards support up to 500 objects, 300 points per stroke and 20 boards per
+conversation. Tasks have optional planned starts, a timeline of loaded tasks,
+and revision-checked rescheduling. Each deadline reminder is delivered once.
+
+New personal datasets use the existing cursor-based export, recheck shared
+access, and exclude scheduler identifiers. Configuration snapshots export one
+at a time. Community, account, collection and whiteboard deletion use bounded
+cleanup, including dependent records authored by other members and sticker
+storage. No new dependency, AI service or Premium restriction was introduced.
+
+Verification includes 231 passing Vitest tests across 27 files. New browser
+checks cover community goals/resources/partnerships, restoration conflicts,
+appeal submission/review, portfolios, shared collections/invitations, whiteboard
+drawing/concurrent edits and timeline scheduling on desktop and phone layouts.
+These fixtures exercise real product components with isolated RPC data; they
+do not establish authenticated multi-device or native media behavior.
+
+The remaining-feature section above reflects the unfinished wider request;
+this continuation does not claim that voice stages, external integrations,
+passkeys, E2EE or the complete platform expansion are implemented.
+
+Final checks passed: typecheck; lint with zero errors and 24 existing warnings;
+production build; all 231 Vitest tests; new `--growth` and `--workspace` browser
+checks; original `--advanced` and `--expansion` browser checks; and the complete
+combined browser regression. The combined run's AutoMod discard check now uses
+the keyboard path to avoid interception by a previous save toast. The existing
+signed-file service is configured on `giant-cricket-958` for sticker previews
+and downloads. Native media and authenticated multi-device verification remain
+outside these checks.

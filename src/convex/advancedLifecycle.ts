@@ -44,8 +44,38 @@ async function cancelPending(ctx: MutationCtx, id: Id<"_scheduled_functions">) {
 
 /** Parents are removed first; every product read rechecks the parent or owner. */
 export async function queueCleanup(ctx: MutationCtx, job: Job) {
-  if ((job.kind === "user" || job.kind === "server") && job.stage === undefined)
-    await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("expansionLifecycle:cleanup"), { kind: job.kind, id: job.id });
+  if (
+    (job.kind === "user" ||
+      job.kind === "server" ||
+      job.kind === "container") &&
+    job.stage === undefined
+  )
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("whiteboardLifecycle:cleanup"),
+      { kind: job.kind, id: job.id, containerType: job.containerType },
+    );
+  if (job.kind === "user" && job.stage === undefined)
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("galleryLifecycle:cleanup"),
+      { kind: "user", id: job.id },
+    );
+  if (
+    (job.kind === "user" || job.kind === "server") &&
+    job.stage === undefined
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("expansionLifecycle:cleanup"),
+      { kind: job.kind, id: job.id },
+    );
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("communityLifecycle:cleanup"),
+      { kind: job.kind, id: job.id },
+    );
+  }
   await ctx.scheduler.runAfter(0, worker, job);
 }
 

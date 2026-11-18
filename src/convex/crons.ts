@@ -7,6 +7,12 @@ import {
 
 const crons = cronJobs();
 crons.interval(
+  "prune community growth history",
+  { hours: 24 },
+  makeFunctionReference<"mutation">("communityLifecycle:prune"),
+  {},
+);
+crons.interval(
   "apply personal data retention",
   { hours: 1 },
   makeFunctionReference<"mutation">("privacyControls:applyRetention"),

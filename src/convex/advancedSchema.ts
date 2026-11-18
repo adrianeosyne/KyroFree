@@ -145,12 +145,14 @@ export const advancedTables = {
     description: v.string(),
     status: v.union(v.literal("todo"), v.literal("doing"), v.literal("done")),
     assigneeId: v.optional(v.id("users")),
+    startsAt: v.optional(v.number()),
     dueAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
     revision: v.number(),
     createdAt: v.number(),
     updatedAt: v.number(),
     reminderJobId: v.optional(v.id("_scheduled_functions")),
+    remindedDueAt: v.optional(v.number()),
   })
     .index("by_user", ["userId", "createdAt"])
     .index("by_user_scope", ["userId", "containerType", "createdAt"])

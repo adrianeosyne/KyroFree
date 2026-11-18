@@ -198,9 +198,11 @@ export async function checkCommunity(page) {
     ),
     savesBeforePreset,
   );
+  // A previous save toast can cover this control after the browser scrolls.
+  // Exercise its keyboard path so the discard check is independent of toast timing.
   await page
     .getByRole("button", { name: "Discard AutoMod changes", exact: true })
-    .click();
+    .press("Enter");
   await expect(
     page.getByLabel("Maximum mentions", { exact: true }),
   ).toHaveValue("10");

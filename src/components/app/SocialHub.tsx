@@ -17,11 +17,12 @@ import { useNow } from "@/hooks/use-now";
 import { toast } from "sonner";
 
 import { FollowUserButton } from "./ProfileActivities";
+import { Portfolio, SocialCollections, SaveSocialPost } from "./SocialGallery";
 
 type Privacy = "public" | "followers" | "friends" | "private";
 export function SocialHub() {
-  const [tab, setTab] = useState("posts");
   const [params, setParams] = useSearchParams();
+  const tab = params.get("section") ?? "posts";
   const author = params.get("author");
   return (
     <motion.main
@@ -47,6 +48,8 @@ export function SocialHub() {
             ["stories", "Stories"],
             ["following", "Following"],
             ["interests", "Interests"],
+            ["portfolio", "Portfolio"],
+            ["collections", "Collections"],
           ].map(([id, label]) => (
             <Button
               role="tab"
@@ -54,7 +57,14 @@ export function SocialHub() {
               key={id}
               size="sm"
               variant={tab === id ? "default" : "outline"}
-              onClick={() => setTab(id)}
+              onClick={() => {
+                setParams((old) => {
+                  const next = new URLSearchParams(old);
+                  next.set("section", id);
+                  next.delete("collection");
+                  return next;
+                });
+              }}
             >
               {label}
             </Button>
@@ -76,7 +86,11 @@ export function SocialHub() {
           </Button>
         )}
         <div role="tabpanel">
-          {tab === "following" ? (
+          {tab === "portfolio" ? (
+            <Portfolio authorId={author} />
+          ) : tab === "collections" ? (
+            <SocialCollections authorId={author} />
+          ) : tab === "following" ? (
             <Following />
           ) : tab === "interests" ? (
             <Interests />
@@ -143,6 +157,7 @@ function PostFeed({
                 <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                   {renderMessage(post.content)}
                 </div>
+                <SaveSocialPost postId={post._id} />
                 {post.mine && (
                   <div className="flex flex-wrap items-center gap-2">
                     <select

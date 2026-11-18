@@ -26,12 +26,42 @@ import { Button } from "@/components/ui/button";
 import Developers from "./Developers";
 import BotDirectory, { BotAuthorization } from "./BotDirectory";
 
-const SocialHub = lazy(() => import("@/components/app/SocialHub").then(m => ({ default: m.SocialHub })));
-const ReleaseWorkspace = lazy(() => import("@/components/app/ReleaseWorkspace").then(m => ({ default: m.ReleaseWorkspace })));
-const GameHub = lazy(() => import("@/components/app/GameHub").then(m => ({ default: m.GameHub })));
-const CompetitionHub = lazy(() => import("@/components/app/CompetitionHub").then(m => ({ default: m.CompetitionHub })));
-const PersonalLibrary = lazy(() => import("@/components/app/PersonalLibrary").then(m => ({ default: m.PersonalLibrary })));
-const CommunityKnowledgePage = lazy(() => import("@/components/app/CommunityKnowledgePage").then(m => ({ default: m.CommunityKnowledgePage })));
+const SocialHub = lazy(() =>
+  import("@/components/app/SocialHub").then((m) => ({ default: m.SocialHub })),
+);
+const ReleaseWorkspace = lazy(() =>
+  import("@/components/app/ReleaseWorkspace").then((m) => ({
+    default: m.ReleaseWorkspace,
+  })),
+);
+const GameHub = lazy(() =>
+  import("@/components/app/GameHub").then((m) => ({ default: m.GameHub })),
+);
+const CompetitionHub = lazy(() =>
+  import("@/components/app/CompetitionHub").then((m) => ({
+    default: m.CompetitionHub,
+  })),
+);
+const CommunityGrowth = lazy(() =>
+  import("@/components/app/CommunityGrowth").then((m) => ({
+    default: m.CommunityGrowth,
+  })),
+);
+const ModerationAppeals = lazy(() =>
+  import("@/components/app/ModerationAppeals").then((m) => ({
+    default: m.ModerationAppeals,
+  })),
+);
+const PersonalLibrary = lazy(() =>
+  import("@/components/app/PersonalLibrary").then((m) => ({
+    default: m.PersonalLibrary,
+  })),
+);
+const CommunityKnowledgePage = lazy(() =>
+  import("@/components/app/CommunityKnowledgePage").then((m) => ({
+    default: m.CommunityKnowledgePage,
+  })),
+);
 
 const AdminPortal = lazy(() =>
   import("@/components/app/AdminPortal").then((m) => ({
@@ -68,9 +98,14 @@ export default function Dashboard() {
           <Routes>
             <Route index element={<FriendsView />} />
             <Route path="social" element={<SocialHub />} />
+            <Route path="appeals" element={<ModerationAppeals />} />
             <Route path="developer-releases" element={<ReleaseWorkspace />} />
             <Route path="s/:serverId/gaming" element={<GamingRoute />} />
-            <Route path="s/:serverId/competitions" element={<CompetitionRoute />} />
+            <Route
+              path="s/:serverId/competitions"
+              element={<CompetitionRoute />}
+            />
+            <Route path="s/:serverId/growth" element={<GrowthRoute />} />
             <Route path="library" element={<PersonalLibrary />} />
             <Route path="s/:serverId/knowledge" element={<KnowledgeRoute />} />
             <Route path="chats" element={<MobileChatsView />} />
@@ -292,7 +327,44 @@ function LobbyRoute() {
   );
 }
 
-function KnowledgeRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><CommunityKnowledgePage /></MembershipGate> : <Navigate to="/dashboard" replace />; }
+function KnowledgeRoute() {
+  const { serverId } = useParams();
+  return serverId ? (
+    <MembershipGate serverId={serverId}>
+      <CommunityKnowledgePage />
+    </MembershipGate>
+  ) : (
+    <Navigate to="/dashboard" replace />
+  );
+}
 
-function GamingRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><GameHub /></MembershipGate> : <Navigate to="/dashboard" replace />; }
-function CompetitionRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><CompetitionHub serverId={serverId as Id<"servers">} /></MembershipGate> : <Navigate to="/dashboard" replace />; }
+function GamingRoute() {
+  const { serverId } = useParams();
+  return serverId ? (
+    <MembershipGate serverId={serverId}>
+      <GameHub />
+    </MembershipGate>
+  ) : (
+    <Navigate to="/dashboard" replace />
+  );
+}
+function CompetitionRoute() {
+  const { serverId } = useParams();
+  return serverId ? (
+    <MembershipGate serverId={serverId}>
+      <CompetitionHub serverId={serverId as Id<"servers">} />
+    </MembershipGate>
+  ) : (
+    <Navigate to="/dashboard" replace />
+  );
+}
+function GrowthRoute() {
+  const { serverId } = useParams();
+  return serverId ? (
+    <MembershipGate serverId={serverId}>
+      <CommunityGrowth serverId={serverId as Id<"servers">} />
+    </MembershipGate>
+  ) : (
+    <Navigate to="/dashboard" replace />
+  );
+}

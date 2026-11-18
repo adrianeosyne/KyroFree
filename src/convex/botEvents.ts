@@ -1,4 +1,9 @@
 import { recordMessage, memberActivity } from "./activityLib";
+import {
+  recordCommunityMessage,
+  recordCommunityMembership,
+  queueConfigurationCapture,
+} from "./communityGrowthLib";
 import { Triggers } from "convex-helpers/server/triggers";
 import { makeFunctionReference } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
@@ -135,9 +140,31 @@ botTriggers.register("servers", async (ctx, change) => {
     `servers:${change.id}`,
     change.newDoc ? { servers: 1 } : {},
   );
+  const keys = [
+    "name",
+    "description",
+    "rules",
+    "welcomeMessage",
+    "isPublic",
+    "tags",
+    "tag",
+    "links",
+    "verificationLevel",
+    "minAccountAgeMs",
+    "applyToJoin",
+    "applicationQuestions",
+    "themeAccent",
+    "themeTint",
+    "rulesChannelId",
+  ];
+  if (change.newDoc && configChanged(change.oldDoc, change.newDoc, keys))
+    await queueConfigurationCapture(ctx, change.id);
 });
 botTriggers.register("messages", async (ctx, change) => {
-  if (change.operation === "insert") await recordMessage(ctx, change.newDoc);
+  if (change.operation === "insert") {
+    await recordMessage(ctx, change.newDoc);
+    await recordCommunityMessage(ctx, change.newDoc);
+  }
   await syncMetricEntry(
     ctx,
     `messages:${change.id}`,
@@ -147,7 +174,19 @@ botTriggers.register("messages", async (ctx, change) => {
 botTriggers.register("serverMembers", async (ctx, change) => {
   const member = change.newDoc ?? change.oldDoc;
   const activity = await memberActivity(ctx, member.serverId, member.userId);
-  if (change.operation === "delete") await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("expansionLifecycle:cleanupMember"), { serverId: member.serverId, userId: member.userId, stage: 0, cursor: null });
+  if (change.operation !== "update")
+    await recordCommunityMembership(ctx, member, change.operation === "insert");
+  if (change.operation === "delete")
+    await ctx.scheduler.runAfter(
+      0,
+      makeFunctionReference<"mutation">("expansionLifecycle:cleanupMember"),
+      {
+        serverId: member.serverId,
+        userId: member.userId,
+        stage: 0,
+        cursor: null,
+      },
+    );
   await ctx.db.patch(activity._id, { active: change.operation !== "delete" });
   const server = await ctx.db.get(member.serverId);
   if (server?.isPlatformHome) {
@@ -378,3 +417,77 @@ botTriggers.register("serverRoles", async (ctx, change) => {
     if (user && user.hqOg !== og) await ctx.db.patch(user._id, { hqOg: og });
   }
 });
+
+function configChanged(
+  previous: unknown,
+  next: unknown,
+  keys: readonly string[],
+) {
+  const before = previous as Record<string, unknown> | null;
+  const after = next as Record<string, unknown> | null;
+  return keys.some(
+    (key) => JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key]),
+  );
+}
+for (const [table, keys] of [
+  [
+    "channels",
+    [
+      "name",
+      "topic",
+      "kind",
+      "position",
+      "slowMode",
+      "readOnly",
+      "categoryId",
+      "permissionOverwrites",
+      "premiumOnly",
+    ],
+  ],
+  ["categories", ["name", "position"]],
+  [
+    "serverRoles",
+    [
+      "name",
+      "color",
+      "position",
+      "permissions",
+      "isDefault",
+      "hoist",
+      "mentionable",
+    ],
+  ],
+  [
+    "serverAutomod",
+    [
+      "enabled",
+      "blockedWords",
+      "blockInvites",
+      "blockLinks",
+      "maxMentions",
+      "blockCaps",
+      "blockSpam",
+      "exemptRoleIds",
+      "exemptChannelIds",
+    ],
+  ],
+  [
+    "serverLobbies",
+    [
+      "enabled",
+      "title",
+      "intro",
+      "layout",
+      "background",
+      "panel",
+      "accent",
+      "sections",
+      "buttons",
+    ],
+  ],
+] as const)
+  botTriggers.register(table, async (ctx, change) => {
+    const row = change.newDoc ?? change.oldDoc;
+    if (configChanged(change.oldDoc, change.newDoc, keys))
+      await queueConfigurationCapture(ctx, row.serverId);
+  });

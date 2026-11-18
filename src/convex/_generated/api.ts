@@ -45,9 +45,14 @@ import type * as bugReports from "../bugReports.js";
 import type * as channels from "../channels.js";
 import type * as cleanup from "../cleanup.js";
 import type * as collaboration from "../collaboration.js";
+import type * as communityBackups from "../communityBackups.js";
 import type * as communityDecorations from "../communityDecorations.js";
+import type * as communityGrowth from "../communityGrowth.js";
+import type * as communityGrowthLib from "../communityGrowthLib.js";
+import type * as communityGrowthSchema from "../communityGrowthSchema.js";
 import type * as communityHub from "../communityHub.js";
 import type * as communityKnowledge from "../communityKnowledge.js";
+import type * as communityLifecycle from "../communityLifecycle.js";
 import type * as communityMigration from "../communityMigration.js";
 import type * as competitions from "../competitions.js";
 import type * as competitionSchema from "../competitionSchema.js";
@@ -72,6 +77,7 @@ import type * as fileSchema from "../fileSchema.js";
 import type * as fileVerification from "../fileVerification.js";
 import type * as forums from "../forums.js";
 import type * as functions from "../functions.js";
+import type * as galleryLifecycle from "../galleryLifecycle.js";
 import type * as gaming from "../gaming.js";
 import type * as gifs from "../gifs.js";
 import type * as http from "../http.js";
@@ -83,6 +89,7 @@ import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as metricsLib from "../metricsLib.js";
 import type * as moderation from "../moderation.js";
+import type * as moderationAppeals from "../moderationAppeals.js";
 import type * as notifications from "../notifications.js";
 import type * as notificationSounds from "../notificationSounds.js";
 import type * as passwordReset from "../passwordReset.js";
@@ -99,13 +106,17 @@ import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
 import type * as security from "../security.js";
+import type * as securityExpansionSchema from "../securityExpansionSchema.js";
 import type * as securityInternal from "../securityInternal.js";
 import type * as securityRefs from "../securityRefs.js";
 import type * as servers from "../servers.js";
 import type * as sha256 from "../sha256.js";
 import type * as social from "../social.js";
 import type * as socialFeed from "../socialFeed.js";
+import type * as socialGallery from "../socialGallery.js";
+import type * as socialGallerySchema from "../socialGallerySchema.js";
 import type * as socialGamingSchema from "../socialGamingSchema.js";
+import type * as socialVisibility from "../socialVisibility.js";
 import type * as templates from "../templates.js";
 import type * as tempResetPassword from "../tempResetPassword.js";
 import type * as threads from "../threads.js";
@@ -127,6 +138,9 @@ import type * as voiceAuthRefs from "../voiceAuthRefs.js";
 import type * as voiceMaintenance from "../voiceMaintenance.js";
 import type * as voiceTickets from "../voiceTickets.js";
 import type * as warnings from "../warnings.js";
+import type * as whiteboardLifecycle from "../whiteboardLifecycle.js";
+import type * as whiteboards from "../whiteboards.js";
+import type * as whiteboardSchema from "../whiteboardSchema.js";
 import type * as workspace from "../workspace.js";
 import type * as workspaceCursors from "../workspaceCursors.js";
 import type * as workspaceSchema from "../workspaceSchema.js";
@@ -167,9 +181,14 @@ const fullApi: ApiFromModules<{
   "channels": typeof channels,
   "cleanup": typeof cleanup,
   "collaboration": typeof collaboration,
+  "communityBackups": typeof communityBackups,
   "communityDecorations": typeof communityDecorations,
+  "communityGrowth": typeof communityGrowth,
+  "communityGrowthLib": typeof communityGrowthLib,
+  "communityGrowthSchema": typeof communityGrowthSchema,
   "communityHub": typeof communityHub,
   "communityKnowledge": typeof communityKnowledge,
+  "communityLifecycle": typeof communityLifecycle,
   "communityMigration": typeof communityMigration,
   "competitions": typeof competitions,
   "competitionSchema": typeof competitionSchema,
@@ -194,6 +213,7 @@ const fullApi: ApiFromModules<{
   "fileVerification": typeof fileVerification,
   "forums": typeof forums,
   "functions": typeof functions,
+  "galleryLifecycle": typeof galleryLifecycle,
   "gaming": typeof gaming,
   "gifs": typeof gifs,
   "http": typeof http,
@@ -205,6 +225,7 @@ const fullApi: ApiFromModules<{
   "messages": typeof messages,
   "metricsLib": typeof metricsLib,
   "moderation": typeof moderation,
+  "moderationAppeals": typeof moderationAppeals,
   "notifications": typeof notifications,
   "notificationSounds": typeof notificationSounds,
   "passwordReset": typeof passwordReset,
@@ -221,13 +242,17 @@ const fullApi: ApiFromModules<{
   "roles": typeof roles,
   "schema": typeof schema,
   "security": typeof security,
+  "securityExpansionSchema": typeof securityExpansionSchema,
   "securityInternal": typeof securityInternal,
   "securityRefs": typeof securityRefs,
   "servers": typeof servers,
   "sha256": typeof sha256,
   "social": typeof social,
   "socialFeed": typeof socialFeed,
+  "socialGallery": typeof socialGallery,
+  "socialGallerySchema": typeof socialGallerySchema,
   "socialGamingSchema": typeof socialGamingSchema,
+  "socialVisibility": typeof socialVisibility,
   "templates": typeof templates,
   "tempResetPassword": typeof tempResetPassword,
   "threads": typeof threads,
@@ -249,6 +274,9 @@ const fullApi: ApiFromModules<{
   "voiceMaintenance": typeof voiceMaintenance,
   "voiceTickets": typeof voiceTickets,
   "warnings": typeof warnings,
+  "whiteboardLifecycle": typeof whiteboardLifecycle,
+  "whiteboards": typeof whiteboards,
+  "whiteboardSchema": typeof whiteboardSchema,
   "workspace": typeof workspace,
   "workspaceCursors": typeof workspaceCursors,
   "workspaceSchema": typeof workspaceSchema,

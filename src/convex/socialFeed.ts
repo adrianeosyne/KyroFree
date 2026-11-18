@@ -1,3 +1,4 @@
+import { socialVisible } from "./socialVisibility";
 import { v } from "convex/values";
 import { paginationOptsValidator, makeFunctionReference } from "convex/server";
 import { query, mutation, internalMutation } from "./functions";
@@ -14,54 +15,8 @@ import { text, lifetime } from "./advancedValidation";
 import type { Ctx } from "./lib";
 import type { Doc, Id } from "./_generated/dataModel";
 
-async function visible(
-  ctx: Ctx,
-  viewer: Id<"users">,
-  post: Doc<"socialPosts">,
-) {
-  const author = await ctx.db.get(post.authorId);
-  if (
-    !author ||
-    author.deletedAt ||
-    author.botApplicationId ||
-    (post.expiresAt && post.expiresAt <= Date.now())
-  )
-    return false;
-  if (viewer === post.authorId) return true;
-  if (await isBlockedBetween(ctx, viewer, post.authorId)) return false;
-  if (post.privacy === "public") return true;
-  if (post.privacy === "private") return false;
-  if (post.privacy === "followers")
-    return !!(await ctx.db
-      .query("socialFollows")
-      .withIndex("by_pair", (q) =>
-        q.eq("followerId", viewer).eq("followingId", post.authorId),
-      )
-      .unique());
-  const [outgoing, incoming] = await Promise.all([
-    ctx.db
-      .query("connections")
-      .withIndex("by_requester", (q) => q.eq("requesterId", viewer))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("addresseeId"), post.authorId),
-          q.eq(q.field("status"), "accepted"),
-        ),
-      )
-      .first(),
-    ctx.db
-      .query("connections")
-      .withIndex("by_requester", (q) => q.eq("requesterId", post.authorId))
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("addresseeId"), viewer),
-          q.eq(q.field("status"), "accepted"),
-        ),
-      )
-      .first(),
-  ]);
-  return !!outgoing || !!incoming;
-}
+const visible = (ctx: Ctx, viewer: Id<"users">, post: Doc<"socialPosts">) =>
+  socialVisible(ctx, viewer, post.authorId, post.privacy, post.expiresAt);
 export const following = query({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {

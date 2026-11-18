@@ -365,6 +365,18 @@ export function ProfileCard() {
                       size="sm"
                       onClick={() => {
                         close(false);
+                        navigate(
+                          `/dashboard/social?section=portfolio&author=${user.id}`,
+                        );
+                      }}
+                    >
+                      View portfolio
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        close(false);
                         navigate(`/dashboard/social?author=${user.id}`);
                       }}
                     >

@@ -19,6 +19,7 @@ import { renderMessage } from "@/lib/markdown";
 import { displayInstant } from "@/lib/zonedTime";
 import { TaskBoard, type CollaborationScope } from "./TaskBoard";
 import { EmptyState, LoadingRows, ConfirmDelete } from "./AdvancedShared";
+import { WhiteboardWorkspace } from "./WhiteboardWorkspace";
 
 export function ConversationTools({
   scope,
@@ -50,6 +51,7 @@ export function ConversationTools({
             ["notes", "Private notes", NotebookPen],
             ["documents", "Documents", FileText],
             ["tasks", "Tasks", ListTodo],
+            ["whiteboards", "Whiteboards", FileText],
             ["folders", "Folder", Folder],
           ].map(([id, label, Icon]) => {
             const Symbol = Icon as typeof FileText;
@@ -73,6 +75,8 @@ export function ConversationTools({
             <PrivateNote scope={scope} />
           ) : tab === "documents" ? (
             <Documents scope={scope} members={members} />
+          ) : tab === "whiteboards" ? (
+            <WhiteboardWorkspace scope={scope} members={members} />
           ) : tab === "tasks" ? (
             <TaskBoard scope={scope} members={members} />
           ) : (

@@ -3,9 +3,12 @@ import { v } from "convex/values";
 import { query } from "./functions";
 import { requireUser, requireServerAccess, isBlockedBetween } from "./lib";
 import { requireReadAccess } from "./messages";
-import type { Doc, TableNames } from "./_generated/dataModel";
+import type { Doc, Id, TableNames } from "./_generated/dataModel";
 
 import { exportDatasets } from "../lib/dataExport";
+import { PERMISSIONS } from "../lib/permissions";
+import { collectionAccess } from "./socialVisibility";
+import { boardAccess } from "./whiteboards";
 const dataset = v.union(...exportDatasets.map((value) => v.literal(value)));
 
 /** Owner-scoped, bounded export. Never includes credentials or scheduler IDs. */
@@ -15,7 +18,10 @@ export const personalPage = query({
     const { id } = await requireUser(ctx);
     const opts = {
       ...args.paginationOpts,
-      numItems: Math.min(10, args.paginationOpts.numItems),
+      numItems: Math.min(
+        args.dataset === "communityBackups" ? 1 : 10,
+        args.paginationOpts.numItems,
+      ),
     };
     let result: {
       page: Doc<TableNames>[];
@@ -73,24 +79,111 @@ export const personalPage = query({
     }
     const page = [];
     for (const row of result.page) {
-      if (["gamingClans", "gamingTournaments", "competitionStats"].includes(args.dataset) && "serverId" in row) {
-        try { await requireServerAccess(ctx, row.serverId!, id); } catch { continue; }
+      if (args.dataset === "whiteboardObjects" && "boardId" in row) {
+        try {
+          await boardAccess(ctx, id, row.boardId);
+        } catch {
+          continue;
+        }
+      }
+      if (args.dataset === "socialCollectionItems" && "collectionId" in row) {
+        try {
+          await collectionAccess(
+            ctx,
+            id,
+            row.collectionId as Id<"socialCollections">,
+          );
+        } catch {
+          continue;
+        }
+      }
+      if (
+        [
+          "communityGoals",
+          "communityGoalProgress",
+          "communityResources",
+          "communityActivityState",
+          "communityBackups",
+        ].includes(args.dataset) &&
+        "serverId" in row
+      ) {
+        try {
+          const access = await requireServerAccess(ctx, row.serverId!, id);
+          if (
+            args.dataset === "communityBackups" &&
+            !access.permissions.includes(PERMISSIONS.MANAGE_SERVER)
+          )
+            continue;
+        } catch {
+          continue;
+        }
+      }
+      if (
+        args.dataset === "communityPartnerships" &&
+        "sourceId" in row &&
+        "targetId" in row
+      ) {
+        let allowed = false;
+        for (const serverId of [row.sourceId, row.targetId]) {
+          try {
+            const access = await requireServerAccess(ctx, serverId, id);
+            if (access.permissions.includes(PERMISSIONS.MANAGE_SERVER))
+              allowed = true;
+          } catch {
+            /* Revoked access is excluded. */
+          }
+        }
+        if (!allowed) continue;
+      }
+      if (
+        ["gamingClans", "gamingTournaments", "competitionStats"].includes(
+          args.dataset,
+        ) &&
+        "serverId" in row
+      ) {
+        try {
+          await requireServerAccess(ctx, row.serverId!, id);
+        } catch {
+          continue;
+        }
       }
       if (args.dataset === "clanMemberships" && "clanId" in row) {
         const clan = await ctx.db.get(row.clanId);
         if (!clan) continue;
-        try { await requireServerAccess(ctx, clan.serverId, id); } catch { continue; }
+        try {
+          await requireServerAccess(ctx, clan.serverId, id);
+        } catch {
+          continue;
+        }
       }
       if (args.dataset === "tournamentRegistrations" && "tournamentId" in row) {
         const tournament = await ctx.db.get(row.tournamentId);
         if (!tournament) continue;
-        try { await requireServerAccess(ctx, tournament.serverId, id); } catch { continue; }
+        try {
+          await requireServerAccess(ctx, tournament.serverId, id);
+        } catch {
+          continue;
+        }
       }
-      if ((args.dataset === "appReleases" || args.dataset === "appCollaborators") && "applicationId" in row) {
-        const app = row.applicationId && await ctx.db.get(row.applicationId);
-        if (!app || app.deletedAt || await isBlockedBetween(ctx, id, app.ownerId)) continue;
+      if (
+        (args.dataset === "appReleases" ||
+          args.dataset === "appCollaborators") &&
+        "applicationId" in row
+      ) {
+        const app = row.applicationId && (await ctx.db.get(row.applicationId));
+        if (
+          !app ||
+          app.deletedAt ||
+          (await isBlockedBetween(ctx, id, app.ownerId))
+        )
+          continue;
         if (args.dataset === "appReleases" && app.ownerId !== id) {
-          const grant = await ctx.db.query("appCollaborators").withIndex("by_app_user", q => q.eq("applicationId", app._id).eq("userId", id)).unique();
+          const grant = await ctx.db
+            .query("appCollaborators")
+            .withIndex("by_app_user", (q) =>
+              q.eq("applicationId", app._id).eq("userId", id),
+            )
+            .unique();
           if (!grant?.accepted || grant.ownerId !== app.ownerId) continue;
         }
       }
@@ -101,7 +194,9 @@ export const personalPage = query({
       )
         continue;
       if (
-        (args.dataset === "sharedDocuments" || args.dataset === "workTasks") &&
+        (args.dataset === "sharedDocuments" ||
+          args.dataset === "workTasks" ||
+          args.dataset === "whiteboards") &&
         "containerType" in row &&
         row.containerType &&
         "containerId" in row &&

@@ -19,6 +19,7 @@ export type UploadClaim =
   | "server_icon"
   | "server_banner"
   | "server_emoji"
+  | "social_sticker"
   | "bot_icon"
   | "bot_banner";
 // Bot assets use the same ownership and single-claim rules as other uploads.
@@ -36,9 +37,14 @@ const SAFE_CONTENT_TYPES = new Set([
 export function isAllowedUploadType(contentType: string): boolean {
   const normalized = contentType.toLowerCase().split(";", 1)[0].trim();
   return (
-    ["image/png", "image/apng", "image/jpeg", "image/gif", "image/webp", "image/avif"].includes(
-      normalized,
-    ) ||
+    [
+      "image/png",
+      "image/apng",
+      "image/jpeg",
+      "image/gif",
+      "image/webp",
+      "image/avif",
+    ].includes(normalized) ||
     normalized.startsWith("video/") ||
     normalized.startsWith("audio/") ||
     SAFE_CONTENT_TYPES.has(normalized)
@@ -73,7 +79,8 @@ export async function requireOwnedUpload(
   const requester =
     upload && upload.ownerId !== ownerId ? await ctx.db.get(ownerId) : null;
   const application =
-    requester?.botApplicationId && upload?.applicationId === requester.botApplicationId
+    requester?.botApplicationId &&
+    upload?.applicationId === requester.botApplicationId
       ? await ctx.db.get(requester.botApplicationId)
       : null;
   if (

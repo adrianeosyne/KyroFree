@@ -404,6 +404,11 @@ export function useMutation(reference) {
       window.fixtureMutations.push({ name, args });
       if (window.fixtureMutationDelay?.[name]) await new Promise(resolve => setTimeout(resolve, window.fixtureMutationDelay[name]));
       if (mutationErrors[name]) throw new Error(mutationErrors[name]);
+      if (name === "whiteboards:create") {
+        const board = { _id: "fixture-board", ...args, userId: "me", mine: true, canEdit: true, revision: 1, updatedById: "me", updatedByName: "Alex", createdAt: Date.now(), updatedAt: Date.now() };
+        window.setFixtureQueries({ "whiteboards:list": [board], "whiteboards:info": board });
+        return board._id;
+      }
       if (name === "attentionSettings:save") {
         const current = queryOverrides["attentionSettings:get"] ?? data["attentionSettings:get"] ?? defaultAttentionFixture;
         if (current.revision !== args.expectedRevision) throw new Error("Settings changed on another device.");
