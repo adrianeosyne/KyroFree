@@ -245,6 +245,8 @@ export const update = mutation({
       .first();
     if (existing && existing._id !== app.botUserId)
       botError(409, "USERNAME_TAKEN", "That username is already taken.");
+    if (app.stagingParentId && args.discoverable)
+      botError(400, "STAGING_ONLY", "Staging applications cannot appear in the directory.");
     const sameListing =
       app.directoryStatus === "approved" &&
       app.name === args.name.trim() &&
@@ -492,6 +494,11 @@ export const remove = mutation({
       app.botUserId,
     );
     await auditBot(ctx, app._id, "application.delete", app.ownerId);
+    await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("expansionLifecycle:cleanup"), { kind: "app", id: app._id });
+    if (app.stagingParentId) {
+      const parent = await ctx.db.get(app.stagingParentId);
+      if (parent?.stagingApplicationId === app._id) await ctx.db.patch(parent._id, { stagingApplicationId: undefined });
+    }
   },
 });
 export const directory = query({
@@ -613,6 +620,8 @@ export const install = mutation({
     const app = await ctx.db.get(args.applicationId);
     if (!app || !app.enabled || app.suspended || app.deletedAt)
       botError(404, "NOT_FOUND", "Bot unavailable.");
+    if (app.stagingParentId && args.serverId !== app.sandboxServerId)
+      botError(403, "STAGING_ONLY", "Staging bots can only be installed in their private test community.");
     await activeBot(ctx, app.tokenHash ?? "");
     const banned = await ctx.db
       .query("bans")

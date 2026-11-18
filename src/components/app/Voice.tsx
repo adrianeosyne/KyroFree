@@ -238,7 +238,7 @@ export function IncomingCallBanner() {
   useEffect(() => {
     const ringing = call !== null;
     if (ringing && !wasRinging.current) {
-      if (useUiStore.getState().callSounds) playNotificationPing();
+      if (useUiStore.getState().callSounds) playNotificationPing("calls");
     }
     wasRinging.current = ringing;
   }, [call]);

@@ -147,6 +147,7 @@ botTriggers.register("messages", async (ctx, change) => {
 botTriggers.register("serverMembers", async (ctx, change) => {
   const member = change.newDoc ?? change.oldDoc;
   const activity = await memberActivity(ctx, member.serverId, member.userId);
+  if (change.operation === "delete") await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("expansionLifecycle:cleanupMember"), { serverId: member.serverId, userId: member.userId, stage: 0, cursor: null });
   await ctx.db.patch(activity._id, { active: change.operation !== "delete" });
   const server = await ctx.db.get(member.serverId);
   if (server?.isPlatformHome) {

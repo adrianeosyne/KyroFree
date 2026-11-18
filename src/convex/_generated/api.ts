@@ -18,6 +18,9 @@ import type * as advancedMessages from "../advancedMessages.js";
 import type * as advancedSchema from "../advancedSchema.js";
 import type * as advancedValidation from "../advancedValidation.js";
 import type * as applications from "../applications.js";
+import type * as appReleases from "../appReleases.js";
+import type * as attentionSchema from "../attentionSchema.js";
+import type * as attentionSettings from "../attentionSettings.js";
 import type * as auth from "../auth.js";
 import type * as auth_config from "../auth.config.js";
 import type * as auth_emailOtp from "../auth/emailOtp.js";
@@ -46,6 +49,8 @@ import type * as communityDecorations from "../communityDecorations.js";
 import type * as communityHub from "../communityHub.js";
 import type * as communityKnowledge from "../communityKnowledge.js";
 import type * as communityMigration from "../communityMigration.js";
+import type * as competitions from "../competitions.js";
+import type * as competitionSchema from "../competitionSchema.js";
 import type * as conversations from "../conversations.js";
 import type * as crons from "../crons.js";
 import type * as dataPortability from "../dataPortability.js";
@@ -59,6 +64,7 @@ import type * as emailRefs from "../emailRefs.js";
 import type * as emailVerification from "../emailVerification.js";
 import type * as emailVerificationInternal from "../emailVerificationInternal.js";
 import type * as emojis from "../emojis.js";
+import type * as expansionLifecycle from "../expansionLifecycle.js";
 import type * as fileAccess from "../fileAccess.js";
 import type * as fileHttp from "../fileHttp.js";
 import type * as files from "../files.js";
@@ -88,6 +94,7 @@ import type * as premiumBenefits from "../premiumBenefits.js";
 import type * as premiumCodes from "../premiumCodes.js";
 import type * as presence from "../presence.js";
 import type * as privacyControls from "../privacyControls.js";
+import type * as releaseSchema from "../releaseSchema.js";
 import type * as reports from "../reports.js";
 import type * as roles from "../roles.js";
 import type * as schema from "../schema.js";
@@ -133,6 +140,9 @@ const fullApi: ApiFromModules<{
   "advancedSchema": typeof advancedSchema,
   "advancedValidation": typeof advancedValidation,
   "applications": typeof applications,
+  "appReleases": typeof appReleases,
+  "attentionSchema": typeof attentionSchema,
+  "attentionSettings": typeof attentionSettings,
   "auth": typeof auth,
   "auth.config": typeof auth_config,
   "auth/emailOtp": typeof auth_emailOtp,
@@ -161,6 +171,8 @@ const fullApi: ApiFromModules<{
   "communityHub": typeof communityHub,
   "communityKnowledge": typeof communityKnowledge,
   "communityMigration": typeof communityMigration,
+  "competitions": typeof competitions,
+  "competitionSchema": typeof competitionSchema,
   "conversations": typeof conversations,
   "crons": typeof crons,
   "dataPortability": typeof dataPortability,
@@ -174,6 +186,7 @@ const fullApi: ApiFromModules<{
   "emailVerification": typeof emailVerification,
   "emailVerificationInternal": typeof emailVerificationInternal,
   "emojis": typeof emojis,
+  "expansionLifecycle": typeof expansionLifecycle,
   "fileAccess": typeof fileAccess,
   "fileHttp": typeof fileHttp,
   "files": typeof files,
@@ -203,6 +216,7 @@ const fullApi: ApiFromModules<{
   "premiumCodes": typeof premiumCodes,
   "presence": typeof presence,
   "privacyControls": typeof privacyControls,
+  "releaseSchema": typeof releaseSchema,
   "reports": typeof reports,
   "roles": typeof roles,
   "schema": typeof schema,

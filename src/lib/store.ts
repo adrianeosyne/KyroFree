@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { findAppTint } from "./tints";
+import { attentionTheme } from "./attention";
 
 /**
  * Ephemeral interface state: layout toggles, overlays and drafts.
@@ -170,8 +171,9 @@ export function applyPreferences(prefs: Preferences) {
   const prefersDark = window.matchMedia?.(
     "(prefers-color-scheme: dark)",
   ).matches;
+  const effectiveTheme = attentionTheme() ?? prefs.theme;
   const dark =
-    prefs.theme === "dark" || (prefs.theme === "system" && prefersDark);
+    effectiveTheme === "dark" || (effectiveTheme === "system" && prefersDark);
   root.classList.toggle("dark", dark);
   root.dataset.accent = prefs.accent === "default" ? "" : prefs.accent;
   root.dataset.density = prefs.density;

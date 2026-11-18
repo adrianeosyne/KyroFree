@@ -168,6 +168,8 @@ export const requestTransfer = mutation({
     const app = await ownerApp(ctx, args.applicationId);
     if (args.confirmation !== app.name)
       botError(400, "CONFIRMATION_REQUIRED", "Type the application name.");
+    if (app.stagingParentId || app.stagingApplicationId)
+      botError(409, "STAGING_LINKED", "Delete the linked staging application before transferring ownership.");
     const user = await ctx.db
       .query("users")
       .withIndex("by_username", (q) =>
@@ -212,6 +214,8 @@ export const acceptTransfer = mutation({
     if (!app || app.deletedAt || app.transferTo !== id)
       botError(404, "NOT_FOUND", "Transfer unavailable.");
     if (args.accept) {
+      if (app.stagingParentId || app.stagingApplicationId)
+        botError(409, "STAGING_LINKED", "Delete the linked staging application before transferring ownership.");
       if (
         (
           await ctx.db

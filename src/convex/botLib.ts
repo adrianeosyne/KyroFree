@@ -197,6 +197,7 @@ export async function auditBot(
   });
 }
 export async function publicBot(ctx: Ctx, app: Doc<"botApplications">) {
+  const release = app.activeReleaseId ? await ctx.db.get(app.activeReleaseId) : null;
   const [bot, owner, installs] = await Promise.all([
     ctx.db.get(app.botUserId),
     ctx.db.get(app.ownerId),
@@ -207,6 +208,9 @@ export async function publicBot(ctx: Ctx, app: Doc<"botApplications">) {
   ]);
   return {
     id: app._id,
+    version: release?.version ?? null,
+    changelog: release?.changelog ?? null,
+    releaseSourceUrl: release?.sourceUrl ?? null,
     botId: app.botUserId,
     name: app.name,
     description: app.description,

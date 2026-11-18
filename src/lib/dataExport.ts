@@ -1,4 +1,12 @@
 export const exportDatasets = [
+  "attentionSettings",
+  "gamingClans",
+  "clanMemberships",
+  "gamingTournaments",
+  "tournamentRegistrations",
+  "competitionStats",
+  "appCollaborators",
+  "appReleases",
   "savedCollections",
   "savedMessages",
   "scheduledMessages",

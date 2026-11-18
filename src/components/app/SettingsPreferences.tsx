@@ -1,4 +1,5 @@
 import { NotificationSoundUpload } from "./NotificationSoundUpload";
+import { AttentionSettings } from "./AttentionSettings";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bell,
@@ -197,6 +198,7 @@ export function NotificationSettings() {
   return (
     <>
       <NotificationSoundUpload />
+      <AttentionSettings />
       <SettingsGroup
         title="Stay in the loop"
         description="Choose what makes a sound. These preferences are saved on this device."
@@ -240,7 +242,7 @@ export function NotificationSettings() {
             size="sm"
             className="mt-5"
             disabled={volume === 0}
-            onClick={() => playNotificationPing()}
+            onClick={() => playNotificationPing("preview")}
           >
             <Bell className="mr-2 size-4" />
             Preview sound

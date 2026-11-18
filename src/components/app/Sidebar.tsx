@@ -303,6 +303,7 @@ function ServerSection({ serverId }: { serverId: string }) {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate(`/dashboard/s/${serverId}/knowledge`)}><BookOpen className="size-4" />Wiki and suggestions</DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate(`/dashboard/s/${serverId}/gaming`)}><Users className="size-4" />Party Finder</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/dashboard/s/${serverId}/competitions`)}><Users className="size-4" />Clans and tournaments</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setHubSection("tickets")}>
                 <MessageCircle className="size-4" />
                 Support tickets
@@ -878,6 +879,7 @@ function HomeSection() {
         <Compass className="size-4" />
         Bot directory
       </NavLink>
+      <NavLink to="/dashboard/developer-releases" className={({ isActive }) => cn("mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm hover:bg-sidebar-accent/60", isActive ? "bg-primary/12 font-semibold text-primary" : "text-muted-foreground hover:text-foreground")}><BookOpen className="size-4" />Releases and teams</NavLink>
       <NavLink
         to="/dashboard/developers"
         className={({ isActive }) =>

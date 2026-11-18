@@ -1,5 +1,6 @@
 import { checkCommunity, checkOffline } from "../tests/ui/community-checks.mjs";
 import { checkAdvanced } from "../tests/ui/advanced-checks.mjs";
+import { checkExpansion } from "../tests/ui/expansion-checks.mjs";
 import { checkFeatures } from "../tests/ui/feature-checks.mjs";
 import { checkReleasePromotion } from "../tests/ui/premium-release-checks.mjs";
 import { createServer } from "vite";
@@ -96,6 +97,12 @@ await context.route(/^https?:\/\/(?!127\.0\.0\.1:5187)/, (route) =>
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
+if (process.argv.includes("--expansion")) {
+  try { await checkExpansion(page); assert.deepEqual(errors, []); }
+  catch (error) { await page.screenshot({ path: "test-results/expansion-failure.png" }); console.error(errors, (await page.locator("body").innerText()).slice(-2200)); throw error; }
+  finally { await browser.close(); await server.close(); }
+  process.exit(0);
+}
 if (process.argv.includes("--community")) {
   try {
     await checkCommunity(page);

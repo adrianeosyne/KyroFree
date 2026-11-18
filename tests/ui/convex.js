@@ -1,6 +1,7 @@
 import { LOBBY_DEFAULTS } from "../../src/lib/lobby";
 import { WORKSPACE_DEFAULTS } from "../../src/lib/workspaceTheme";
 import { getFunctionName } from "convex/server";
+import { defaultAttention } from "../../src/lib/attention";
 import { useState, useSyncExternalStore } from "react";
 
 const person = (id, name, presence, customStatus = null) => ({
@@ -314,6 +315,7 @@ export function useQuery(reference, args) {
   const name = getFunctionName(reference);
   if (queryErrors[name]) throw new Error(queryErrors[name]);
   if (Object.hasOwn(queryOverrides, name)) return queryOverrides[name];
+  if (name === "attentionSettings:get" && !data[name]) return defaultAttentionFixture;
   if (name === "advancedMessages:privateState") return data[`private:${args.containerType}:${args.containerId}`] ?? data[name];
   if (
     name === "messages:list" &&
@@ -357,6 +359,7 @@ export function useQuery(reference, args) {
   return Object.hasOwn(data, name) ? data[name] : empty;
 }
 export function usePaginatedQuery(reference, args, options) {
+  useSyncExternalStore(subscribeQueries, querySnapshot);
   useSyncExternalStore(subscribe, () => fixtureRevision);
   const name = getFunctionName(reference);
   if (args !== "skip" && queryErrors[name]) throw new Error(queryErrors[name]);
@@ -392,6 +395,7 @@ export function usePaginatedQuery(reference, args, options) {
 }
 
 const mutations = new Map();
+const defaultAttentionFixture = { ...defaultAttention, revision: 0 };
 export function useMutation(reference) {
   const name = getFunctionName(reference);
   if (!mutations.has(name))
@@ -400,6 +404,12 @@ export function useMutation(reference) {
       window.fixtureMutations.push({ name, args });
       if (window.fixtureMutationDelay?.[name]) await new Promise(resolve => setTimeout(resolve, window.fixtureMutationDelay[name]));
       if (mutationErrors[name]) throw new Error(mutationErrors[name]);
+      if (name === "attentionSettings:save") {
+        const current = queryOverrides["attentionSettings:get"] ?? data["attentionSettings:get"] ?? defaultAttentionFixture;
+        if (current.revision !== args.expectedRevision) throw new Error("Settings changed on another device.");
+        const { expectedRevision, ...policy } = args;
+        window.setFixtureQueries({ "attentionSettings:get": { ...policy, revision: expectedRevision + 1 } });
+      }
       if (name === "advancedMessages:savePrivate") {
         const key = `private:${args.containerType}:${args.containerId}`;
         const current = data[key] ?? data["advancedMessages:privateState"];

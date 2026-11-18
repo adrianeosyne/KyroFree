@@ -54,6 +54,7 @@ import {
   useBotTask,
 } from "@/components/app/BotPlatformShared";
 
+import { ReleasePanel } from "@/components/app/ReleaseWorkspace";
 type App = FunctionReturnType<typeof api.botApplications.get>;
 const tabs = [
   "Overview",
@@ -74,6 +75,7 @@ const tabs = [
   "Integrations",
   "Developer Settings",
   "Sandbox",
+  "Releases and Team",
 ];
 export default function Developers() {
   const { applicationId } = useParams();
@@ -403,6 +405,7 @@ function ApplicationEditor({ app }: { app: App }) {
           {tab === "Analytics" && <DeveloperAnalytics applicationId={app.id} />}
           {tab === "Developer Settings" && <DeveloperSettings app={app} />}
           {tab === "Sandbox" && <DeveloperSandbox app={app} />}
+          {tab === "Releases and Team" && <ReleasePanel key={app.id} applicationId={app.id} />}
           {tab === "Integrations" && (
             <BotPanel
               title="Connect your infrastructure"

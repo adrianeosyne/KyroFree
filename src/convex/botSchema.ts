@@ -20,6 +20,9 @@ const commandOptionValidator = v.object({
 
 export const botTables = {
   botApplications: defineTable({
+    activeReleaseId: v.optional(v.id("appReleases")),
+    stagingApplicationId: v.optional(v.id("botApplications")),
+    stagingParentId: v.optional(v.id("botApplications")),
     ownerId: v.id("users"),
     botUserId: v.id("users"),
     name: v.string(),

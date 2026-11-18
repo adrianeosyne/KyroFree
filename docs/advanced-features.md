@@ -8,6 +8,30 @@ and the remaining work.
 
 ## Using the features
 
+- In **Settings → Notifications**, edit notification profiles, timezone and
+  quiet hours, or schedule light/dark themes. These choices sync to your
+  account. Quiet hours suppress mention/call sounds while the inbox still
+  receives notifications. Overnight hours belong to the day they start.
+  Other-device changes require loading the latest settings before saving.
+- Open **Releases and teams** from the sidebar, or **Releases and Team** in
+  an application editor. Owners invite collaborators and activate immutable
+  production releases; activation updates the bot profile and announces the
+  version to installers. Viewers read releases; accepted maintainers publish
+  staging release notes. Changing a collaborator's role requires acceptance
+  again. Credentials and deployment of bot code remain with the owner.
+- Owners can create a separate staging bot and private test community. It
+  uses a separate credential and one existing application slot. Staging bots
+  cannot install outside that test community. Delete the linked staging bot
+  before transferring application ownership. Staging release notes do not
+  automatically deploy or promote executable bot code.
+- Use a community's menu → **Clans and tournaments** to create/join teams,
+  approve requests or register for a tournament. Individual entrants receive
+  a single-elimination bracket seeded by registration order, with byes.
+  Registration closes at the scheduled time; the host or a community manager
+  starts the bracket and records decisive scores. Results reject stale writes
+  and cannot be overwritten. Completion records participation and wins once
+  in the community/game leaderboard. This does not import external game stats.
+
 - In a conversation, use **Message expiry** before sending temporary content,
   or the clock button to **Schedule text message**. Enter an IANA timezone such
   as `Asia/Colombo`; the stored delivery time is a UTC instant. Attachments,
@@ -175,7 +199,9 @@ Deploy the Convex schema/functions **before** deploying the frontend that calls
 them. Use the project's authorized Convex production deployment process, then
 the normal Vercel frontend release process. Confirm index deployment, scheduler
 health and the retention cron in a staging deployment first. Git push does not
-deploy Convex. No cloud deployment was performed as part of this source change.
+deploy Convex. The November 18 continuation targets `giant-cricket-958`, which
+is labeled a dev deployment by Convex but is the backend configured on the
+live Vercel site. See the continuation report for rollout verification.
 
 Rollback the frontend first. Retain the additive tables/optional fields and
 the job handlers while pending scheduled work exists. Do not remove schema

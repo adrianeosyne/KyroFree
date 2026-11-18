@@ -16,6 +16,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { BOT_CATEGORIES } from "@/lib/botContract";
+import { renderMessage } from "@/lib/markdown";
 import {
   BotLoading,
   BotPanel,
@@ -136,6 +137,7 @@ export default function BotDirectory() {
                     )}
                     <p className="text-xs text-[#A0A6B5]">
                       {bot.category}
+                      {bot.version ? ` · v${bot.version}` : ""}
                       {bot.featured ? " · Featured" : ""}
                     </p>
                   </div>
@@ -237,6 +239,11 @@ function BotProfile({
             </div>
           </div>
           <p className="whitespace-pre-wrap text-sm">{bot.botDescription}</p>
+          {bot.version && <section className="space-y-3 rounded-lg border border-white/10 p-4">
+            <h2 className="font-semibold">Current release · {bot.version}</h2>
+            <div className="whitespace-pre-wrap break-words text-sm">{renderMessage(bot.changelog ?? "")}</div>
+            {bot.releaseSourceUrl && <a className="text-indigo-300 underline" href={bot.releaseSourceUrl} target="_blank" rel="noopener noreferrer">Release source</a>}
+          </section>}
           <p className="break-all font-mono text-xs text-[#A0A6B5]">
             Bot ID: {bot.botId}
           </p>

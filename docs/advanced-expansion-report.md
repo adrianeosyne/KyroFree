@@ -58,11 +58,10 @@ history and retains the documented legacy message/notification limits.
   library beyond wiki pages, custom domains and verified backup restoration.
 - **Social:** dedicated portfolios, sticker collections, shared social
   collections and further creator/profile activity controls.
-- **Gaming:** clans, tournaments/brackets/registration, game leaderboards/stats,
-  playtime/achievements, Minecraft/game-server and game-library integrations,
+- **Gaming:** external game stats, playtime/achievements,
+  Minecraft/game-server and game-library integrations,
   overlay/detection and streaming integration.
-- **Developers:** application releases/changelogs/update notifications,
-  collaborators/staging, general scheduled-task API, general OAuth2, hosted
+- **Developers:** general scheduled-task API, general OAuth2, hosted
   WebSocket transport and additional extension/plugin interfaces.
 - **Security:** WebAuthn passkey ceremony/provider, trusted-device approval,
   suspicious-login notifications, additional phishing/impersonation protection,
@@ -70,8 +69,8 @@ history and retains the documented legacy message/notification limits.
   verification for direct/group conversations.
 - **Productivity/platform:** file versioning, live collaborative code editor,
   whiteboard, project timelines and additional team activity; new split-screen,
-  multi-window/media pop-outs, notification profiles/quiet hours/grouping,
-  scheduled themes, Discord-export import and broader cache/offline sync.
+  multi-window/media pop-outs, notification grouping,
+  Discord-export import and broader cache/offline sync.
 
 These are not represented by placeholder buttons. Captions commonly rely on
 learned recognition models; no transcription provider was enabled under the
@@ -162,3 +161,49 @@ Known remaining risks: existing vendor chunk/annotation and Fast Refresh
 warnings; pre-existing bounded global search and legacy export; unbounded
 fan-out in some legacy deletion paths; plaintext local drafts; no verified
 native Android build without JDK 17/SDK 35; no live cloud migration/media QA.
+
+## November 18 continuation
+
+The continuation finishes the saved notification, application release/team,
+and competition work. The wider remaining-feature list above still applies;
+this is not a claim that the entire original expansion is complete.
+
+- Account notification profiles, quiet hours and scheduled themes now have
+  persisted settings, validated timezones, optimistic revisions and runtime
+  enforcement. Quiet hours control sounds, not delivery or unread counts.
+- Applications have accepted viewer/maintainer grants, immutable production
+  and staging changelogs, compare-and-set activation/rollback and bounded
+  installer update notifications. Active versions appear in bot profiles.
+  Isolated staging creates a separate bot credential and private test community;
+  publishing a release does not host or deploy the developer's executable code.
+- Communities have clans, private approval requests, tournaments with bounded
+  transactional registration, seeded brackets/byes and protected scoring.
+  Finished tournaments update game/community wins and participation once.
+  Removed members release clan and registration seats through bounded cleanup.
+- New personal datasets are included in the existing account export. Shared
+  records recheck access. App deletion removes grants/releases, and community/
+  account deletion removes new competition data in batches. Staging-linked
+  applications must unlink through staging deletion before ownership transfer.
+
+Eight additive tables are defined in the attention, release and competition
+schema modules. Existing application rows use optional release/staging IDs.
+No new dependency, service credential or new Premium restriction was added;
+staging consumes the existing application quota.
+
+Verification: typecheck passed; 55 advanced tests passed across eight files;
+the expansion browser suite passed for settings conflicts and themes,
+release roles/activation, clan approval, scoring, leaderboards and desktop/
+phone light/dark layouts. The original advanced browser suite also passed.
+The full Vitest regression passed 208 tests across 23 files, including the
+owner-deletion regression. Lint passed with
+zero errors and 24 existing warnings. The web build passed; vendor chunk,
+dependency annotation and mixed static/dynamic release import warnings remain.
+Browser fixtures exercise real UI components with isolated RPC data.
+Native Android/Windows media and authenticated multi-device
+cloud behavior remain outside these fixture results.
+
+Rollout targets the verified live Convex backend `giant-cricket-958` (labeled
+dev by Convex) before the production Vercel project `kyro-free`, serving
+`kyro-chat.cyou`. Use `npx convex dev --once` for this configured deployment;
+`convex deploy` would select a different production deployment. The final
+delivery response records the actual deployed status and source commit.

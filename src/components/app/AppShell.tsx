@@ -1,4 +1,5 @@
 import { WorkspaceAppearance } from "./WorkspaceStudio";
+import { AttentionRuntime } from "./AttentionSettings";
 import { useQuery } from "convex/react";
 import {
   Bell,
@@ -219,6 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </div>
       <WorkspaceAppearance />
+      <AttentionRuntime />
       <ConnectionBanner />
       <PremiumExpiryBanner premiumUntil={me?.premiumUntil} />
       <div className="flex min-h-0 flex-1">

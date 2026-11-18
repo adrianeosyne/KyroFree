@@ -1,4 +1,7 @@
 import { socialGamingTables } from "./socialGamingSchema";
+import { attentionTables } from "./attentionSchema";
+import { releaseTables } from "./releaseSchema";
+import { competitionTables } from "./competitionSchema";
 import { workspaceValidator } from "./workspaceSchema";
 import { authTables } from "@convex-dev/auth/server";
 import { defineSchema, defineTable } from "convex/server";
@@ -41,6 +44,9 @@ const schema = defineSchema(
     // default auth tables using convex auth.
     ...authTables, // do not remove or modify
     ...botTables,
+    ...attentionTables,
+    ...releaseTables,
+    ...competitionTables,
 
     // the users table is the default users table that is brought in by the authTables
     users: defineTable({

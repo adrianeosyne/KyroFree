@@ -44,6 +44,8 @@ async function cancelPending(ctx: MutationCtx, id: Id<"_scheduled_functions">) {
 
 /** Parents are removed first; every product read rechecks the parent or owner. */
 export async function queueCleanup(ctx: MutationCtx, job: Job) {
+  if ((job.kind === "user" || job.kind === "server") && job.stage === undefined)
+    await ctx.scheduler.runAfter(0, makeFunctionReference<"mutation">("expansionLifecycle:cleanup"), { kind: job.kind, id: job.id });
   await ctx.scheduler.runAfter(0, worker, job);
 }
 
@@ -187,7 +189,7 @@ export const cleanup = internalMutation({
     }
     if (args.kind === "user") {
       const userId = args.id as Id<"users">;
-      stages = 21;
+      stages = 22;
       switch (stage) {
         case 0:
           rows = await ctx.db
@@ -273,6 +275,7 @@ export const cleanup = internalMutation({
               "conversationFolders",
               "conversationNotes",
               "messageDrafts",
+              "attentionSettings",
             ] as const
           )[stage - 12];
           rows = await ctx.db

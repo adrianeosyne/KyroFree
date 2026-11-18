@@ -4,6 +4,7 @@
  * call site (see AppShell).
  */
 import { useUiStore } from "./store";
+import { allowAlert } from "./attention";
 
 let context: AudioContext | null = null;
 let customSoundUrl: string | null = null;
@@ -14,8 +15,9 @@ export function setNotificationSound(url: string | null) {
   customAudio = null;
 }
 
-export function playNotificationPing(): void {
+export function playNotificationPing(kind: "mentions" | "calls" | "preview" = "mentions"): void {
   if (typeof window === "undefined") return;
+  if (kind !== "preview" && !allowAlert(kind)) return;
   try {
     if (customSoundUrl) {
       customAudio?.pause();

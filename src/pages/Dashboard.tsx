@@ -27,7 +27,9 @@ import Developers from "./Developers";
 import BotDirectory, { BotAuthorization } from "./BotDirectory";
 
 const SocialHub = lazy(() => import("@/components/app/SocialHub").then(m => ({ default: m.SocialHub })));
+const ReleaseWorkspace = lazy(() => import("@/components/app/ReleaseWorkspace").then(m => ({ default: m.ReleaseWorkspace })));
 const GameHub = lazy(() => import("@/components/app/GameHub").then(m => ({ default: m.GameHub })));
+const CompetitionHub = lazy(() => import("@/components/app/CompetitionHub").then(m => ({ default: m.CompetitionHub })));
 const PersonalLibrary = lazy(() => import("@/components/app/PersonalLibrary").then(m => ({ default: m.PersonalLibrary })));
 const CommunityKnowledgePage = lazy(() => import("@/components/app/CommunityKnowledgePage").then(m => ({ default: m.CommunityKnowledgePage })));
 
@@ -66,7 +68,9 @@ export default function Dashboard() {
           <Routes>
             <Route index element={<FriendsView />} />
             <Route path="social" element={<SocialHub />} />
+            <Route path="developer-releases" element={<ReleaseWorkspace />} />
             <Route path="s/:serverId/gaming" element={<GamingRoute />} />
+            <Route path="s/:serverId/competitions" element={<CompetitionRoute />} />
             <Route path="library" element={<PersonalLibrary />} />
             <Route path="s/:serverId/knowledge" element={<KnowledgeRoute />} />
             <Route path="chats" element={<MobileChatsView />} />
@@ -291,3 +295,4 @@ function LobbyRoute() {
 function KnowledgeRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><CommunityKnowledgePage /></MembershipGate> : <Navigate to="/dashboard" replace />; }
 
 function GamingRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><GameHub /></MembershipGate> : <Navigate to="/dashboard" replace />; }
+function CompetitionRoute() { const { serverId } = useParams(); return serverId ? <MembershipGate serverId={serverId}><CompetitionHub serverId={serverId as Id<"servers">} /></MembershipGate> : <Navigate to="/dashboard" replace />; }
